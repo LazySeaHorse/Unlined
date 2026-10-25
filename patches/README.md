@@ -5,9 +5,9 @@ the unminified `mathlive.mjs` in every mode (see `vite.config.ts`), so that is t
 
 ## mathlive
 
-- **Caret into an empty argument.** `ModeEditor.insert` meant to put the caret inside a command's empty
-  argument but selected one offset too far, taking in the whole command. `\hat` committed from LaTeX mode
-  then lost its argument: the next key replaced the accent or landed beside it.
+- **Caret into an empty argument.** `MathModeEditor.insert` meant to put the caret inside a command's
+  empty argument but selected one offset too far, taking in the whole command. `\hat` committed from LaTeX
+  mode then lost its argument: the next key replaced the accent or landed beside it.
 - **Balanced drag selection.** `extendSelectionTo` only grew a drag to whole fractions, scripts and accents,
   so a drag across a square root, parentheses or integral limits ended at a different depth than it began,
   highlighting and copying only part of the math. `balanceRange` lifts both ends to the same branch; ends
