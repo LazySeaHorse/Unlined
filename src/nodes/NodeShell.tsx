@@ -25,6 +25,8 @@ interface NodeShellProps {
   toolbar?: ReactNode;
   /** Controls on the tab line, shown while the node is hovered or selected; hidden in read-only mode. */
   actions?: ReactNode;
+  /** The actions stay when the canvas is zoomed out, where editing controls go: a video's play button. */
+  steadyActions?: boolean;
   resize?: {
     minWidth: number;
     minHeight: number;
@@ -51,6 +53,7 @@ export function NodeShell({
   customTitle,
   toolbar,
   actions,
+  steadyActions,
   resize,
   tint,
   live,
@@ -87,7 +90,12 @@ export function NodeShell({
             </div>
           )}
           {!readOnly && actions && (
-            <div className="node-actions nodrag ml-auto flex items-center gap-1 self-center">{actions}</div>
+            <div
+              className="node-actions nodrag ml-auto flex items-center gap-1 self-center"
+              data-steady={steadyActions || undefined}
+            >
+              {actions}
+            </div>
           )}
         </div>
         <div

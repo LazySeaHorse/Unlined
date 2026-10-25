@@ -152,6 +152,32 @@ test('inserting a row keeps text cells as text', async ({ page }) => {
   await expect.poll(() => value(6)).toBe('\\text{two}');
 });
 
+test('a video keeps its play button when the canvas is zoomed out, unlike editing controls', async ({
+  page,
+}) => {
+  await page.route('https://www.youtube.com/**', (route) =>
+    route.fulfill({ contentType: 'text/html', body: '' }),
+  );
+  await page.getByRole('button', { name: 'Insert video', exact: true }).click();
+  await page.getByRole('textbox').fill('https://youtu.be/dQw4w9WgXcQ');
+  await page.getByRole('button', { name: 'OK' }).click();
+  await placeNode(page, 'Script', 300, 250);
+  await expect(nodes(page)).toHaveCount(2);
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('ControlOrMeta+a');
+  const play = nodes(page).getByRole('button', { name: 'Play' });
+  const run = nodes(page).getByRole('button', { name: 'Run' });
+  await expect(play).toBeVisible();
+  await expect(run).toBeVisible();
+  // Clicks made while the view is still animating can be lost, so keep zooming until the tier changes.
+  await expect(async () => {
+    await page.getByRole('button', { name: 'Zoom out' }).click();
+    await expect(page.locator('.react-flow[data-zoom="mid"]')).toHaveCount(1, { timeout: 400 });
+  }).toPass();
+  await expect(run).toBeHidden();
+  await expect(play).toBeVisible();
+});
+
 test('search dims non-matching nodes', async ({ page }) => {
   await placeNode(page, 'Text', 400, 300);
   await placeNode(page, 'Script', 900, 300);

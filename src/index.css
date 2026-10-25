@@ -586,8 +586,8 @@ math-field::part(virtual-keyboard-toggle) {
     opacity var(--dur-fast),
     visibility var(--dur-fast);
 }
-/* Zoomed out the controls fade away, even on hover, instead of popping out. */
-[data-zoom="mid"] .node-actions {
+/* Zoomed out the controls fade away, even on hover, instead of popping out; steady ones (playback) stay. */
+[data-zoom="mid"] .node-actions:not([data-steady]) {
   visibility: hidden;
   pointer-events: none;
 }
@@ -595,7 +595,7 @@ math-field::part(virtual-keyboard-toggle) {
 .react-flow__node.selected .node-actions {
   opacity: 1;
 }
-[data-zoom="mid"] .node .node-actions {
+[data-zoom="mid"] .node .node-actions:not([data-steady]) {
   opacity: 0;
 }
 .react-flow__node.selected .node-tab {
