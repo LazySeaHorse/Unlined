@@ -80,7 +80,7 @@ function ColorPicker({ value, onChange }: { value: SectionColor; onChange: (colo
         <Popover.Content
           align="end"
           sideOffset={6}
-          className="z-50 rounded-xl border border-border bg-surface p-2 shadow-xl"
+          className="pop z-50 rounded-xl border border-border bg-surface p-2 shadow-xl"
         >
           <ColorSwatches value={value} onChange={onChange} />
         </Popover.Content>

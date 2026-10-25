@@ -43,7 +43,7 @@ export function Modal({
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50" />
+        <Dialog.Overlay className="fade fixed inset-0 z-40 bg-black/50" />
         <Dialog.Content
           aria-describedby={undefined}
           // Radix focuses the first tabbable (the close chip) on open; let content opt in to a better target.
@@ -57,7 +57,7 @@ export function Modal({
             target.focus();
           }}
           className={cn(
-            'fixed top-1/2 left-1/2 z-50 flex w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[18px] border border-border bg-surface text-fg shadow-2xl',
+            'pop fixed top-1/2 left-1/2 z-50 flex w-[calc(100vw-2rem)] -translate-x-1/2 -translate-y-1/2 flex-col overflow-hidden rounded-[18px] border border-border bg-surface text-fg shadow-2xl',
             size === 'large' ? 'h-[92vh] max-w-6xl' : 'max-h-[85vh] max-w-md',
             className,
           )}

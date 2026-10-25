@@ -38,7 +38,7 @@ export function WithTooltip({ label, children }: { label: ReactNode; children: R
       <Tooltip.Portal>
         <Tooltip.Content
           sideOffset={6}
-          className="z-50 rounded-lg bg-fg px-2 py-1 text-xs text-canvas shadow-md"
+          className="pop z-50 rounded-lg bg-fg px-2 py-1 text-xs text-canvas shadow-md"
         >
           {label}
         </Tooltip.Content>

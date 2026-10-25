@@ -140,7 +140,7 @@ function NodeTitle({ fallback, value, color }: { fallback: string; value?: strin
           onOpenAutoFocus={(e) => e.preventDefault()}
           onCloseAutoFocus={(e) => e.preventDefault()}
           aria-label="Node colour"
-          className="z-50 rounded-xl border border-border bg-surface p-2 shadow-xl"
+          className="pop z-50 rounded-xl border border-border bg-surface p-2 shadow-xl"
         >
           <ColorSwatches value={color} onChange={recolour} onClear={() => recolour(undefined)} />
         </Popover.Content>

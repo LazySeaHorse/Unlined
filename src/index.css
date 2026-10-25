@@ -209,6 +209,13 @@ body,
   --xy-resize-background-color: transparent;
 }
 
+/* Search dims and restores gently rather than blinking. */
+.react-flow__node,
+.react-flow__edge {
+  transition:
+    opacity var(--dur) ease-out,
+    filter var(--dur) ease-out;
+}
 /* Read-only nodes are not selectable, which makes React Flow ignore pointer events on them.
    Keep links, embedded videos and scrollable output usable; dragging still pans the canvas. */
 .react-flow.read-only .react-flow__node {
@@ -222,6 +229,58 @@ body,
 }
 .react-flow__edge.search-miss {
   opacity: 0.25;
+}
+/* While nodes glide to new places (motion/useGlide), links routed to where they land wait out of sight. */
+.react-flow__edges,
+.react-flow__edgelabel-renderer {
+  transition: opacity var(--dur-fast) ease-out;
+}
+.react-flow.gliding :is(.react-flow__edges, .react-flow__edgelabel-renderer) {
+  opacity: 0;
+}
+
+/*
+ * Popups (menus, popovers, tooltips, dialogs) grow from where they open and fade out quicker than they came.
+ * Radix keeps a closing popup mounted until its animation ends. Without motion they simply appear and go.
+ */
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    scale: 0.98;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pop {
+    transform-origin: var(--radix-popper-transform-origin, center);
+  }
+  .pop:is([data-state="open"], [data-state="delayed-open"]) {
+    animation: pop-in var(--dur-fast) var(--ease-spring);
+  }
+  .pop[data-state="closed"] {
+    animation: pop-out 80ms var(--ease-exit) forwards;
+  }
+  .fade[data-state="open"] {
+    animation: fade-in var(--dur) ease-out;
+  }
+  .fade[data-state="closed"] {
+    animation: fade-out var(--dur-fast) var(--ease-exit) forwards;
+  }
 }
 
 /*
@@ -449,7 +508,11 @@ math-field::part(virtual-keyboard-toggle) {
 /* Tone changes (hover, focus, tint) fade. */
 .node-tab,
 .node-tile {
-  transition: background-color 0.15s;
+  transition:
+    background-color var(--dur-fast),
+    color var(--dur-fast),
+    outline-color var(--dur-fast),
+    box-shadow var(--dur);
 }
 
 /*
@@ -501,8 +564,9 @@ math-field::part(virtual-keyboard-toggle) {
  * Node states. Dark mode has no box-shadows, so selection and focus are outlines, and only the lift of a
  * dragged node uses a shadow (a bonus in light mode). Everything animates transform or opacity.
  */
+/* Put down, a node settles with a slight overshoot; picked up, it lifts quickly (see .dragging below). */
 .node {
-  transition: transform 0.18s var(--ease-spring);
+  transition: transform var(--dur-move) var(--ease-bounce);
 }
 /* A section is an empty tile; its dashed edge says it only holds other nodes. */
 .node-section {
@@ -514,14 +578,21 @@ math-field::part(virtual-keyboard-toggle) {
 }
 .node-actions {
   opacity: 0;
-  transition: opacity 0.14s;
+  transition:
+    opacity var(--dur-fast),
+    visibility var(--dur-fast);
 }
+/* Zoomed out the controls fade away, even on hover, instead of popping out. */
 [data-zoom="mid"] .node-actions {
-  display: none;
+  visibility: hidden;
+  pointer-events: none;
 }
 .node:is(:hover, :focus-within) .node-actions,
 .react-flow__node.selected .node-actions {
   opacity: 1;
+}
+[data-zoom="mid"] .node .node-actions {
+  opacity: 0;
 }
 .react-flow__node.selected .node-tab {
   --tab: var(--fg);
@@ -558,6 +629,7 @@ math-field::part(virtual-keyboard-toggle) {
 .react-flow__node.dragging .node {
   transform: translateY(-4px) rotate(-0.4deg);
   transform-origin: 1.5rem 0;
+  transition: transform var(--dur) var(--ease-spring);
 }
 .react-flow__node.dragging .node-tile {
   box-shadow: var(--elevation-lift);
