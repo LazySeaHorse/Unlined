@@ -149,6 +149,8 @@ const LINES = '\\displaylines{C_1=5p_1+3p_2+6p_3\\\\ C_2=3p_1+5p_2+4p_3\\\\ C_3=
 
 /** The centre of each glyph drawn in a math field, line by line from the top. */
 async function glyphLines(field: Locator) {
+  // MathLive draws a new value on the next frame; the layout settles on the one after.
+  await field.evaluate(() => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))));
   const glyphs = await field.evaluate((el) =>
     [...(el.shadowRoot?.querySelectorAll('span') ?? [])]
       .filter((s) => !s.children.length && s.textContent?.trim().replace('\u200b', ''))
