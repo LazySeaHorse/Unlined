@@ -18,5 +18,8 @@ the unminified `mathlive.mjs` in every mode (see `vite.config.ts`), so that is t
 - **Subscripts and superscripts under the pointer.** A script draws no box of its own, so
   `nearestAtomFromPointRecursive` skipped it and a drag over `p_3` stopped short of the `3`.
   `nearestChildFromPoint` looks inside it.
+- **Copying across lines.** `Model.getValue` serialized a range as one flat list of atoms, so math copied
+  from several lines of a multi-line field came out on one line. `serializeLines` keeps the lines, as
+  `\displaylines{a\\ b}`.
 
 When upgrading MathLive, re-apply these by hand to the new `mathlive.mjs` and run `npx patch-package mathlive`.

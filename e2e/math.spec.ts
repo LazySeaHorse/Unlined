@@ -194,6 +194,24 @@ test('a drag along a line of multi-line math takes in its subscripts and stops a
   await page.mouse.up();
 });
 
+test('math copied across lines keeps its line breaks', async ({ page }) => {
+  await placeNode(page, 'Math');
+  const field = nodes(page).locator('math-field');
+  await field.click();
+  await expect(field).toBeFocused();
+  await field.evaluate((el: HTMLElement & { setValue: (v: string) => void }, v) => el.setValue(v), LINES);
+  const [first, second] = await glyphLines(field);
+  const five = first[first.findIndex((g) => g.text === '=') + 1];
+  await page.mouse.move(five.x - 6, five.y);
+  await page.mouse.down();
+  await page.mouse.move(second[second.length - 1].right + 30, second[0].y, { steps: 10 });
+  await page.mouse.up();
+  await page.keyboard.press('ControlOrMeta+c');
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(
+    '\\displaylines{5p_1+3p_2+6p_3\\\\ C_2=3p_1+5p_2+4p_3}',
+  );
+});
+
 test('Ctrl+Z in a field steps back through the one canvas history, newest edit first', async ({ page }) => {
   await placeNode(page, 'Math', 400, 300);
   const field = nodes(page).locator('math-field');

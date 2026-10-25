@@ -1,5 +1,5 @@
 diff --git a/node_modules/mathlive/mathlive.mjs b/node_modules/mathlive/mathlive.mjs
-index 47351c7..b1d7e32 100644
+index 47351c7..d4aaad4 100644
 --- a/node_modules/mathlive/mathlive.mjs
 +++ b/node_modules/mathlive/mathlive.mjs
 @@ -34529,6 +34529,8 @@ function distance(x, y, r) {
@@ -80,6 +80,15 @@ index 47351c7..b1d7e32 100644
          } else {
            model.position = model.offsetOf(lastNewAtom);
          }
+@@ -38850,7 +38886,7 @@ var _Model = class {
+         defaultMode: this.mathfield.options.defaultMode
+       };
+       return joinLatex(
+-        ranges.map((range2) => Atom.serialize(this.getAtoms(range2), options))
++        ranges.map((range2) => serializeLines(this, range2, options))
+       );
+     }
+     return ranges.map(
 @@ -38901,6 +38937,7 @@ var _Model = class {
            parent = parent.parent;
          }
@@ -88,7 +97,7 @@ index 47351c7..b1d7e32 100644
        this._position = this.normalizeOffset(position);
        this._selection = {
          ranges: [[start, end]],
-@@ -39070,6 +39107,34 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
+@@ -39070,6 +39107,53 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
    }
    return false;
  }
@@ -119,6 +128,25 @@ index 47351c7..b1d7e32 100644
 +    if (j >= 0) return lift(i, j);
 +  }
 +  return lift(from.length - 1, to.length - 1);
++}
++function serializeLines(model, range2, options) {
++  const root = model.root;
++  const [start, end] = range2;
++  const lines = [];
++  if (root instanceof ArrayAtom && root.environmentName === "lines") {
++    for (const row of root.rows) {
++      const cell = row[0];
++      const from = Math.max(start, model.offsetOf(cell[0]));
++      const to = Math.min(end, model.offsetOf(cell[cell.length - 1]));
++      lines.push(from < to ? [from, to] : null);
++    }
++  }
++  const first = lines.findIndex(Boolean);
++  const last = lines.findLastIndex(Boolean);
++  if (first === last || start <= 0 && end >= model.lastOffset)
++    return Atom.serialize(model.getAtoms(range2), options);
++  const body = lines.slice(first, last + 1).map((line) => line ? Atom.serialize(model.getAtoms(line), options) : "");
++  return `\\displaylines{${body.join("\\\\ ")}}`;
 +}
  function childrenInRange(model, atom, range2) {
    if (!(atom == null ? void 0 : atom.hasChildren)) return false;
