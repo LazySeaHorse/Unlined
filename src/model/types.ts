@@ -50,12 +50,20 @@ export type NodeDataMap = {
     size?: number;
   };
   section: { title: string; color: SectionColor };
+  /**
+   * Cards on one spot, one shown at a time behind tabs. The stack owns the place and size; its members are
+   * ordinary nodes, in this order, whose own position and size wait unused until they leave the stack.
+   */
+  stack: { members: string[] };
 };
 
 export type NodeKind = keyof NodeDataMap;
 /** Distributes over unions, so `NodeOf<NodeKind>` is the union of every node type. */
 export type NodeOf<K extends NodeKind> = K extends NodeKind ? Node<NodeDataMap[K], K> : never;
 export type AppNode = NodeOf<NodeKind>;
+/** A node holding content of its own, with an optional title and tint: anything but a section or a stack. */
+export type CardNode = Exclude<AppNode, NodeOf<'section'> | NodeOf<'stack'>>;
+export const isCard = (node: AppNode): node is CardNode => node.type !== 'section' && node.type !== 'stack';
 
 /** What a link can have at either end. */
 export const LINK_ENDS = ['arrow', 'dot', 'bar', 'none'] as const;
@@ -108,6 +116,8 @@ export interface CanvasContent {
   groups?: CanvasGroup[];
   /** Omitted while the canvas has no links. */
   edges?: CanvasEdge[];
+  /** Which card each stack shows, by stack id. Not undoable; omitted until a stack has switched cards. */
+  fronts?: Record<string, string>;
 }
 
 export const DEFAULT_VIEWPORT: Viewport = { x: 0, y: 0, zoom: 1 };

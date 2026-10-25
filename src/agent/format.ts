@@ -1,7 +1,9 @@
+import { stackOf } from '@/lib/stacks';
 import type { AppEdge, AppNode, NodeDataMap } from '@/model/types';
 import { searchTextOf } from '@/nodes/factory';
 import type { LineResult, LinkInput } from '@/nodes/mathPlus/evaluate';
 import { splitLines } from '@/nodes/mathPlus/evaluate';
+import { useCanvasStore } from '@/store/canvasStore';
 import { nodeRect } from '@/store/groups';
 import { alias } from './aliases';
 
@@ -103,8 +105,10 @@ export function linksOf(node: AppNode, links: AppEdge[]): string {
     .join('; ');
 }
 
-/** Where a node is: "x,y w×h". */
+/** Where a node is: "x,y w×h", or for a card in a stack, "in stack n7". */
 export function placement(node: AppNode): string {
+  const stack = stackOf(useCanvasStore.getState().nodes, node.id);
+  if (stack) return `in stack ${alias(stack)}`;
   const r = nodeRect(node);
   return `${round(r.x)},${round(r.y)} ${round(r.width)}×${round(r.height)}`;
 }
@@ -170,5 +174,7 @@ export function nodeBody(node: AppNode, mathPlusResults?: LineResult[], inputs?:
       return pdfSummary(node.data);
     case 'section':
       return node.data.title;
+    case 'stack':
+      return `stack of ${node.data.members.map((id) => alias(id)).join(', ')}`;
   }
 }

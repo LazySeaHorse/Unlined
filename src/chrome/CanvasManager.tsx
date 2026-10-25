@@ -3,6 +3,7 @@ import { Boxes, Clock, Download, Library, Pencil, Plus, Search, Trash2 } from 'l
 import { useMemo, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { downloadJson, slugify } from '@/lib/files';
+import { placedNodes } from '@/lib/stacks';
 import { timeAgo } from '@/lib/time';
 import type { CanvasContent, CanvasMeta } from '@/model/types';
 import { listSyncRecords, loadContent } from '@/persistence/canvasRepo';
@@ -30,7 +31,7 @@ const THUMB = { width: 64, height: 44, pad: 4 };
 /** A tiny map of where the nodes sit, drawn from the saved content. */
 function Thumbnail({ content }: { content: CanvasContent | undefined }) {
   const boxes = useMemo(() => {
-    const nodes = content?.nodes ?? [];
+    const nodes = placedNodes(content?.nodes ?? []);
     if (nodes.length === 0) return [];
     const rects = nodes.map((n) => ({
       x: n.position.x,

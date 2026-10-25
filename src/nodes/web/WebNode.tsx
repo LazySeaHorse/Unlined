@@ -6,6 +6,7 @@ import { cn } from '@/lib/cn';
 import type { NodeDataMap, NodeOf } from '@/model/types';
 import { useCanvasStore } from '@/store/canvasStore';
 import { NodeShell } from '../NodeShell';
+import { useHiddenInStack, usePlacedId } from '../stack/cardContext';
 import { type FrameCommand, parseFrameState, sendFrameCommand } from './frameMessages';
 import { hostnameOf, normaliseWebUrl } from './url';
 import { useNearScreen } from './useLoaded';
@@ -125,9 +126,10 @@ export function WebNode({ id, data, selected, dragging }: NodeProps<NodeOf<'web'
   const address = normaliseWebUrl(data.url);
   // An iframe swallows mouse events, so it only becomes interactive once its node is selected and still.
   const interactive = selected && !dragging && !resizing;
-  // Far from the screen the page is unmounted, to give its memory and CPU back; it resumes where it was.
-  // A node set to keep its page loaded is the exception.
-  const near = useNearScreen(id);
+  // Far from the screen, or behind another card of its stack, the page is unmounted to give its memory and CPU
+  // back; it resumes where it was. A node set to keep its page loaded is the exception.
+  const hidden = useHiddenInStack();
+  const near = useNearScreen(usePlacedId(id)) && !hidden;
   const wanted = data.keepLoaded || near || selected;
   // Unless the node loads by itself, a click is what starts its page, each time it has been unloaded.
   const [started, setStarted] = useState(false);

@@ -6,11 +6,16 @@ import { stripTransient } from '@/nodes/factory';
 
 /**
  * JSON import/export format. Bump `version` (and add a migration) if the shape ever changes.
- * Version 2 added links; files without any are still written as version 1 so older builds can open them.
+ * Version 2 added links, version 3 stacks; a file is written with the lowest version that holds it, so older
+ * builds can open what they understand.
  */
 const APP_TAG = 'unlined';
 const VERSION = 1;
 const LINKS_VERSION = 2;
+const STACKS_VERSION = 3;
+
+const versionFor = (nodes: AppNode[], edges: unknown[] | undefined) =>
+  nodes.some((n) => n.type === 'stack') ? STACKS_VERSION : edges?.length ? LINKS_VERSION : VERSION;
 
 const point = z.object({ x: z.number(), y: z.number() });
 const viewportSchema = z.object({ x: z.number(), y: z.number(), zoom: z.number().positive() });
@@ -32,7 +37,7 @@ const nodeSchema = z.discriminatedUnion(
 
 const header = {
   app: z.literal(APP_TAG),
-  version: z.union([z.literal(VERSION), z.literal(LINKS_VERSION)]),
+  version: z.union([z.literal(VERSION), z.literal(LINKS_VERSION), z.literal(STACKS_VERSION)]),
 };
 
 const exportFileSchema = z.discriminatedUnion('kind', [
@@ -46,6 +51,7 @@ const exportFileSchema = z.discriminatedUnion('kind', [
         viewport: viewportSchema,
         groups: z.array(groupSchema).optional(),
         edges: z.array(edgeSchema).optional(),
+        fronts: z.record(z.string(), z.string()).optional(),
       }),
     ),
   }),
@@ -64,7 +70,7 @@ export type NamedCanvas = { name: string } & CanvasContent;
 
 export const exportCanvases = (canvases: NamedCanvas[]): CanvasesFile => ({
   app: APP_TAG,
-  version: canvases.some((c) => c.edges?.length) ? LINKS_VERSION : VERSION,
+  version: Math.max(VERSION, ...canvases.map((c) => versionFor(c.nodes, c.edges))) as 1 | 2 | 3,
   kind: 'canvases',
   canvases: canvases.map((c) => ({
     name: c.name,
@@ -72,12 +78,13 @@ export const exportCanvases = (canvases: NamedCanvas[]): CanvasesFile => ({
     viewport: c.viewport,
     ...(c.groups ? { groups: c.groups } : {}),
     ...(c.edges?.length ? { edges: c.edges.map(stripEdge) } : {}),
+    ...(c.fronts ? { fronts: c.fronts } : {}),
   })),
 });
 
 export const exportNodes = (nodes: AppNode[], edges: CanvasEdge[] = []): NodesFile => ({
   app: APP_TAG,
-  version: edges.length > 0 ? LINKS_VERSION : VERSION,
+  version: versionFor(nodes, edges),
   kind: 'nodes',
   nodes: nodes.map(stripTransient),
   ...(edges.length > 0 ? { edges: edges.map(stripEdge) } : {}),

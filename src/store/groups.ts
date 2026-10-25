@@ -1,6 +1,7 @@
 import { clusterRects, organiseLayout, reconcileGroups } from '@/lib/clusters';
 import { nodeRect } from '@/lib/nodeRect';
 import { containsCentre, sectionContents } from '@/lib/sections';
+import { placedNodes } from '@/lib/stacks';
 import type { CanvasGroup } from '@/model/types';
 import { glide } from '@/motion/glide';
 import { newId } from '@/nodes/factory';
@@ -15,9 +16,11 @@ export { nodeRect };
 export function refreshGroups(): CanvasGroup[] {
   const { nodes, groups, setGroups } = useCanvasStore.getState();
   // Sections are drawn by the user; groups are only about the nodes themselves.
-  const clusters = clusterRects(nodes.filter((n) => n.type !== 'section').map(nodeRect)).map((c) =>
-    c.map((r) => r.id),
-  );
+  const clusters = clusterRects(
+    placedNodes(nodes)
+      .filter((n) => n.type !== 'section')
+      .map(nodeRect),
+  ).map((c) => c.map((r) => r.id));
   const next = reconcileGroups(groups, clusters, newId);
   setGroups(next);
   return next;
@@ -28,7 +31,9 @@ export function refreshGroups(): CanvasGroup[] {
  * A top-level section moves as one block with everything inside it; its contents keep their layout.
  */
 export function organiseCanvas(): void {
-  const { nodes, moveNodes } = useCanvasStore.getState();
+  // Cards inside stacks go wherever their stack goes.
+  const nodes = placedNodes(useCanvasStore.getState().nodes);
+  const { moveNodes } = useCanvasStore.getState();
   const rects = nodes.map(nodeRect);
   const sections = rects.filter((_, i) => nodes[i].type === 'section');
   const topLevel = sections.filter((s) => !sections.some((o) => o.id !== s.id && containsCentre(o, s)));

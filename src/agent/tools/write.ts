@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { besideCandidates, boundsOf, CLUSTER_PADDING, findFreeSpot, type Rect } from '@/lib/clusters';
 import { setCell } from '@/lib/grid';
 import { sectionContents } from '@/lib/sections';
+import { placedId, placedNodes } from '@/lib/stacks';
 import { type AppNode, type NodeDataMap, type NodeKind, SECTION_COLORS } from '@/model/types';
 import { createNode } from '@/nodes/factory';
 import { splitLines } from '@/nodes/mathPlus/evaluate';
@@ -27,7 +28,7 @@ import {
 
 const MAX_GRID = { rows: 200, cols: 52 };
 /** Kinds whose size can be set; the others size to their content. */
-const RESIZABLE = new Set<NodeKind>(['code', 'graph', 'video', 'web', 'section']);
+const RESIZABLE = new Set<NodeKind>(['code', 'graph', 'video', 'web', 'section', 'stack']);
 
 const cellsSchema = z
   .array(z.array(z.string().max(2000)).max(MAX_GRID.cols))
@@ -97,7 +98,7 @@ const content = {
   },
 } satisfies {
   // `suggestionDismissed`, `keepLoaded` and `autoLoad` are UI flags and `pageTitle` what the page reported, not content.
-  [K in Exclude<NodeKind, 'image' | 'pdf' | 'section'>]: Record<
+  [K in Exclude<NodeKind, 'image' | 'pdf' | 'section' | 'stack'>]: Record<
     Exclude<keyof NodeDataMap[K], 'suggestionDismissed' | 'keepLoaded' | 'autoLoad' | 'pageTitle'>,
     z.ZodType
   >;
@@ -123,7 +124,7 @@ const newNodeSchema = z.discriminatedUnion(
     z.object({ kind: z.literal(kind), ...content[kind], ...placementShape }),
   ) as unknown as [z.ZodObject, ...z.ZodObject[]],
 );
-type NewNode = { kind: Exclude<NodeKind, 'image' | 'pdf' | 'section'> } & z.infer<
+type NewNode = { kind: Exclude<NodeKind, 'image' | 'pdf' | 'section' | 'stack'> } & z.infer<
   z.ZodObject<typeof placementShape>
 > &
   Record<string, unknown>;
@@ -158,7 +159,7 @@ export const createNodes = defineTool({
   readOnly: false,
   handler: ({ nodes: specs }) => {
     const { groups } = currentGroups();
-    const obstacles: Omit<Rect, 'id'>[] = canvasNodes().map(nodeRect);
+    const obstacles: Omit<Rect, 'id'>[] = placedNodes(canvasNodes()).map(nodeRect);
     const created: AppNode[] = [];
 
     for (const spec of specs as NewNode[]) {
@@ -371,9 +372,11 @@ export const moveNodes = defineTool({
   }),
   readOnly: false,
   handler: ({ moves }) => {
+    // A card in a stack has no place of its own: moving or resizing it moves or resizes the stack.
+    const placedNode = (handle: string) => requireNode(placedId(canvasNodes(), requireNode(handle).id));
     const changes = new Map(
       moves.map((m) => {
-        const node = requireNode(m.id);
+        const node = placedNode(m.id);
         if ((m.width || m.height) && !RESIZABLE.has(node.type) && node.type !== 'image')
           throw new ToolError('not_resizable', `${m.id} is a ${node.type} node, which sizes to its content.`);
         const position = {
@@ -384,9 +387,9 @@ export const moveNodes = defineTool({
       }),
     );
     // A moved section takes the nodes inside it along, unless those are being moved explicitly too.
-    const rects = canvasNodes().map(nodeRect);
+    const rects = placedNodes(canvasNodes()).map(nodeRect);
     for (const m of moves) {
-      const node = requireNode(m.id);
+      const node = placedNode(m.id);
       const to = changes.get(node.id)?.position;
       const rect = rects.find((r) => r.id === node.id);
       if (node.type !== 'section' || !to || !rect) continue;

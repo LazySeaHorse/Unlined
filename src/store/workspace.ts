@@ -1,6 +1,7 @@
 import type { XYPosition } from '@xyflow/react';
 import { create } from 'zustand';
 import { cloneGraph, internalEdges, sanitizeEdges, stripEdge } from '@/lib/links';
+import { placedNodes, withStackMembers } from '@/lib/stacks';
 import type { AppNode, CanvasContent, CanvasEdge } from '@/model/types';
 import { createAutosave } from '@/persistence/autosave';
 import * as repo from '@/persistence/canvasRepo';
@@ -32,7 +33,8 @@ useCanvasStore.subscribe((state, prev) => {
     state.nodes !== prev.nodes ||
     state.edges !== prev.edges ||
     state.viewport !== prev.viewport ||
-    state.groups !== prev.groups
+    state.groups !== prev.groups ||
+    state.fronts !== prev.fronts
   )
     autosave.schedule();
 });
@@ -123,7 +125,8 @@ export async function exportAllCanvases(): Promise<ExportFile> {
 
 export function exportSelectedNodes(): ExportFile {
   const { nodes, edges } = useCanvasStore.getState();
-  const picked = nodes.filter((n) => n.selected);
+  const ids = withStackMembers(nodes, new Set(nodes.filter((n) => n.selected).map((n) => n.id)));
+  const picked = nodes.filter((n) => ids.has(n.id));
   return exportNodes(picked, internalEdges(edges, new Set(picked.map((n) => n.id))).map(stripEdge));
 }
 
@@ -133,8 +136,10 @@ export function exportSelectedNodes(): ExportFile {
  */
 export function pasteNodes(nodes: AppNode[], at: XYPosition, edges: CanvasEdge[] = []): void {
   if (nodes.length === 0) return;
-  const minX = Math.min(...nodes.map((n) => n.position.x));
-  const minY = Math.min(...nodes.map((n) => n.position.y));
+  // Cards inside a stack keep their own old place, which does not count: the stack's does.
+  const placed = placedNodes(nodes);
+  const minX = Math.min(...placed.map((n) => n.position.x));
+  const minY = Math.min(...placed.map((n) => n.position.y));
   const copy = cloneGraph(nodes, edges, { x: at.x - minX, y: at.y - minY });
   asUndoStep(() => useCanvasStore.getState().addNodes(copy.nodes, copy.edges));
 }

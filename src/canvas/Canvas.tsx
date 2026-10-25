@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { setAgentView } from '@/agent';
 import { cn } from '@/lib/cn';
 import { closesMathPlusLoop, findLink } from '@/lib/links';
+import { cardFor, placedId } from '@/lib/stacks';
 import type { AppNode } from '@/model/types';
 import { useGlide } from '@/motion/useGlide';
 import { nodeSpecs } from '@/nodes/catalog';
@@ -35,6 +36,7 @@ import { useContextMenu } from './useContextMenu';
 import { useFitToMatches } from './useSearch';
 import { useSections } from './useSections';
 import { useShortcuts } from './useShortcuts';
+import { useStackDrop } from './useStackDrop';
 import { useZoomTier } from './zoomTier';
 
 const proOptions = { hideAttribution: true };
@@ -83,8 +85,11 @@ const readOnlyProps: Partial<ReactFlowProps<AppNode>> = {
 };
 
 /** Creates the link a drag ended on, or says why it was not made. */
-function connect({ source, target }: Connection) {
-  const { nodes, edges, linkNodes } = useCanvasStore.getState();
+function connect({ source: from, target: to }: Connection) {
+  const { nodes, edges, fronts, linkNodes } = useCanvasStore.getState();
+  // Dropped on a stack, a link goes to the card it shows.
+  const source = cardFor(nodes, fronts, from);
+  const target = cardFor(nodes, fronts, to);
   const existing = findLink(edges, source, target);
   const loop = closesMathPlusLoop(nodes, edges, source, target);
   const id = linkNodes(source, target);
@@ -106,10 +111,11 @@ export function Canvas({ readOnly }: { readOnly: boolean }) {
   const linking = linkingOn && !readOnly;
   useGlide();
   const view = useView(nodes);
-  useFitToMatches(view.matches);
+  useFitToMatches(view.matches, nodes);
   const { displayNodes, displayEdges } = useProjection(nodes, edges, view);
   const multipleSelected = useMemo(() => nodes.filter((n) => n.selected).length > 1, [nodes]);
   const sectionHandlers = useSections();
+  const stackDrop = useStackDrop();
   const { onNodesChange: applyChanges } = sectionHandlers;
   const onNodesChange = useCallback(
     (changes: NodeChange<AppNode>[]) =>
@@ -124,8 +130,12 @@ export function Canvas({ readOnly }: { readOnly: boolean }) {
 
   useEffect(() => {
     setAgentView({
-      fitNodes: (ids) =>
-        void fitView({ nodes: ids.map((id) => ({ id })), duration: 400, padding: 0.3, maxZoom: 1.2 }),
+      fitNodes: (ids) => {
+        // A card in a stack is wherever its stack is.
+        const { nodes } = useCanvasStore.getState();
+        const placed = [...new Set(ids.map((id) => placedId(nodes, id)))];
+        void fitView({ nodes: placed.map((id) => ({ id })), duration: 400, padding: 0.3, maxZoom: 1.2 });
+      },
     });
     return () => setAgentView(null);
   }, [fitView]);
@@ -168,6 +178,11 @@ export function Canvas({ readOnly }: { readOnly: boolean }) {
         connectionMode={ConnectionMode.Loose}
         edgesReconnectable={false}
         {...sectionHandlers}
+        onNodeDrag={stackDrop.onNodeDrag}
+        onNodeDragStop={(event, node, dragged) => {
+          sectionHandlers.onNodeDragStop();
+          stackDrop.onNodeDragStop(event, node, dragged);
+        }}
         onNodesChange={onNodesChange}
         defaultViewport={useCanvasStore.getState().viewport}
         onMoveEnd={(_, viewport) => setViewport(viewport)}

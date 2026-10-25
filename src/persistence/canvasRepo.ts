@@ -27,6 +27,7 @@ export async function loadContent(id: string): Promise<CanvasContent> {
     viewport: row.viewport,
     ...(row.groups ? { groups: row.groups } : {}),
     ...(row.edges ? { edges: row.edges } : {}),
+    ...(row.fronts ? { fronts: row.fronts } : {}),
   };
 }
 

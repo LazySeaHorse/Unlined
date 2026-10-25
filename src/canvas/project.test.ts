@@ -4,7 +4,13 @@ import type { AppEdge } from '@/model/types';
 import { createNode } from '@/nodes/factory';
 import { projectEdges, projectNodes, type View } from './project';
 
-const view = (over: Partial<View> = {}): View => ({ matches: null, query: '', marks: new Map(), ...over });
+const view = (over: Partial<View> = {}): View => ({
+  matches: null,
+  query: '',
+  marks: new Map(),
+  dropTarget: null,
+  ...over,
+});
 
 describe('projectNodes', () => {
   it('passes untouched nodes through as the same objects', () => {
@@ -42,4 +48,36 @@ describe('projectEdges', () => {
     const out = projectEdges(edges, [a, b, c], view({ matches: new Set([a.id]), query: 'force' }));
     expect(out.map((e) => e.className)).toEqual([undefined, undefined, 'search-miss']);
   });
+});
+
+describe('stacks', () => {
+  const card = () => createNode('text', { x: 0, y: 0 });
+
+  it('draws a stack in place of its cards, dimmed only when no card matches', () => {
+    const [a, b, c] = [card(), card(), card()];
+    const stack = createNode('stack', { x: 0, y: 0 }, { members: [a.id, b.id] });
+    const nodes = [a, b, c, stack];
+    expect(projectNodes(nodes, view()).map((n) => n.id)).toEqual([c.id, stack.id]);
+    const searched = projectNodes(nodes, view({ matches: new Set([b.id]) }));
+    expect(searched.map((n) => n.className)).toEqual(['search-miss', undefined]);
+  });
+
+  it('draws links to a card to its stack, and none between cards of one stack', () => {
+    const [a, b, c] = [card(), card(), card()];
+    const stack = createNode('stack', { x: 0, y: 0 }, { members: [a.id, b.id] });
+    const edges: AppEdge[] = [
+      { id: 'ca', source: c.id, target: a.id },
+      { id: 'ab', source: a.id, target: b.id },
+    ];
+    expect(projectEdges(edges, [a, b, c, stack], view())).toEqual([
+      { id: 'ca', source: c.id, target: stack.id },
+    ]);
+  });
+});
+
+it('shows the marks of a card on its stack', () => {
+  const [a, b] = [createNode('text', { x: 0, y: 0 }), createNode('text', { x: 0, y: 0 })];
+  const stack = createNode('stack', { x: 0, y: 0 }, { members: [a.id, b.id] });
+  const out = projectNodes([a, b, stack], view({ marks: new Map([[b.id, 'ai-touched']]) }));
+  expect(out[0].className).toBe('ai-touched');
 });

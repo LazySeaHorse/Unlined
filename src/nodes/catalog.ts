@@ -8,6 +8,7 @@ import { pdfSpec } from './pdf/spec';
 import { sectionSpec } from './section/spec';
 import { sheetSpec } from './sheet/spec';
 import type { NodeSpec } from './spec';
+import { stackSpec } from './stack/spec';
 import { tableSpec } from './table/spec';
 import { textSpec } from './text/spec';
 import { videoSpec } from './video/spec';
@@ -27,6 +28,7 @@ export const nodeSpecs: { [K in NodeKind]: NodeSpec<K> } = {
   web: webSpec,
   pdf: pdfSpec,
   section: sectionSpec,
+  stack: stackSpec,
 };
 
 export const nodeKinds = Object.keys(nodeSpecs) as NodeKind[];

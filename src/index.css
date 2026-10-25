@@ -676,6 +676,111 @@ math-field::part(virtual-keyboard-toggle) {
   opacity: 1;
 }
 
+/*
+ * Stacks (nodes/stack/StackNode): the front card is drawn as usual; the cards behind wait out of sight, their
+ * edges peeking out under it, and their tabs sit as icons to the right of the front card's tab.
+ */
+.stack-node {
+  position: relative;
+  isolation: isolate;
+  width: 100%;
+  height: 100%;
+}
+.stack-card {
+  position: absolute;
+  inset: 0;
+}
+/* A card fills the stack's box whatever size it would take alone, and scrolls what does not fit. */
+.react-flow__node .stack-card .node-tile {
+  width: auto;
+  min-width: 0;
+  max-width: none;
+}
+.stack-card .node-tile > :last-child {
+  overflow: auto;
+}
+.stack-card:not([data-front]) {
+  visibility: hidden;
+  content-visibility: hidden;
+}
+.stack-node::before,
+.stack-node::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: calc(var(--node-tab-height, 28px) + 5px) -5px -5px 5px;
+  border: 1px solid color-mix(in srgb, var(--fg) 16%, var(--canvas));
+  border-radius: 0.8125rem;
+  background: color-mix(in srgb, var(--fg) 4%, var(--surface));
+  transition: translate var(--dur) var(--ease-spring);
+}
+.stack-node::after {
+  inset: calc(var(--node-tab-height, 28px) + 10px) -10px -10px 10px;
+  z-index: -2;
+  opacity: 0.7;
+}
+.stack-node[data-depth="1"]::after,
+.stack-node[data-depth="0"]::before,
+.stack-node[data-depth="0"]::after {
+  display: none;
+}
+.react-flow__node.selected .stack-node::before {
+  border-color: color-mix(in srgb, var(--fg) 40%, var(--canvas));
+}
+.stack-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+}
+.stack-tab {
+  --tab-tint: var(--fg);
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: 22px;
+  padding: 0 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 12%, var(--canvas));
+  border-bottom: 0;
+  border-radius: 0.5rem 0.5rem 0 0;
+  background: color-mix(in srgb, var(--tab-tint) 8%, var(--canvas));
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    height var(--dur-fast) var(--ease-spring),
+    background-color var(--dur-fast),
+    color var(--dur-fast);
+}
+.stack-tab-tinted {
+  background: color-mix(in srgb, var(--tab-tint) 45%, var(--canvas));
+}
+.stack-tab:hover {
+  height: 25px;
+  background: color-mix(in srgb, var(--tab-tint) 16%, var(--canvas));
+  color: var(--fg);
+}
+.stack-tab-tinted:hover {
+  background: color-mix(in srgb, var(--tab-tint) 65%, var(--canvas));
+}
+[data-zoom="mid"] .stack-tab {
+  visibility: hidden;
+}
+/* The tab after the front one clears its fillet. */
+.stack-tabs > .node-tab + .stack-tab {
+  margin-left: 0.75rem;
+}
+/* A node dragged over these tabs would join this stack if dropped. */
+.react-flow__node.stack-drop .node-tab {
+  --tab: var(--accent);
+  color: var(--canvas);
+}
+.react-flow__node.stack-drop .node-tile {
+  outline: 2px dashed var(--accent);
+  outline-offset: 3px;
+}
+
 /* Nodes an AI agent just changed. */
 @keyframes ai-touched {
   from {

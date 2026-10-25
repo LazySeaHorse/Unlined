@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { boundsOf } from '@/lib/clusters';
 import { loadEngine } from '@/lib/math/engine';
 import { sectionContents } from '@/lib/sections';
+import { placedNodes } from '@/lib/stacks';
 import type { AppNode, NodeKind } from '@/model/types';
 import { nodeKinds } from '@/nodes/catalog';
 import { searchTextOf } from '@/nodes/factory';
@@ -93,7 +94,7 @@ export const getOverview = defineTool({
     }
     const sections = nodes.filter((n) => n.type === 'section');
     if (sections.length > 0) {
-      const rects = nodes.map(nodeRect);
+      const rects = placedNodes(nodes).map(nodeRect);
       lines.push('Sections (titled boxes made by the user): handle, title, bounds, nodes inside:');
       for (const s of sections) {
         const rect = nodeRect(s);

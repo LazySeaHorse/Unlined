@@ -1,5 +1,6 @@
 import { nodeRect } from '@/lib/nodeRect';
 import { sectionContents, wrapBounds } from '@/lib/sections';
+import { placedNodes } from '@/lib/stacks';
 import { createNode } from '@/nodes/factory';
 import { asUndoStep, useCanvasStore } from './canvasStore';
 import { useUiStore } from './uiStore';
@@ -25,5 +26,5 @@ export function deleteSectionWithContents(id: string): void {
   const { nodes, deleteNodes } = useCanvasStore.getState();
   const section = nodes.find((n) => n.id === id);
   if (!section) return;
-  deleteNodes([id, ...sectionContents(nodeRect(section), nodes.map(nodeRect))]);
+  deleteNodes([id, ...sectionContents(nodeRect(section), placedNodes(nodes).map(nodeRect))]);
 }

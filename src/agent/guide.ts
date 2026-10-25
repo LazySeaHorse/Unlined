@@ -37,13 +37,16 @@ FIELDS (create_nodes takes them flat next to "kind"; update_nodes "set" replaces
   drew around nodes. Moving a section moves the nodes inside it; deleting one keeps them. You can rename, recolour,
   move, resize and delete sections but not create them. They are separate from groups.
 - image: uploaded by the user; you can move, resize or delete images but not create them or see them.
+- stack: several nodes the user put on one spot behind tabs, one shown at a time. Its cards are ordinary nodes
+  you read and edit by their own handles; their place is the stack's ("in stack s3"). Moving or resizing a card
+  moves or resizes its stack; deleting the stack deletes its cards. You cannot create stacks.
 
 - pdf: a PDF the user linked from their disk. It shows the pages the user pinned, or its cover (page 1) while
   nothing is pinned. read_nodes gives you the text of the shown pages only; other pages are off limits and
   are never shown to you. If it says the file is not connected, ask the user to click Reconnect on the node.
   You cannot create pdf nodes or change what they show, only move, delete or retitle them.
 
-Every kind but section also takes an optional title, a name the user sees on the node, and an optional color
+Every kind but section and stack also takes an optional title, a name the user sees on the node, and an optional color
 (the section palette), a background tint; untinted nodes are plain white.
 
 LINKS

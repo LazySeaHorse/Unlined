@@ -17,6 +17,7 @@ import {
   Copy,
   CopyPlus,
   Eraser,
+  Layers,
   Maximize,
   Minus,
   Moon,
@@ -27,6 +28,7 @@ import {
   Plus,
   Shapes,
   Sigma,
+  SquareArrowOutUpRight,
   SquareDashed,
   Table2,
   Trash2,
@@ -35,9 +37,11 @@ import {
 import { copyText } from '@/lib/clipboard';
 import { MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, resizeGrid } from '@/lib/grid';
 import { applyGridOp, applyToAll, columnLabel, GridOpError } from '@/lib/gridOps';
+import { frontOf, isStack } from '@/lib/stacks';
 import {
   type AppEdge,
   type AppNode,
+  type CardNode,
   LINK_ENDS,
   type LinkEnd,
   type NodeKind,
@@ -61,6 +65,7 @@ import { type AlignEdge, alignSelected, bringToFront, sendToBack } from '@/store
 import { useCanvasStore } from '@/store/canvasStore';
 import { organiseCanvas } from '@/store/groups';
 import { deleteSectionWithContents } from '@/store/sections';
+import { stackSelection, takeOut, unstack } from '@/store/stacks';
 import { useUiStore } from '@/store/uiStore';
 import { askNumbers } from '@/ui/dialogs';
 import type { MenuEntry } from '@/ui/Menu';
@@ -191,7 +196,7 @@ const unloadOffscreen = (node: NodeOf<'web'>): MenuEntry => ({
     useCanvasStore.getState().updateNodeData<'web'>(node.id, { keepLoaded: !node.data.keepLoaded }),
 });
 
-const rename = (node: Exclude<AppNode, NodeOf<'section'>>): MenuEntry => ({
+const rename = (node: CardNode): MenuEntry => ({
   label: node.data.title ? 'Rename' : 'Add title',
   icon: PencilLine,
   // After the menu has closed and settled focus, or the title would lose it at once.
@@ -326,13 +331,45 @@ export function tableMenu(node: NodeOf<'table'>): MenuEntry[] {
   return entries;
 }
 
-export function nodeMenu(node: Exclude<AppNode, NodeOf<'section'>>): MenuEntry[] {
+const kindExtras = (node: CardNode): MenuEntry[] => {
   const extra = (kindItems[node.type] as ((n: AppNode) => MenuEntry[]) | undefined)?.(node) ?? [];
+  return extra.length > 0 ? [...extra, { separator: true }] : [];
+};
+
+/** What right-clicking a stack offers, for the card shown (or the tab right-clicked) and the stack as a whole. */
+export function stackMenu(stack: NodeOf<'stack'>, card: CardNode): MenuEntry[] {
+  return [
+    rename(card),
+    { separator: true },
+    ...kindExtras(card),
+    { label: 'Take out of stack', icon: SquareArrowOutUpRight, onSelect: () => takeOut(stack.id, card.id) },
+    { label: 'Unstack all', icon: Ungroup, onSelect: () => unstack(stack.id) },
+    { separator: true },
+    copy,
+    duplicate,
+    {
+      label: 'Delete card',
+      icon: Trash2,
+      danger: true,
+      onSelect: () => useCanvasStore.getState().deleteNodes([card.id]),
+    },
+    {
+      label: 'Delete stack',
+      icon: Trash2,
+      hint: 'Delete',
+      danger: true,
+      onSelect: () => useCanvasStore.getState().deleteNodes([stack.id]),
+    },
+    { separator: true },
+    ...order,
+  ];
+}
+
+export function nodeMenu(node: CardNode): MenuEntry[] {
   return [
     rename(node),
     { separator: true },
-    ...extra,
-    ...(extra.length > 0 ? [{ separator: true } as const] : []),
+    ...kindExtras(node),
     copy,
     duplicate,
     remove,
@@ -436,6 +473,7 @@ const alignItems: { edge: AlignEdge; label: string; icon: typeof AlignStartVerti
 export function selectionMenu(actions: MenuActions): MenuEntry[] {
   return [
     { label: 'Wrap in section', icon: SquareDashed, hint: 'Ctrl+G', onSelect: actions.wrapInSection },
+    { label: 'Stack', icon: Layers, hint: 'Ctrl+Shift+G', onSelect: () => void stackSelection() },
     {
       label: 'Align',
       icon: AlignHorizontalJustifyStart,
@@ -470,17 +508,26 @@ export function menuFor(target: Element | null, at: XYPosition, actions: MenuAct
     return linkMenu(link);
   }
   const id = target?.closest<HTMLElement>('.react-flow__node')?.dataset.id;
-  const hit = useCanvasStore.getState().nodes.find((n) => n.id === id);
-  if (!hit) return canvasMenu(at, actions);
-  if (!hit.selected) useCanvasStore.getState().setSelection((n) => n.id === hit.id);
+  const { nodes, fronts } = useCanvasStore.getState();
+  const flowHit = nodes.find((n) => n.id === id);
+  if (!flowHit) return canvasMenu(at, actions);
+  if (!flowHit.selected) useCanvasStore.getState().setSelection((n) => n.id === flowHit.id);
+  // In a stack, the menu is about the card under the pointer: the tab right-clicked, else the one shown.
+  const stack = isStack(flowHit) ? flowHit : undefined;
+  const cardId = stack
+    ? (target?.closest<HTMLElement>('[data-stack-tab]')?.dataset.stackTab ?? frontOf(stack, nodes, fronts))
+    : undefined;
+  const hit = stack ? nodes.find((n) => n.id === cardId) : flowHit;
+  if (!hit || hit.type === 'stack') return [];
+  const menu = (node: CardNode) => (stack ? stackMenu(stack, node) : nodeMenu(node));
   if (hit.type === 'sheet' && target?.closest('.Spreadsheet')) {
     const onSelection = sheetMenu(hit);
-    if (onSelection.length > 0) return [...onSelection, { separator: true }, ...nodeMenu(hit)];
+    if (onSelection.length > 0) return [...onSelection, { separator: true }, ...menu(hit)];
   }
   if (hit.type === 'table' && target?.closest('table')) {
     const onSelection = tableMenu(hit);
-    if (onSelection.length > 0) return [...onSelection, { separator: true }, ...nodeMenu(hit)];
+    if (onSelection.length > 0) return [...onSelection, { separator: true }, ...menu(hit)];
   }
   if (useCanvasStore.getState().nodes.filter((n) => n.selected).length > 1) return selectionMenu(actions);
-  return hit.type === 'section' ? sectionMenu(hit) : nodeMenu(hit);
+  return hit.type === 'section' ? sectionMenu(hit) : menu(hit);
 }

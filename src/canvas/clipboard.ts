@@ -5,6 +5,7 @@ import { copyText } from '@/lib/clipboard';
 import { internalEdges } from '@/lib/links';
 import { nodeRect } from '@/lib/nodeRect';
 import { expandWithContents } from '@/lib/sections';
+import { placedNodes, withStackMembers } from '@/lib/stacks';
 import type { AppEdge, AppNode, CanvasEdge } from '@/model/types';
 import { exportNodes, ImportError, parseExportFile } from '@/persistence/io';
 import { useCanvasStore } from '@/store/canvasStore';
@@ -15,12 +16,16 @@ const MIME = 'application/x-unlined+json';
 /** Repeated pastes in the same spot step down-right by this much so copies do not hide each other. */
 const PASTE_STEP = 30;
 
-/** The selected nodes; a selected section brings what is inside it. */
+/** The selected nodes; a selected section brings what is inside it, and a stack its cards. */
 function copiedNodes(nodes: AppNode[]): AppNode[] {
-  const ids = expandWithContents(
-    new Set(nodes.filter((n) => n.selected).map((n) => n.id)),
-    new Set(nodes.filter((n) => n.type === 'section').map((n) => n.id)),
-    nodes.map(nodeRect),
+  const placed = placedNodes(nodes);
+  const ids = withStackMembers(
+    nodes,
+    expandWithContents(
+      new Set(placed.filter((n) => n.selected).map((n) => n.id)),
+      new Set(placed.filter((n) => n.type === 'section').map((n) => n.id)),
+      placed.map(nodeRect),
+    ),
   );
   return nodes.filter((n) => ids.has(n.id));
 }

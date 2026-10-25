@@ -1,5 +1,6 @@
 import { useReactFlow } from '@xyflow/react';
 import { useEffect, useMemo } from 'react';
+import { placedId } from '@/lib/stacks';
 import type { AppNode } from '@/model/types';
 import { searchTextOf } from '@/nodes/factory';
 import { useUiStore } from '@/store/uiStore';
@@ -18,10 +19,13 @@ export function useSearchMatches(nodes: AppNode[]): Set<string> | null {
   );
 }
 
-/** Pans the camera to the search matches once typing pauses. (Dimming the rest is the projection's job.) */
-export function useFitToMatches(matches: ReadonlySet<string> | null): void {
+/**
+ * Pans the camera to the search matches once typing pauses; a card in a stack is wherever its stack is.
+ * (Dimming the rest is the projection's job.)
+ */
+export function useFitToMatches(matches: ReadonlySet<string> | null, nodes: AppNode[]): void {
   const { fitView } = useReactFlow();
-  const matchKey = matches ? [...matches].join() : '';
+  const matchKey = matches ? [...new Set([...matches].map((id) => placedId(nodes, id)))].join() : '';
 
   useEffect(() => {
     if (!matchKey) return;

@@ -5,7 +5,7 @@ import { copyText } from '@/lib/clipboard';
 import { cn } from '@/lib/cn';
 import { MathField } from '@/lib/math/MathField';
 import { Tex } from '@/lib/math/Tex';
-import type { NodeOf } from '@/model/types';
+import type { NodeOf, Titled } from '@/model/types';
 import { useCanvasStore } from '@/store/canvasStore';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
@@ -66,7 +66,9 @@ function InputChips({ id }: { id: string }) {
 }
 
 function InputChip({ input }: { input: LinkInput }) {
-  const title = useCanvasStore((s) => s.nodes.find((n) => n.id === input.sourceId)?.data.title);
+  const title = useCanvasStore(
+    (s) => (s.nodes.find((n) => n.id === input.sourceId)?.data as Titled | undefined)?.title,
+  );
   const name = input.name === 'ans' ? '\\mathrm{ans}' : input.name;
   return (
     <li

@@ -1,11 +1,26 @@
 import { type Engine, loadEngine, useEngine } from '@/lib/math/engine';
+import { isStack, placedPosition, stackIndex } from '@/lib/stacks';
 import type { AppNode } from '@/model/types';
 import { type CanvasState, useCanvasStore } from '@/store/canvasStore';
 import { type Evaluation, evaluateLinked, type LineResult, type LinkInput } from './evaluate';
 import { linkVarName, type MathLink } from './order';
 
-/** Math+ nodes evaluate top-to-bottom, then left-to-right, like reading a page. */
-const readingOrder = (a: AppNode, b: AppNode) => a.position.y - b.position.y || a.position.x - b.position.x;
+/**
+ * Math+ nodes evaluate top-to-bottom, then left-to-right, like reading a page. Cards in a stack are where the
+ * stack is, in the stack's order.
+ */
+function readingOrder(nodes: AppNode[]) {
+  const { byId, stackOf } = stackIndex(nodes);
+  const rank = (n: AppNode) => {
+    const stack = byId.get(stackOf.get(n.id) ?? '');
+    return isStack(stack) ? stack.data.members.indexOf(n.id) : 0;
+  };
+  return (a: AppNode, b: AppNode) => {
+    const pa = placedPosition(nodes, a);
+    const pb = placedPosition(nodes, b);
+    return pa.y - pb.y || pa.x - pb.x || rank(a) - rank(b);
+  };
+}
 
 /** Everything evaluation depends on: the Math+ nodes' formulas in reading order, and the links between them. */
 interface MathPlusInput {
@@ -20,7 +35,7 @@ interface MathPlusInput {
 function mathPlusInput(state: Pick<CanvasState, 'nodes' | 'edges'>): MathPlusInput {
   const docs = state.nodes
     .filter((n) => n.type === 'mathPlus')
-    .sort(readingOrder)
+    .sort(readingOrder(state.nodes))
     .map((n) => ({ id: n.id, latex: n.data.latex as string }));
   const ids = new Set(docs.map((d) => d.id));
   const links = state.edges

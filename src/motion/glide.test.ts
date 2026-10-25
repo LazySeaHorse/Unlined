@@ -49,7 +49,12 @@ describe('glide', () => {
 
   it('folds a glide inside another into the outer one', () => {
     let captures = 0;
-    setGlideDriver({ capture: () => (captures++, at(0)) });
+    setGlideDriver({
+      capture: () => {
+        captures++;
+        return at(0);
+      },
+    });
     glide(() => glide(() => undefined));
     expect(captures).toBe(1);
   });

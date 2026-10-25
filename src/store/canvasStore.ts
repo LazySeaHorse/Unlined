@@ -12,6 +12,7 @@ import { create } from 'zustand';
 import { cloneGraph, findLink, normaliseLinkData, sanitizeEdges, stripEdge } from '@/lib/links';
 import { nodeRect } from '@/lib/nodeRect';
 import { expandWithContents } from '@/lib/sections';
+import { cardFor, placedNodes, removeNodes, stackIndex, withStackMembers } from '@/lib/stacks';
 import {
   type AppEdge,
   type AppNode,
@@ -38,6 +39,8 @@ export interface CanvasState {
   viewport: Viewport;
   /** Not undoable: groups are derived from positions and refreshed whenever they are needed. */
   groups: CanvasGroup[];
+  /** The card each stack shows, by stack id. Saved, but not undoable: switching cards is like scrolling. */
+  fronts: Record<string, string>;
   onNodesChange: (changes: NodeChange<AppNode>[]) => void;
   onEdgesChange: (changes: EdgeChange<AppEdge>[]) => void;
   /**
@@ -64,13 +67,18 @@ export interface CanvasState {
    * when the other way round is already linked: that link is selected instead.
    */
   reverseEdge: (id: string) => boolean;
-  /** Removes nodes and links as one undo step. Links to a removed node go with it. A section's contents stay. */
+  /**
+   * Removes nodes and links as one undo step. Links to a removed node go with it. A section's contents stay; a
+   * stack's cards go with it, and a stack left with one card dissolves into that card.
+   */
   deleteElements: (nodeIds: string[], edgeIds: string[]) => void;
   /** Removes nodes as one undo step; a section's contents stay. */
   deleteNodes: (ids: string[]) => void;
   deleteSelected: () => void;
   clear: () => void;
   setGroups: (groups: CanvasGroup[]) => void;
+  /** Shows card `memberId` of stack `stackId`. */
+  setFront: (stackId: string, memberId: string) => void;
   /** Moves nodes to new positions in one update. */
   moveNodes: (positions: Map<string, XYPosition>) => void;
   load: (content: CanvasContent) => void;
@@ -156,6 +164,7 @@ export const useCanvasStore = create<CanvasState>()(
       edges: [],
       viewport: DEFAULT_VIEWPORT,
       groups: [],
+      fronts: {},
 
       onNodesChange: (changes) => {
         const nodes = applyNodeChanges(changes, get().nodes);
@@ -177,8 +186,11 @@ export const useCanvasStore = create<CanvasState>()(
         if (removed.length > 0) get().deleteElements([], removed);
       },
 
-      setSelection: (pickNode, pickEdge) => {
+      setSelection: (pick, pickEdge) => {
         const { nodes, edges } = get();
+        // Cards inside a stack are never selected themselves: their stack is.
+        const { stackOf: stacked } = stackIndex(nodes);
+        const pickNode = (n: AppNode) => !stacked.has(n.id) && pick(n);
         const nodesSame = nodes.every((n) => !!n.selected === pickNode(n));
         const picked = new Set(nodes.flatMap((n) => (pickNode(n) ? [n.id] : [])));
         const wantEdge = (e: AppEdge) => pickEdge?.(e, picked) ?? false;
@@ -233,11 +245,15 @@ export const useCanvasStore = create<CanvasState>()(
 
       duplicateSelected: () => {
         const { nodes, edges } = get();
-        // Duplicating a section takes the nodes inside it along.
-        const ids = expandWithContents(
-          new Set(nodes.filter((n) => n.selected).map((n) => n.id)),
-          new Set(nodes.filter((n) => n.type === 'section').map((n) => n.id)),
-          nodes.map(nodeRect),
+        // Duplicating a section takes the nodes inside it along, and a stack its cards.
+        const placed = placedNodes(nodes);
+        const ids = withStackMembers(
+          nodes,
+          expandWithContents(
+            new Set(placed.filter((n) => n.selected).map((n) => n.id)),
+            new Set(placed.filter((n) => n.type === 'section').map((n) => n.id)),
+            placed.map(nodeRect),
+          ),
         );
         const selected = nodes.filter((n) => ids.has(n.id));
         if (selected.length === 0) return;
@@ -245,8 +261,11 @@ export const useCanvasStore = create<CanvasState>()(
         get().addNodes(copy.nodes, copy.edges);
       },
 
-      linkNodes: (source, target, data) => {
-        const { nodes, edges } = get();
+      linkNodes: (from, to, data) => {
+        const { nodes, edges, fronts } = get();
+        // A link to a stack is a link to the card it shows.
+        const source = cardFor(nodes, fronts, from);
+        const target = cardFor(nodes, fronts, to);
         if (source === target) return null;
         if (!nodes.some((n) => n.id === source) || !nodes.some((n) => n.id === target)) return null;
         const existing = findLink(edges, source, target);
@@ -310,11 +329,13 @@ export const useCanvasStore = create<CanvasState>()(
           (e) => e.id === renaming && (doomedEdges.has(e.id) || doomed.has(e.source) || doomed.has(e.target)),
         );
         if (gone) useUiStore.getState().stopRenamingLink(gone.id);
+        const nodes = removeNodes(get().nodes, doomed);
+        const alive = new Set(nodes.map((n) => n.id));
         asUndoStep(() =>
           set({
-            nodes: get().nodes.filter((n) => !doomed.has(n.id)),
+            nodes,
             edges: get().edges.filter(
-              (e) => !doomedEdges.has(e.id) && !doomed.has(e.source) && !doomed.has(e.target),
+              (e) => !doomedEdges.has(e.id) && alive.has(e.source) && alive.has(e.target),
             ),
           }),
         );
@@ -334,6 +355,10 @@ export const useCanvasStore = create<CanvasState>()(
 
       setGroups: (groups) => set({ groups }),
 
+      setFront: (stackId, memberId) => {
+        if (get().fronts[stackId] !== memberId) set({ fronts: { ...get().fronts, [stackId]: memberId } });
+      },
+
       moveNodes: (positions) =>
         set({
           nodes: get().nodes.map((n) => {
@@ -342,7 +367,7 @@ export const useCanvasStore = create<CanvasState>()(
           }),
         }),
 
-      load: ({ nodes, edges = [], viewport, groups = [] }) => {
+      load: ({ nodes, edges = [], viewport, groups = [], fronts = {} }) => {
         set({
           nodes,
           edges: sanitizeEdges(
@@ -351,6 +376,7 @@ export const useCanvasStore = create<CanvasState>()(
           ),
           viewport,
           groups,
+          fronts,
         });
         useCanvasStore.temporal.getState().clear();
         startNewUndoStep();
@@ -387,10 +413,20 @@ export const redo = () => {
 /** Snapshot of the open canvas in its persisted form. */
 export function getCanvasContent(): CanvasContent {
   const { nodes, edges, viewport, groups } = useCanvasStore.getState();
+  const fronts = savedFronts();
   return {
     nodes: nodes.map(stripTransient),
     viewport,
     ...(groups.length > 0 ? { groups } : {}),
     ...(edges.length > 0 ? { edges: edges.map(stripEdge) } : {}),
+    ...(fronts ? { fronts } : {}),
   };
+}
+
+/** The cards stacks show, for the stacks that still exist; undefined when there are none to keep. */
+function savedFronts(): Record<string, string> | undefined {
+  const { nodes, fronts } = useCanvasStore.getState();
+  const { byId } = stackIndex(nodes);
+  const kept = Object.entries(fronts).filter(([stack]) => byId.get(stack)?.type === 'stack');
+  return kept.length > 0 ? Object.fromEntries(kept) : undefined;
 }

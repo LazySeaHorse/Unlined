@@ -21,6 +21,8 @@ interface UiState {
   renamingNode: string | null;
   /** The link whose label is open for editing, if any. */
   renamingLink: string | null;
+  /** The node that the nodes being dragged would stack onto if dropped now. */
+  stackDropTarget: string | null;
   setTool: (tool: NodeKind) => void;
   setLinking: (linking: boolean) => void;
   toggleTheme: () => void;
@@ -40,6 +42,7 @@ interface UiState {
   renameLink: (id: string) => void;
   /** Closes the label editor of link `id`, unless another link has taken over since. */
   stopRenamingLink: (id: string) => void;
+  setStackDropTarget: (id: string | null) => void;
 }
 
 const systemTheme = (): Theme =>
@@ -60,6 +63,7 @@ export const useUiStore = create<UiState>()(
       renamingSection: null,
       renamingNode: null,
       renamingLink: null,
+      stackDropTarget: null,
       // Picking a node to place ends linking, since a double-click on the canvas would otherwise do nothing.
       setTool: (tool) => set({ tool, linking: false }),
       setLinking: (linking) => set({ linking }),
@@ -76,6 +80,8 @@ export const useUiStore = create<UiState>()(
       stopRenamingNode: (id) => set((s) => (s.renamingNode === id ? { renamingNode: null } : s)),
       renameLink: (id) => set({ renamingLink: id }),
       stopRenamingLink: (id) => set((s) => (s.renamingLink === id ? { renamingLink: null } : s)),
+      setStackDropTarget: (stackDropTarget) =>
+        set((s) => (s.stackDropTarget === stackDropTarget ? s : { stackDropTarget })),
     }),
     { name: 'unlined-ui', partialize: ({ tool, theme }) => ({ tool, theme }) },
   ),

@@ -56,7 +56,7 @@ describe('io', () => {
     expect(() => parseExportFile(JSON.stringify({ version: 4, fields: [] }))).toThrow(
       /Not an Unlined export/,
     );
-    expect(() => parseExportFile(JSON.stringify({ ...exportNodes([]), version: 3 }))).toThrow(ImportError);
+    expect(() => parseExportFile(JSON.stringify({ ...exportNodes([]), version: 4 }))).toThrow(ImportError);
   });
 
   it('rejects nodes whose data does not match their kind', () => {
@@ -113,6 +113,19 @@ describe('io', () => {
       const file = { ...exportNodes([a, b], [{ id: 'l', source: a.id, target: b.id }]) };
       const bad = { ...file, edges: [{ id: 'l', source: a.id, target: b.id, data: { head: 'star' } }] };
       expect(() => parseExportFile(JSON.stringify(bad))).toThrow(ImportError);
+    });
+  });
+
+  describe('stacks', () => {
+    it('round-trips stacks and the card each shows, as version 3', () => {
+      const [a, b] = [createNode('text', { x: 0, y: 0 }), createNode('graph', { x: 0, y: 0 })];
+      const stack = createNode('stack', { x: 0, y: 0 }, { members: [a.id, b.id] });
+      const file = exportCanvases([
+        { name: 'A', nodes: [a, b, stack], fronts: { [stack.id]: b.id }, viewport: { x: 0, y: 0, zoom: 1 } },
+      ]);
+      expect(file.version).toBe(3);
+      expect(parseExportFile(JSON.stringify(file))).toEqual(file);
+      expect(exportNodes([a, b, stack]).version).toBe(3);
     });
   });
 });

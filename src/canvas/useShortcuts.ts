@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { kindForNumberKey } from '@/nodes/catalog';
 import { redo, undo, useCanvasStore } from '@/store/canvasStore';
+import { cycleFront, selectedStack, stackSelection } from '@/store/stacks';
 import { useUiStore } from '@/store/uiStore';
 import { editsCanvas, isTextField, isTyping } from './keyboard';
 import { useWrapInSection } from './useSections';
@@ -66,9 +67,17 @@ export function useShortcuts(readOnly: boolean) {
       } else if (mod && key === 'd') {
         event.preventDefault();
         canvas.duplicateSelected();
+      } else if (mod && event.shiftKey && key === 'g') {
+        event.preventDefault();
+        stackSelection();
       } else if (mod && key === 'g') {
         event.preventDefault(); // the browser's find-next
         wrapInSection();
+      } else if ((key === '[' || key === ']') && !mod && !event.altKey) {
+        const stack = selectedStack();
+        if (!stack) return;
+        event.preventDefault();
+        cycleFront(stack, key === ']' ? 1 : -1);
       } else if (mod && key === 'a') {
         event.preventDefault();
         canvas.setSelection(

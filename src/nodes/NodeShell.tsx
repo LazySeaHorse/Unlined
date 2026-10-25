@@ -11,6 +11,7 @@ import { ColorSwatches, swatch } from './ColorSwatches';
 import { CornerResizer } from './CornerResizer';
 import { nodeSpecs } from './catalog';
 import { NODE_TAB_HEIGHT } from './spec';
+import { useCardInStack } from './stack/cardContext';
 
 interface NodeShellProps {
   /** Picks the label and icon of the tab. */
@@ -57,27 +58,34 @@ export function NodeShell({
   children,
 }: NodeShellProps) {
   const readOnly = useReadOnly();
-  const id = useNodeId();
+  // Inside a stack, React Flow's node is the stack; the card is this node, and the stack draws the tabs.
+  const card = useCardInStack();
+  const flowId = useNodeId();
+  const id = card?.cardId ?? flowId;
   const { icon: Icon, label } = nodeSpecs[kind];
   // Typing into a node's field selects the node, so Escape can hand the keys back to it (Ctrl+D, Ctrl+C...).
   const selectOnFocus = (event: FocusEvent) => {
-    if (id && isTextField(event.target)) useCanvasStore.getState().setSelection((n) => n.id === id);
+    if (flowId && isTextField(event.target)) useCanvasStore.getState().setSelection((n) => n.id === flowId);
   };
   const tone = tint ? `color-mix(in srgb, ${swatch(tint)} 35%, var(--surface))` : 'var(--surface)';
   return (
     <>
-      {resize && <CornerResizer selected={selected} {...resize} />}
+      {resize && !card && <CornerResizer selected={selected} {...resize} />}
       <div
         className="node node-card flex h-full w-full flex-col"
         data-live={live || undefined}
         style={{ '--tone-base': tone } as CSSProperties}
       >
         <div className="flex shrink-0 items-end" style={{ height: NODE_TAB_HEIGHT }}>
-          <div className="node-tab cursor-grab">
-            <Icon className="size-3.5 shrink-0 opacity-70" />
-            <NodeTitle fallback={title ?? label} value={customTitle} color={tint} />
-            {live && <span className="shrink-0 text-2xs font-normal opacity-80">· Live</span>}
-          </div>
+          {card ? (
+            card.tabs
+          ) : (
+            <div className="node-tab cursor-grab">
+              <Icon className="size-3.5 shrink-0 opacity-70" />
+              {id && <NodeTitle id={id} fallback={title ?? label} value={customTitle} color={tint} />}
+              {live && <span className="shrink-0 text-2xs font-normal opacity-80">· Live</span>}
+            </div>
+          )}
           {!readOnly && actions && (
             <div className="node-actions nodrag ml-auto flex items-center gap-1 self-center">{actions}</div>
           )}
@@ -100,11 +108,19 @@ export function NodeShell({
  * A node's title: its own, else `fallback` (the node kind). Double-click renames; so does Rename in the node's menu.
  * An empty name restores the fallback. While renaming, swatches above the tab recolour the node.
  */
-function NodeTitle({ fallback, value, color }: { fallback: string; value?: string; color?: SectionColor }) {
-  const id = useNodeId();
+export function NodeTitle({
+  id,
+  fallback,
+  value,
+  color,
+}: {
+  id: string;
+  fallback: string;
+  value?: string;
+  color?: SectionColor;
+}) {
   const readOnly = useReadOnly();
   const editing = useUiStore((s) => s.renamingNode === id) && !readOnly;
-  if (!id) return null;
 
   const stopEditing = () => useUiStore.getState().stopRenamingNode(id);
   const commit = (name: string) => {

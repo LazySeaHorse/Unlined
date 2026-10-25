@@ -32,11 +32,16 @@ export function setGlideDriver(next: GlideDriver | null): void {
   session = null;
 }
 
-/** Runs `fn`, a store write, and glides the nodes it moves. Returns what `fn` does; a promise keeps gliding until it settles. */
-export function glide<T>(fn: () => T): T {
+/**
+ * Runs `fn`, a store write, and glides the nodes it moves. Returns what `fn` does; a promise keeps gliding until
+ * it settles. `from` says where nodes not drawn yet come from, e.g. cards leaving a stack glide out of it.
+ */
+export function glide<T>(fn: () => T, from?: ReadonlyMap<string, XYPosition>): T {
   // Inside another glide (an agent's tool undoing several steps), the outer one already covers this.
   if (!driver || !motionOK() || session?.open) return fn();
-  const current: Session = { before: driver.capture(), open: true };
+  const before = driver.capture();
+  for (const [id, at] of from ?? []) if (!before.has(id)) before.set(id, at);
+  const current: Session = { before, open: true };
   session = current;
   const close = () => {
     current.open = false;

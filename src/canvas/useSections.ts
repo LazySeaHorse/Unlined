@@ -2,6 +2,7 @@ import { type NodeChange, useStoreApi } from '@xyflow/react';
 import { useCallback, useEffect, useRef } from 'react';
 import { nodeRect } from '@/lib/nodeRect';
 import { encloses, type SectionDragSnapshot, snapshotSectionDrag, withSectionDrag } from '@/lib/sections';
+import { placedNodes } from '@/lib/stacks';
 import type { AppNode } from '@/model/types';
 import { useCanvasStore } from '@/store/canvasStore';
 import { wrapSelectionInSection } from '@/store/sections';
@@ -27,8 +28,7 @@ export function useSections() {
   const drags = useRef(new Map<string, SectionDragSnapshot>());
 
   const startDrag = useCallback((dragged: AppNode[]) => {
-    const { nodes } = useCanvasStore.getState();
-    const rects = nodes.map(nodeRect);
+    const rects = placedNodes(useCanvasStore.getState().nodes).map(nodeRect);
     drags.current.clear();
     for (const node of dragged) {
       if (node.type !== 'section') continue;
