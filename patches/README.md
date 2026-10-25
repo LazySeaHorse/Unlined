@@ -26,7 +26,8 @@ the unminified `mathlive.mjs` in every mode (see `vite.config.ts`), so that is t
   instead, where a pasted `\displaylines` replaced the whole field. `insertLines` splits the line at the
   caret around the pasted lines, or, with the caret deeper than a line, pastes their contents inline.
 - **Backspace between cells.** Backspace at the start of a cell (or Delete at its end) only joined the
-  lines of a one-column field, and did nothing in `aligned` and the like. `joinCells` joins the cell to
+  lines of a one-column field, did nothing in `aligned` and the like, and at the start of a field's first
+  line deleted that line. `joinCells` replaces `deleteRow` there: it joins the cell to
   the one before (or after), as deleting the `&` would, and a line's first cell to the line above, cell by
   cell. In a matrix, where cells are separate entries, it steps into the neighbouring cell instead.
 

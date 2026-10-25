@@ -272,6 +272,26 @@ test('Backspace at the start of a cell of aligned math joins it to the cell befo
   expect(await value()).toContain('\\text{Row 1:}5q_1=v & \\\\');
 });
 
+test('Backspace joins a line to the one above, and does nothing at the start of the first line', async ({
+  page,
+}) => {
+  await placeNode(page, 'Math');
+  const field = nodes(page).locator('math-field');
+  await field.click();
+  await expect(field).toBeFocused();
+  const backspaceAt = async (position: number) => {
+    await field.evaluate((el: HTMLElement & { setValue: (v: string) => void; position: number }, p) => {
+      el.setValue('\\displaylines{a+b\\\\ c+d}');
+      el.position = p;
+    }, position);
+    await page.keyboard.press('Backspace');
+    await page.keyboard.type('x');
+    return field.evaluate((el: HTMLElement & { value: string }) => el.value);
+  };
+  expect(await backspaceAt(0)).toBe('\\displaylines{xa+b\\\\ c+d}');
+  expect(await backspaceAt(4)).toBe('a+bxc+d');
+});
+
 test('Ctrl+Z in a field steps back through the one canvas history, newest edit first', async ({ page }) => {
   await placeNode(page, 'Math', 400, 300);
   const field = nodes(page).locator('math-field');
