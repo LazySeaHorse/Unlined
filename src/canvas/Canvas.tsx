@@ -16,6 +16,7 @@ import { setAgentView } from '@/agent';
 import { cn } from '@/lib/cn';
 import { closesMathPlusLoop, findLink } from '@/lib/links';
 import type { AppNode } from '@/model/types';
+import { useGlide } from '@/motion/useGlide';
 import { nodeSpecs } from '@/nodes/catalog';
 import { nodeTypes } from '@/nodes/nodeTypes';
 import { dragHasPdf } from '@/nodes/pdf/drop';
@@ -103,6 +104,7 @@ export function Canvas({ readOnly }: { readOnly: boolean }) {
   const theme = useUiStore((s) => s.theme);
   const linkingOn = useUiStore((s) => s.linking);
   const linking = linkingOn && !readOnly;
+  useGlide();
   const view = useView(nodes);
   useFitToMatches(view.matches);
   const { displayNodes, displayEdges } = useProjection(nodes, edges, view);

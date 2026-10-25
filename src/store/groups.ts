@@ -2,6 +2,7 @@ import { clusterRects, organiseLayout, reconcileGroups } from '@/lib/clusters';
 import { nodeRect } from '@/lib/nodeRect';
 import { containsCentre, sectionContents } from '@/lib/sections';
 import type { CanvasGroup } from '@/model/types';
+import { glide } from '@/motion/glide';
 import { newId } from '@/nodes/factory';
 import { asUndoStep, useCanvasStore } from './canvasStore';
 
@@ -52,6 +53,6 @@ export function organiseCanvas(): void {
     }
   }
 
-  asUndoStep(() => moveNodes(layout));
+  glide(() => asUndoStep(() => moveNodes(layout)));
   refreshGroups();
 }

@@ -23,6 +23,7 @@ import {
   type NodeDataMap,
   type NodeKind,
 } from '@/model/types';
+import { glide } from '@/motion/glide';
 import { newId, stripTransient } from '@/nodes/factory';
 import { useUiStore } from './uiStore';
 
@@ -373,12 +374,13 @@ export const useCanvasStore = create<CanvasState>()(
   ),
 );
 
+/** Steps back through the history; nodes it moves glide back to where they were. */
 export const undo = () => {
-  useCanvasStore.temporal.getState().undo();
+  glide(() => useCanvasStore.temporal.getState().undo());
   startNewUndoStep();
 };
 export const redo = () => {
-  useCanvasStore.temporal.getState().redo();
+  glide(() => useCanvasStore.temporal.getState().redo());
   startNewUndoStep();
 };
 

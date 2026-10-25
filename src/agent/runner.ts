@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { glide } from '@/motion/glide';
 import type { AgentToolDescriptor, AgentToolResult, AnyAgentTool } from './defineTool';
 import { ToolError } from './errors';
 import { type AgentEvent, agentEvents } from './events';
@@ -56,7 +57,9 @@ export async function runAgentTool(name: string, rawInput: unknown): Promise<Age
 
   if (!tool.readOnly) holdLock();
   try {
-    const exec = () => Promise.resolve(tool.handler(parsed.data));
+    // What an agent moves glides there, so the user can follow the edit.
+    const run = () => Promise.resolve(tool.handler(parsed.data));
+    const exec = tool.readOnly ? run : () => glide(run);
     const outcome = await (tool.exclusive ? runExclusive(exec) : exec());
     if (!tool.readOnly) {
       holdLock();

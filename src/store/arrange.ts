@@ -1,6 +1,7 @@
 import { boundsOf } from '@/lib/clusters';
 import { nodeRect } from '@/lib/nodeRect';
 import type { AppNode } from '@/model/types';
+import { glide } from '@/motion/glide';
 import { asUndoStep, useCanvasStore } from './canvasStore';
 
 export type AlignEdge = 'left' | 'center' | 'right' | 'top' | 'middle' | 'bottom';
@@ -23,7 +24,7 @@ export function alignSelected(edge: AlignEdge): void {
       return [r.id, at];
     }),
   );
-  asUndoStep(() => moveNodes(positions));
+  glide(() => asUndoStep(() => moveNodes(positions)));
 }
 
 /** Reorders the selected nodes within their layer: sections stay behind every other node. */
