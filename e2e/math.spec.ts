@@ -171,7 +171,9 @@ const selectedLatex = (field: Locator) =>
     el.getValue(el.selection, 'latex'),
   );
 
-test('a drag along a line of multi-line math takes in its subscripts', async ({ page }) => {
+test('a drag along a line of multi-line math takes in its subscripts and stops at the end of the line', async ({
+  page,
+}) => {
   await placeNode(page, 'Math');
   const field = nodes(page).locator('math-field');
   await field.click();
@@ -185,6 +187,9 @@ test('a drag along a line of multi-line math takes in its subscripts', async ({ 
   await page.mouse.move(five.x - 6, five.y);
   await page.mouse.down();
   await page.mouse.move(subscript.x, five.y, { steps: 10 });
+  expect(await selectedLatex(field)).toBe('5p_1+3p_2+6p_3');
+  // Every line ends at the right edge of the math, so a drag just past it must not run to the end of the field.
+  await page.mouse.move(subscript.right + 30, five.y, { steps: 5 });
   expect(await selectedLatex(field)).toBe('5p_1+3p_2+6p_3');
   await page.mouse.up();
 });

@@ -1,5 +1,5 @@
 diff --git a/node_modules/mathlive/mathlive.mjs b/node_modules/mathlive/mathlive.mjs
-index 47351c7..1346384 100644
+index 47351c7..b1d7e32 100644
 --- a/node_modules/mathlive/mathlive.mjs
 +++ b/node_modules/mathlive/mathlive.mjs
 @@ -34529,6 +34529,8 @@ function distance(x, y, r) {
@@ -11,7 +11,7 @@ index 47351c7..1346384 100644
    if (!atom.id) return [Infinity, null];
    if (cache.has(atom.id)) return cache.get(atom.id);
    const bounds = getAtomBounds(mathfield, atom);
-@@ -34619,6 +34621,14 @@ function nearestAtomFromPointRecursive(mathfield, cache, atom, x, y) {
+@@ -34619,6 +34621,42 @@ function nearestAtomFromPointRecursive(mathfield, cache, atom, x, y) {
    cache.set(atom.id, result);
    return result;
  }
@@ -23,10 +23,52 @@ index 47351c7..1346384 100644
 +  }
 +  return result;
 +}
++function lineEdgeFromPoint(mathfield, y, end) {
++  const model = mathfield.model;
++  const root = model.root;
++  let line = null;
++  let nearest = Infinity;
++  if (root instanceof ArrayAtom && root.isMultiline) {
++    for (const row of root.rows) {
++      const atoms = row.filter(Boolean).flat();
++      let top = Infinity;
++      let bottom = -Infinity;
++      for (const atom of atoms) {
++        const b = getAtomBounds(mathfield, atom);
++        if (b) {
++          top = Math.min(top, b.top);
++          bottom = Math.max(bottom, b.bottom);
++        }
++      }
++      if (top === Infinity) continue;
++      const d = y < top ? top - y : y > bottom ? y - bottom : 0;
++      if (d < nearest) {
++        nearest = d;
++        line = atoms;
++      }
++    }
++  }
++  if (!line) return end ? model.lastOffset : 0;
++  return model.offsetOf(end ? line[line.length - 1] : line[0]);
++}
  function nearestAtomFromPoint(mathfield, x, y) {
    const [, atom] = nearestAtomFromPointRecursive(
      mathfield,
-@@ -34901,10 +34911,7 @@ var MathModeEditor = class extends ModeEditor {
+@@ -34633,9 +34671,10 @@ function offsetFromPoint(mathfield, x, y, options) {
+   var _a3;
+   const bounds = mathfield.field.querySelector(".ML__latex").getBoundingClientRect();
+   if (!bounds) return 0;
+-  if (x > bounds.right || y > bounds.bottom + 8)
+-    return mathfield.model.lastOffset;
+-  if (x < bounds.left || y < bounds.top - 8) return 0;
++  if (y > bounds.bottom + 8) return mathfield.model.lastOffset;
++  if (y < bounds.top - 8) return 0;
++  if (x > bounds.right || x < bounds.left)
++    return lineEdgeFromPoint(mathfield, y, x > bounds.right);
+   options = options != null ? options : {};
+   options.bias = (_a3 = options.bias) != null ? _a3 : 0;
+   let atom = nearestAtomFromPoint(mathfield, x, y);
+@@ -34901,10 +34940,7 @@ var MathModeEditor = class extends ModeEditor {
          const body = lastNewAtom.body;
          const hadEmptyBody = lastNewAtom.hasEmptyBranch("body");
          if (body && hadEmptyBody) {
@@ -38,7 +80,7 @@ index 47351c7..1346384 100644
          } else {
            model.position = model.offsetOf(lastNewAtom);
          }
-@@ -38901,6 +38908,7 @@ var _Model = class {
+@@ -38901,6 +38937,7 @@ var _Model = class {
            parent = parent.parent;
          }
        }
@@ -46,7 +88,7 @@ index 47351c7..1346384 100644
        this._position = this.normalizeOffset(position);
        this._selection = {
          ranges: [[start, end]],
-@@ -39070,6 +39078,34 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
+@@ -39070,6 +39107,34 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
    }
    return false;
  }
