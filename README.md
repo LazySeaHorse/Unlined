@@ -27,6 +27,7 @@ Most digital study tools require a tablet and stylus. Computational notebooks hi
 - **Search** (Ctrl+F) dims non-matching nodes and flies to the matches.
 - **Context menus**: right-click for add node, paste, copy, duplicate, delete, order, align and per-node actions; math nodes add insert, insert matrix, text colour and background (right-drag still pans).
 - **Organise**: groups nearby nodes and spaces them evenly (one undo step).
+- **Stacks**: put several nodes on one spot behind tabs, one shown at a time, e.g. a problem, its textbook page and your working. Each card keeps its scroll and state while hidden. Tap Space to fan the cards out and pick one. See [Controls](#controls).
 - **Links**: connect nodes with grid-snapped orthogonal pipes (arrow, dot or bar ends, colour, dashed, a label that may contain `$math$`). Turn on linking mode (toolbar button next to Organise, or `L`), drag from one node to another; click a link for its options, double-click it to name it, right-click for the menu. Between two Math+ nodes a link passes the source's result to the target as a variable: name it `k` (a single letter other than `e` or `i`) to use `k`, or leave it as `ans`. See [Links](#links).
 - **AI control**: let a coding agent (Claude Code, Codex, Gemini CLI, …) read and edit the open canvas through a small local bridge, or a browser agent through WebMCP. See [AI control](#ai-control).
 - **Dark mode**, **offline PWA**.
@@ -49,6 +50,10 @@ Most digital study tools require a tablet and stylus. Computational notebooks hi
 | Duplicate / delete | Ctrl+D / Delete (nodes and links together) |
 | Copy / paste nodes | Ctrl+C / Ctrl+V (with a node selected, not while typing in one) |
 | Wrap selection in a section | Ctrl+G |
+| Stack nodes | Ctrl+Shift+G (or Stack in the selection menu), or drag a node onto another node's tab |
+| Switch a stack's card | Click its tab, scroll over the tabs, or `[` / `]` with the stack selected |
+| Spread a stack out | Tap Space with the stack selected, or the button by its tabs. Click a card (or arrows, then Enter) to show it; drag one along the row to reorder, or away to take it out. Esc folds them up |
+| Take a card out, or unstack | Right-click the stack (or one of its tabs) |
 | Link nodes | `L` (or the toolbar button), then drag from one node to another. Esc or `L` leaves linking mode |
 | Edit a link | Click it for tail, head, colour, dashed, swap and delete; double-click to name it; right-click for the same options as a menu |
 | Select all | Ctrl+A |
