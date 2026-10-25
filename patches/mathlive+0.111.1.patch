@@ -1,8 +1,61 @@
 diff --git a/node_modules/mathlive/mathlive.mjs b/node_modules/mathlive/mathlive.mjs
-index 47351c7..d4aaad4 100644
+index 47351c7..a8656ff 100644
 --- a/node_modules/mathlive/mathlive.mjs
 +++ b/node_modules/mathlive/mathlive.mjs
-@@ -34529,6 +34529,8 @@ function distance(x, y, r) {
+@@ -31706,8 +31706,9 @@ var UndoManager = _UndoManager;
+ function onDelete(model, direction, atom, branch) {
+   var _a3, _b3, _c2, _d2, _e, _f;
+   const parent = atom.parent;
+-  if (isCellBranch(branch) && atom instanceof ArrayAtom && atom.isMultiline) {
+-    if (deleteRow(model, atom, branch[0], direction)) return true;
++  if (isCellBranch(branch) && atom instanceof ArrayAtom) {
++    if (atom.isMultiline && deleteRow(model, atom, branch[0], direction)) return true;
++    if (joinCells(model, atom, branch, direction)) return true;
+   }
+   if (parent && atom instanceof LeftRightAtom) {
+     const atStart = !branch && direction === "forward" || branch === "body" && direction === "backward";
+@@ -32135,6 +32136,40 @@ function deleteRange(model, range2, type) {
+     }
+   );
+ }
++function joinCells(model, array, [row, col], direction) {
++  var _a3;
++  const back = direction === "backward";
++  const acrossRows = back ? col === 0 : col === array.rows[row].length - 1;
++  const r = acrossRows ? back ? row - 1 : row + 1 : row;
++  if (r < 0 || r >= array.rowCount) return false;
++  const c = acrossRows ? back ? array.rows[r].length - 1 : 0 : back ? col - 1 : col + 1;
++  if (/matrix|^array$/.test(array.environmentName)) {
++    const cell = array.getCell(r, c);
++    model.position = model.offsetOf(back ? cell[cell.length - 1] : cell[0]);
++    return true;
++  }
++  const content = (cell) => (cell != null ? cell : []).filter((x) => x.type !== "first" && x.type !== "placeholder");
++  if (acrossRows) {
++    const [above, below] = back ? [r, row] : [row, r];
++    const upper = array.rows[above].map(content);
++    const lower = array.rows[below].map(content);
++    array.removeRow(below);
++    upper.forEach((cell, j) => {
++      var _a4;
++      return array.setCell(above, j, [...cell, ...(_a4 = lower[j]) != null ? _a4 : []]);
++    });
++    model.position = model.offsetOf(array.getCell(above, col)[upper[col].length]);
++  } else {
++    const [left, right] = back ? [c, col] : [col, c];
++    const cells = array.rows[row].map(content);
++    const joined = [...cells[left], ...cells[right]];
++    [...cells.slice(0, left), joined, ...cells.slice(right + 1), []].forEach(
++      (cell, j) => array.setCell(row, j, cell)
++    );
++    model.position = model.offsetOf(array.getCell(row, left)[cells[left].length]);
++  }
++  return true;
++}
+ function deleteRow(model, atom, row, direction) {
+   if (!(atom instanceof ArrayAtom)) return false;
+   if (!atom.isMultiline) return false;
+@@ -34529,6 +34564,8 @@ function distance(x, y, r) {
    return dx * dx + dy * dy;
  }
  function nearestAtomFromPointRecursive(mathfield, cache, atom, x, y) {
@@ -11,7 +64,7 @@ index 47351c7..d4aaad4 100644
    if (!atom.id) return [Infinity, null];
    if (cache.has(atom.id)) return cache.get(atom.id);
    const bounds = getAtomBounds(mathfield, atom);
-@@ -34619,6 +34621,42 @@ function nearestAtomFromPointRecursive(mathfield, cache, atom, x, y) {
+@@ -34619,6 +34656,42 @@ function nearestAtomFromPointRecursive(mathfield, cache, atom, x, y) {
    cache.set(atom.id, result);
    return result;
  }
@@ -54,7 +107,7 @@ index 47351c7..d4aaad4 100644
  function nearestAtomFromPoint(mathfield, x, y) {
    const [, atom] = nearestAtomFromPointRecursive(
      mathfield,
-@@ -34633,9 +34671,10 @@ function offsetFromPoint(mathfield, x, y, options) {
+@@ -34633,9 +34706,10 @@ function offsetFromPoint(mathfield, x, y, options) {
    var _a3;
    const bounds = mathfield.field.querySelector(".ML__latex").getBoundingClientRect();
    if (!bounds) return 0;
@@ -68,7 +121,7 @@ index 47351c7..d4aaad4 100644
    options = options != null ? options : {};
    options.bias = (_a3 = options.bias) != null ? _a3 : 0;
    let atom = nearestAtomFromPoint(mathfield, x, y);
-@@ -34901,10 +34940,7 @@ var MathModeEditor = class extends ModeEditor {
+@@ -34901,10 +34975,7 @@ var MathModeEditor = class extends ModeEditor {
          const body = lastNewAtom.body;
          const hadEmptyBody = lastNewAtom.hasEmptyBranch("body");
          if (body && hadEmptyBody) {
@@ -80,7 +133,7 @@ index 47351c7..d4aaad4 100644
          } else {
            model.position = model.offsetOf(lastNewAtom);
          }
-@@ -38850,7 +38886,7 @@ var _Model = class {
+@@ -38850,7 +38921,7 @@ var _Model = class {
          defaultMode: this.mathfield.options.defaultMode
        };
        return joinLatex(
@@ -89,7 +142,7 @@ index 47351c7..d4aaad4 100644
        );
      }
      return ranges.map(
-@@ -38901,6 +38937,7 @@ var _Model = class {
+@@ -38901,6 +38972,7 @@ var _Model = class {
            parent = parent.parent;
          }
        }
@@ -97,7 +150,7 @@ index 47351c7..d4aaad4 100644
        this._position = this.normalizeOffset(position);
        this._selection = {
          ranges: [[start, end]],
-@@ -39070,6 +39107,53 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
+@@ -39070,6 +39142,53 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
    }
    return false;
  }

@@ -214,6 +214,34 @@ test('math copied across lines keeps its line breaks', async ({ page }) => {
   );
 });
 
+test('Backspace at the start of a cell of aligned math joins it to the cell before', async ({ page }) => {
+  await placeNode(page, 'Math');
+  const field = nodes(page).locator('math-field');
+  await field.click();
+  await expect(field).toBeFocused();
+  const value = () => field.evaluate((el: HTMLElement & { value: string }) => el.value);
+  await field.evaluate(
+    (el: HTMLElement & { setValue: (v: string) => void }) =>
+      el.setValue(
+        '\\begin{aligned}\\text{Row 1: } & 5q_1=v\\\\ \\text{Row 2: } & 3q_1=v\\\\ & 6q_1=v\\end{aligned}',
+      ),
+    undefined,
+  );
+  const lines = await glyphLines(field);
+  // The left half of a glyph puts the caret before it: the start of its cell.
+  const six = lines[2][0];
+  await page.mouse.click(six.x - 2, six.y);
+  await page.keyboard.press('Backspace');
+  expect(await value()).toContain('\\\\ 6q_1=v & \\end{aligned}');
+
+  const five = lines[0].find((g) => g.text === '5');
+  if (!five) throw new Error('missing 5');
+  await page.mouse.click(five.x - 2, five.y);
+  await page.keyboard.press('Backspace');
+  await page.keyboard.press('Backspace');
+  expect(await value()).toContain('\\text{Row 1:}5q_1=v & \\\\');
+});
+
 test('Ctrl+Z in a field steps back through the one canvas history, newest edit first', async ({ page }) => {
   await placeNode(page, 'Math', 400, 300);
   const field = nodes(page).locator('math-field');

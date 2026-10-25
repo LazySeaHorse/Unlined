@@ -21,5 +21,9 @@ the unminified `mathlive.mjs` in every mode (see `vite.config.ts`), so that is t
 - **Copying across lines.** `Model.getValue` serialized a range as one flat list of atoms, so math copied
   from several lines of a multi-line field came out on one line. `serializeLines` keeps the lines, as
   `\displaylines{a\\ b}`.
+- **Backspace between cells.** Backspace at the start of a cell (or Delete at its end) only joined the
+  lines of a one-column field, and did nothing in `aligned` and the like. `joinCells` joins the cell to
+  the one before (or after), as deleting the `&` would, and a line's first cell to the line above, cell by
+  cell. In a matrix, where cells are separate entries, it steps into the neighbouring cell instead.
 
 When upgrading MathLive, re-apply these by hand to the new `mathlive.mjs` and run `npx patch-package mathlive`.
