@@ -850,9 +850,41 @@ math-field::part(virtual-keyboard-toggle) {
     translate: 0 -6px;
   }
 }
-/* The tab after the front one clears its fillet. */
-.stack-tabs > .node-tab + .stack-tab {
+/* Tabs either side of the front one clear its fillets. */
+.stack-tabs > .node-tab + .stack-tab,
+.stack-tabs > .stack-tab + .node-tab {
   margin-left: 0.75rem;
+}
+/* Selected, a front tab flush with the tile's left edge widens over the outline; one among others keeps its place. */
+.react-flow__node.selected .stack-tabs > .stack-tab + .node-tab {
+  margin-left: 0.75rem;
+  padding-left: 0.625rem;
+}
+/* The front tab's left fillet, when tabs come before it: .node-tab::after mirrored. */
+.node-tab-fillet {
+  position: absolute;
+  right: calc(100% + 1px);
+  bottom: 0;
+  width: 0.6875rem;
+  height: 0.6875rem;
+  background: radial-gradient(
+    circle at 0 0,
+    transparent calc(0.6875rem - 0.5px),
+    var(--ring) 0.6875rem,
+    var(--ring) calc(0.6875rem + 0.5px),
+    var(--tab) calc(0.6875rem + 1px)
+  );
+  pointer-events: none;
+}
+/* A patch over the tab's left hairline where the fillet takes over (.node-card .node-tab::before mirrored). */
+.node-tab-fillet::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  bottom: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--tab);
 }
 /* A node dragged over these tabs would join this stack if dropped. */
 .react-flow__node.stack-drop .node-tab {

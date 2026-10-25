@@ -47,9 +47,9 @@ function useFront(stackId: string, cards: CardNode[]): string | undefined {
 }
 
 /**
- * Cards on one spot behind tabs: the front card's tab with its title, the others as icons to its right in the
- * order cycling reaches them. Every card stays mounted (out of sight and inert unless in front) so switching keeps
- * its state: scroll, selection, history. A video card is the exception, as it would keep playing.
+ * Cards on one spot behind tabs, in the stack's order like a browser's: the front card's tab with its title, the
+ * others as icons either side of it. Every card stays mounted (out of sight and inert unless in front) so
+ * switching keeps its state: scroll, selection, history. A video card is the exception, as it would keep playing.
  *
  * Fanned out (Space, or the button by the tabs), the cards spread into a row over the canvas to pick from: click
  * one to show it, drag one along the row to reorder, or away from it to take it out.
@@ -134,15 +134,6 @@ function CardTab({ card }: { card: CardNode }) {
   );
 }
 
-/** The cards in the order their tabs show: the front one, then the rest as cycling forward reaches them. */
-function tabOrder(cards: CardNode[], front: string | undefined): CardNode[] {
-  const at = Math.max(
-    0,
-    cards.findIndex((c) => c.id === front),
-  );
-  return [...cards.slice(at), ...cards.slice(0, at)];
-}
-
 function StackTabs({ stackId, cards, front }: { stackId: string; cards: CardNode[]; front?: string }) {
   const wheel = useRef(0);
   // Scrolling over the tabs flips through the cards instead of zooming.
@@ -154,11 +145,13 @@ function StackTabs({ stackId, cards, front }: { stackId: string; cards: CardNode
   };
   return (
     <div className="stack-tabs nowheel" onWheel={onWheel}>
-      {tabOrder(cards, front).map((card) => {
+      {cards.map((card, i) => {
         const { icon: Icon, label } = nodeSpecs[card.type];
         const name = card.data.title || label;
         return card.id === front ? (
           <div key={card.id} className="node-tab cursor-grab" data-stack-tab={card.id}>
+            {/* With tabs before it, it curves into the tile on its left too. */}
+            {i > 0 && <span className="node-tab-fillet" />}
             <Icon className="size-3.5 shrink-0 opacity-70" />
             <NodeTitle id={card.id} fallback={label} value={card.data.title} color={card.data.color} />
           </div>

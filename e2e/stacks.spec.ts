@@ -21,15 +21,23 @@ async function stackThree(page: Page) {
   await expect(nodes(page)).toHaveCount(1);
 }
 
+const tabOrder = (page: Page) =>
+  stack(page)
+    .locator('.stack-card[data-front] [data-stack-tab]')
+    .evaluateAll((tabs) => tabs.map((tab) => (tab as HTMLElement).dataset.stackTab));
+
 test('Ctrl+Shift+G stacks the selection; tabs, ] and [ switch cards, and the choice is saved', async ({
   page,
 }) => {
   await stackThree(page);
   await expect(frontTab(page)).toContainText('Text');
   await expect(backTabs(page)).toHaveCount(2);
+  const order = await tabOrder(page);
 
+  // Like a browser's tabs, the one clicked opens where it is and the others stay put.
   await backTabs(page).first().click();
   await expect(frontTab(page)).toContainText('Math');
+  expect(await tabOrder(page)).toEqual(order);
 
   await page.keyboard.press(']');
   await expect(frontTab(page)).toContainText('Graph');
