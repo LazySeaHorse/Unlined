@@ -1,8 +1,32 @@
 diff --git a/node_modules/mathlive/mathlive.mjs b/node_modules/mathlive/mathlive.mjs
-index 47351c7..93e3969 100644
+index 47351c7..1346384 100644
 --- a/node_modules/mathlive/mathlive.mjs
 +++ b/node_modules/mathlive/mathlive.mjs
-@@ -34901,10 +34901,7 @@ var MathModeEditor = class extends ModeEditor {
+@@ -34529,6 +34529,8 @@ function distance(x, y, r) {
+   return dx * dx + dy * dy;
+ }
+ function nearestAtomFromPointRecursive(mathfield, cache, atom, x, y) {
++  if (atom.type === "subsup" && !getAtomBounds(mathfield, atom))
++    return nearestChildFromPoint(mathfield, cache, atom, x, y);
+   if (!atom.id) return [Infinity, null];
+   if (cache.has(atom.id)) return cache.get(atom.id);
+   const bounds = getAtomBounds(mathfield, atom);
+@@ -34619,6 +34621,14 @@ function nearestAtomFromPointRecursive(mathfield, cache, atom, x, y) {
+   cache.set(atom.id, result);
+   return result;
+ }
++function nearestChildFromPoint(mathfield, cache, atom, x, y) {
++  let result = [Infinity, null];
++  for (const child of atom.children) {
++    const r = nearestAtomFromPointRecursive(mathfield, cache, child, x, y);
++    if (r[0] <= result[0]) result = r;
++  }
++  return result;
++}
+ function nearestAtomFromPoint(mathfield, x, y) {
+   const [, atom] = nearestAtomFromPointRecursive(
+     mathfield,
+@@ -34901,10 +34911,7 @@ var MathModeEditor = class extends ModeEditor {
          const body = lastNewAtom.body;
          const hadEmptyBody = lastNewAtom.hasEmptyBranch("body");
          if (body && hadEmptyBody) {
@@ -14,7 +38,7 @@ index 47351c7..93e3969 100644
          } else {
            model.position = model.offsetOf(lastNewAtom);
          }
-@@ -38901,6 +38898,7 @@ var _Model = class {
+@@ -38901,6 +38908,7 @@ var _Model = class {
            parent = parent.parent;
          }
        }
@@ -22,7 +46,7 @@ index 47351c7..93e3969 100644
        this._position = this.normalizeOffset(position);
        this._selection = {
          ranges: [[start, end]],
-@@ -39070,6 +39068,34 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
+@@ -39070,6 +39078,34 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
    }
    return false;
  }

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Locator, test } from '@playwright/test';
 import { nodes, openApp, placeNode } from './helpers';
 
 test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
@@ -143,6 +143,50 @@ test('a drag that ends inside a square root selects the whole root', async ({ pa
       el.getValue(el.selection, 'latex'),
   );
   expect(selected).toBe('ab+\\sqrt{xyzw}');
+});
+
+const LINES = '\\displaylines{C_1=5p_1+3p_2+6p_3\\\\ C_2=3p_1+5p_2+4p_3\\\\ C_3=6p_1+4p_2+3p_3}';
+
+/** The centre of each glyph drawn in a math field, line by line from the top. */
+async function glyphLines(field: Locator) {
+  const glyphs = await field.evaluate((el) =>
+    [...(el.shadowRoot?.querySelectorAll('span') ?? [])]
+      .filter((s) => !s.children.length && s.textContent?.trim().replace('\u200b', ''))
+      .map((s) => {
+        const r = s.getBoundingClientRect();
+        return { text: s.textContent ?? '', x: r.x + r.width / 2, y: r.y + r.height / 2, right: r.right };
+      }),
+  );
+  const lines: (typeof glyphs)[] = [];
+  for (const g of glyphs) {
+    const line = lines.find((l) => Math.abs(l[0].y - g.y) < 10);
+    if (line) line.push(g);
+    else lines.push([g]);
+  }
+  return lines.sort((a, b) => a[0].y - b[0].y);
+}
+
+const selectedLatex = (field: Locator) =>
+  field.evaluate((el: HTMLElement & { selection: unknown; getValue: (s: unknown, f: string) => string }) =>
+    el.getValue(el.selection, 'latex'),
+  );
+
+test('a drag along a line of multi-line math takes in its subscripts', async ({ page }) => {
+  await placeNode(page, 'Math');
+  const field = nodes(page).locator('math-field');
+  await field.click();
+  await expect(field).toBeFocused();
+  await field.evaluate((el: HTMLElement & { setValue: (v: string) => void }, v) => el.setValue(v), LINES);
+  const [line] = await glyphLines(field);
+  const five = line[line.findIndex((g) => g.text === '=') + 1];
+  const subscript = line[line.length - 1];
+  expect(subscript.text).toBe('3');
+
+  await page.mouse.move(five.x - 6, five.y);
+  await page.mouse.down();
+  await page.mouse.move(subscript.x, five.y, { steps: 10 });
+  expect(await selectedLatex(field)).toBe('5p_1+3p_2+6p_3');
+  await page.mouse.up();
 });
 
 test('Ctrl+Z in a field steps back through the one canvas history, newest edit first', async ({ page }) => {
