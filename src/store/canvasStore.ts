@@ -16,6 +16,7 @@ import {
   type AppEdge,
   type AppNode,
   type CanvasContent,
+  type CanvasEdge,
   type CanvasGroup,
   DEFAULT_VIEWPORT,
   type LinkData,
@@ -122,6 +123,28 @@ export function asUndoStep<T>(fn: () => T): T {
 const changeKey = (c: NodeChange<AppNode>) => `${c.type}:${c.type === 'add' ? c.item.id : c.id}`;
 const fieldsKey = (patch: object) => Object.keys(patch).sort().join();
 
+/**
+ * Whether two undo snapshots hold the same content. Data is compared by reference: every edit replaces a node's
+ * data object (and `updateNodeData` skips edits that change nothing), so comparing contents would only walk every
+ * cell and image on each keystroke and drag frame to learn the same thing.
+ */
+type Snapshot = { nodes: AppNode[]; edges: CanvasEdge[] };
+const sameNode = (a: AppNode, b: AppNode) =>
+  a.id === b.id &&
+  a.type === b.type &&
+  a.data === b.data &&
+  a.position.x === b.position.x &&
+  a.position.y === b.position.y &&
+  a.width === b.width &&
+  a.height === b.height;
+const sameEdge = (a: CanvasEdge, b: CanvasEdge) =>
+  a.id === b.id && a.source === b.source && a.target === b.target && isEqual(a.data, b.data);
+const sameSnapshot = (a: Snapshot, b: Snapshot) =>
+  a.nodes.length === b.nodes.length &&
+  a.edges.length === b.edges.length &&
+  a.nodes.every((n, i) => sameNode(n, b.nodes[i])) &&
+  a.edges.every((e, i) => sameEdge(e, b.edges[i]));
+
 const deselect = (nodes: AppNode[]) => nodes.map((n) => (n.selected ? { ...n, selected: false } : n));
 const deselectEdges = (edges: AppEdge[]) => edges.map((e) => (e.selected ? { ...e, selected: false } : e));
 
@@ -194,14 +217,18 @@ export const useCanvasStore = create<CanvasState>()(
         });
       },
 
-      updateNodeData: (id, patch) =>
+      updateNodeData: (id, patch) => {
+        const node = get().nodes.find((n) => n.id === id);
+        const data = node?.data as Record<string, unknown> | undefined;
+        if (!data || Object.entries(patch).every(([key, value]) => isEqual(data[key], value))) return;
         continuing(`data:${id}:${fieldsKey(patch)}`, () =>
           set({
             nodes: get().nodes.map((n) =>
               n.id === id ? ({ ...n, data: { ...n.data, ...patch } } as AppNode) : n,
             ),
           }),
-        ),
+        );
+      },
 
       duplicateSelected: () => {
         const { nodes, edges } = get();
@@ -331,7 +358,7 @@ export const useCanvasStore = create<CanvasState>()(
     {
       // Only node and link content is undoable: selection, measurement and the viewport are not.
       partialize: (state) => ({ nodes: state.nodes.map(stripTransient), edges: state.edges.map(stripEdge) }),
-      equality: isEqual,
+      equality: sameSnapshot,
       handleSet: (handleSet) => (pastState, replace) => {
         const now = Date.now();
         const carriesOn =

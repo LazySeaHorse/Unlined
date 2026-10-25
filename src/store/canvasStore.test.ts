@@ -112,6 +112,19 @@ describe('canvasStore', () => {
     expect(useCanvasStore.temporal.getState().pastStates.length).toBe(pastLength);
   });
 
+  it('does not record edits that change nothing, or a node being measured', () => {
+    const node = createNode('math', { x: 0, y: 0 });
+    state().addNodes([node]);
+    settle();
+    const pastLength = useCanvasStore.temporal.getState().pastStates.length;
+    const before = state().nodes;
+    state().updateNodeData<'math'>(node.id, { latex: '' });
+    expect(state().nodes).toBe(before);
+    state().onNodesChange([{ type: 'dimensions', id: node.id, dimensions: { width: 100, height: 50 } }]);
+    settle();
+    expect(useCanvasStore.temporal.getState().pastStates.length).toBe(pastLength);
+  });
+
   it('sets the selection by predicate and deletes it as one undo step', () => {
     const [a, b, c] = [0, 1, 2].map((x) => createNode('math', { x, y: 0 }));
     state().load({ nodes: [a, b, c], viewport: DEFAULT_VIEWPORT });
