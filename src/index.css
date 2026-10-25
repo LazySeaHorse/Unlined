@@ -72,6 +72,13 @@
   --elevation-float: 0 4px 18px rgb(0 0 0 / 0.18);
   /* Keeps a link's label readable over the line under it. */
   --label-halo: 0 0 3px var(--canvas), 0 0 3px var(--canvas), 0 0 3px var(--canvas);
+  /* Motion. State changes are fast; things travelling across the canvas take longer. Mirrored in motion/motion.ts. */
+  --dur-fast: 120ms;
+  --dur: 180ms;
+  --dur-move: 320ms;
+  /* Settles with a slight overshoot, for things landing. --ease-spring (in @theme) glides without one. */
+  --ease-bounce: linear(0, 0.14 5%, 0.52 14%, 0.86 24%, 1.03 34%, 1.07 42%, 1.05 52%, 1.01 64%, 0.995 78%, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
 }
 
 /* Neutral greys: no blue tint in dark mode. */

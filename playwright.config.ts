@@ -10,6 +10,8 @@ export default defineConfig({
   use: {
     baseURL: `http://localhost:${port}/app/`,
     serviceWorkers: 'block',
+    // Animations finish instantly, so tests never wait on one or catch a node mid-glide.
+    reducedMotion: 'reduce',
     launchOptions: { executablePath: process.env.PLAYWRIGHT_CHROMIUM_PATH || undefined },
   },
   projects: [

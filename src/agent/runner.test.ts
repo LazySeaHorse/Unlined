@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type AppNode, DEFAULT_VIEWPORT } from '@/model/types';
+import { useMarks } from '@/motion/marks';
 import { createNode } from '@/nodes/factory';
 import { undo, useCanvasStore } from '@/store/canvasStore';
 import { alias, resetAliases } from './aliases';
@@ -85,7 +86,7 @@ describe('runner', () => {
     expect(useAgentStore.getState().locked).toBe(false);
     await call('move_nodes', { moves: [{ id: 'n1', dx: 10 }] });
     expect(useAgentStore.getState().locked).toBe(true);
-    expect(useAgentStore.getState().touched.has(canvas().nodes[0].id)).toBe(true);
+    expect(useMarks.getState().marks.get(canvas().nodes[0].id)).toBe('ai-touched');
   });
 });
 

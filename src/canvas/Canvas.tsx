@@ -12,10 +12,9 @@ import {
 } from '@xyflow/react';
 import { type DragEvent, type MouseEvent, useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
-import { setAgentView, useAgentStore } from '@/agent';
+import { setAgentView } from '@/agent';
 import { cn } from '@/lib/cn';
 import { closesMathPlusLoop, findLink } from '@/lib/links';
-import { SECTION_Z } from '@/lib/sections';
 import type { AppNode } from '@/model/types';
 import { nodeSpecs } from '@/nodes/catalog';
 import { nodeTypes } from '@/nodes/nodeTypes';
@@ -28,10 +27,11 @@ import { ALREADY_LINKED } from './links/actions';
 import { edgeTypes } from './links/LinkEdge';
 import { LinkPreview } from './links/LinkPreview';
 import { LinkToolbar } from './links/LinkToolbar';
+import { useProjection, useView } from './project';
 import { GRID, withSnappedResize } from './snap';
 import { useCanvasActions } from './useCanvasActions';
 import { useContextMenu } from './useContextMenu';
-import { useSearchEdges, useSearchHighlight } from './useSearch';
+import { useFitToMatches } from './useSearch';
 import { useSections } from './useSections';
 import { useShortcuts } from './useShortcuts';
 import { useZoomTier } from './zoomTier';
@@ -103,9 +103,9 @@ export function Canvas({ readOnly }: { readOnly: boolean }) {
   const theme = useUiStore((s) => s.theme);
   const linkingOn = useUiStore((s) => s.linking);
   const linking = linkingOn && !readOnly;
-  const touched = useAgentStore((s) => s.touched);
-  const searched = useSearchHighlight(nodes);
-  const displayEdges = useSearchEdges(edges, nodes);
+  const view = useView(nodes);
+  useFitToMatches(view.matches);
+  const { displayNodes, displayEdges } = useProjection(nodes, edges, view);
   const multipleSelected = useMemo(() => nodes.filter((n) => n.selected).length > 1, [nodes]);
   const sectionHandlers = useSections();
   const { onNodesChange: applyChanges } = sectionHandlers;
@@ -115,23 +115,6 @@ export function Canvas({ readOnly }: { readOnly: boolean }) {
     [applyChanges],
   );
   const tier = useZoomTier();
-  const displayNodes = useMemo(
-    () =>
-      searched.map((n) => {
-        const node = touched.has(n.id) ? { ...n, className: 'ai-touched' } : n;
-        // Sections sit behind everything and only their header takes the pointer, so the canvas
-        // underneath (marquee, double-click to add a node, panning) keeps working inside them.
-        return node.type === 'section'
-          ? {
-              ...node,
-              zIndex: SECTION_Z,
-              dragHandle: '.section-handle',
-              style: { pointerEvents: 'none' as const },
-            }
-          : node;
-      }),
-    [searched, touched],
-  );
   // Figma-style wheel: scroll zooms, holding Shift pans instead.
   const panningScroll = useKeyPress('Shift');
   const { addNode, dropPdfs } = useCanvasActions();

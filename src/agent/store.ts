@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { mark } from '@/motion/marks';
 
 /** How long the canvas stays locked for the user after the agent's last edit. */
 export const LOCK_MS = 8000;
@@ -10,8 +11,6 @@ interface AgentState {
   enabled: boolean;
   /** True while the agent is editing: the canvas is read-only for the user. */
   locked: boolean;
-  /** Nodes changed by the agent in the last moment, highlighted on the canvas. */
-  touched: ReadonlySet<string>;
   bridgeConnected: boolean;
   /** Tools registered with the browser's WebMCP API (0 when unsupported). */
   webMcpTools: number;
@@ -23,7 +22,6 @@ interface AgentState {
 export const useAgentStore = create<AgentState>()((set) => ({
   enabled: false,
   locked: false,
-  touched: new Set(),
   bridgeConnected: false,
   webMcpTools: 0,
   setEnabled: (enabled) => {
@@ -48,11 +46,7 @@ export function releaseLock(): void {
   if (useAgentStore.getState().locked) useAgentStore.setState({ locked: false });
 }
 
-let touchTimer: ReturnType<typeof setTimeout> | undefined;
-
+/** Highlights nodes the agent changed, for a moment. */
 export function markTouched(ids: string[]): void {
-  if (ids.length === 0) return;
-  clearTimeout(touchTimer);
-  useAgentStore.setState((s) => ({ touched: new Set([...s.touched, ...ids]) }));
-  touchTimer = setTimeout(() => useAgentStore.setState({ touched: new Set() }), TOUCH_HIGHLIGHT_MS);
+  mark(ids, 'ai-touched', TOUCH_HIGHLIGHT_MS);
 }
