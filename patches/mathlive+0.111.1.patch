@@ -1,8 +1,24 @@
 diff --git a/node_modules/mathlive/mathlive.mjs b/node_modules/mathlive/mathlive.mjs
-index 47351c7..a8656ff 100644
+index 47351c7..b907e9f 100644
 --- a/node_modules/mathlive/mathlive.mjs
 +++ b/node_modules/mathlive/mathlive.mjs
-@@ -31706,8 +31706,9 @@ var UndoManager = _UndoManager;
+@@ -12288,10 +12288,11 @@ var _ModeEditor = class _ModeEditor {
+           atoms = atom.body.filter((x) => x.type !== "first");
+       }
+       try {
+-        ev.clipboardData.setData(
+-          "application/json+mathlive",
+-          JSON.stringify(atoms.map((x) => x.toJson()))
+-        );
++        if (!latex.startsWith("\\displaylines{"))
++          ev.clipboardData.setData(
++            "application/json+mathlive",
++            JSON.stringify(atoms.map((x) => x.toJson()))
++          );
+       } catch (e) {
+       }
+       if ((_a3 = window[/* @__PURE__ */ Symbol.for("io.cortexjs.compute-engine")]) == null ? void 0 : _a3.ComputeEngine) {
+@@ -31706,8 +31707,9 @@ var UndoManager = _UndoManager;
  function onDelete(model, direction, atom, branch) {
    var _a3, _b3, _c2, _d2, _e, _f;
    const parent = atom.parent;
@@ -14,7 +30,7 @@ index 47351c7..a8656ff 100644
    }
    if (parent && atom instanceof LeftRightAtom) {
      const atStart = !branch && direction === "forward" || branch === "body" && direction === "backward";
-@@ -32135,6 +32136,40 @@ function deleteRange(model, range2, type) {
+@@ -32135,6 +32137,40 @@ function deleteRange(model, range2, type) {
      }
    );
  }
@@ -55,7 +71,7 @@ index 47351c7..a8656ff 100644
  function deleteRow(model, atom, row, direction) {
    if (!(atom instanceof ArrayAtom)) return false;
    if (!atom.isMultiline) return false;
-@@ -34529,6 +34564,8 @@ function distance(x, y, r) {
+@@ -34529,6 +34565,8 @@ function distance(x, y, r) {
    return dx * dx + dy * dy;
  }
  function nearestAtomFromPointRecursive(mathfield, cache, atom, x, y) {
@@ -64,7 +80,7 @@ index 47351c7..a8656ff 100644
    if (!atom.id) return [Infinity, null];
    if (cache.has(atom.id)) return cache.get(atom.id);
    const bounds = getAtomBounds(mathfield, atom);
-@@ -34619,6 +34656,42 @@ function nearestAtomFromPointRecursive(mathfield, cache, atom, x, y) {
+@@ -34619,6 +34657,42 @@ function nearestAtomFromPointRecursive(mathfield, cache, atom, x, y) {
    cache.set(atom.id, result);
    return result;
  }
@@ -107,7 +123,7 @@ index 47351c7..a8656ff 100644
  function nearestAtomFromPoint(mathfield, x, y) {
    const [, atom] = nearestAtomFromPointRecursive(
      mathfield,
-@@ -34633,9 +34706,10 @@ function offsetFromPoint(mathfield, x, y, options) {
+@@ -34633,9 +34707,10 @@ function offsetFromPoint(mathfield, x, y, options) {
    var _a3;
    const bounds = mathfield.field.querySelector(".ML__latex").getBoundingClientRect();
    if (!bounds) return 0;
@@ -121,7 +137,58 @@ index 47351c7..a8656ff 100644
    options = options != null ? options : {};
    options.bias = (_a3 = options.bias) != null ? _a3 : 0;
    let atom = nearestAtomFromPoint(mathfield, x, y);
-@@ -34901,10 +34975,7 @@ var MathModeEditor = class extends ModeEditor {
+@@ -34665,6 +34740,39 @@ function offsetFromPoint(mathfield, x, y, options) {
+   return result;
+ }
+ 
++function insertLines(model, lines) {
++  if (!(lines instanceof ArrayAtom) || lines.environmentName !== "lines") return false;
++  const root = model.root;
++  const cursor = model.at(model.position);
++  const content = (atoms) => atoms.filter((x) => x.type !== "first");
++  let rows;
++  let row = 0;
++  if (root instanceof ArrayAtom && root.environmentName === "lines" && cursor.parent === root) {
++    rows = root.rows.map((r) => r[0]);
++    row = cursor.parentBranch[0];
++  } else if (root.type === "root" && cursor.parent === root) rows = [root.body];
++  else if (cursor.parent) {
++    const flat = lines.rows.flatMap((r) => content(r[0]));
++    cursor.parent.addChildrenAfter(flat, cursor);
++    model.position = model.offsetOf(flat.length > 0 ? flat[flat.length - 1] : cursor);
++    return true;
++  } else return false;
++  const line = rows[row];
++  const split = line.indexOf(cursor) + 1;
++  const before = content(line.slice(0, split));
++  const pasted = lines.rows.map((r) => content(r[0]));
++  const end = pasted[pasted.length - 1];
++  const caret = end.length > 0 ? end[end.length - 1] : pasted.length === 1 ? before[before.length - 1] : void 0;
++  pasted[0] = [...before, ...pasted[0]];
++  pasted[pasted.length - 1] = [...pasted[pasted.length - 1], ...content(line.slice(split))];
++  const all = [...rows.slice(0, row), ...pasted, ...rows.slice(row + 1)].map(content);
++  while (lines.rowCount < all.length) lines.addRowAfter(lines.rowCount - 1);
++  all.forEach((atoms, i) => lines.setCell(i, 0, atoms));
++  model.root = lines;
++  model.position = model.offsetOf(caret != null ? caret : lines.getCell(row + pasted.length - 1, 0)[0]);
++  return true;
++}
++
+ // src/editor-mathfield/mode-editor-math.ts
+ var MathModeEditor = class extends ModeEditor {
+   constructor() {
+@@ -34838,7 +34946,9 @@ var MathModeEditor = class extends ModeEditor {
+       );
+     }
+     const implicitArgEndOffset = model.position;
+-    if (newAtoms.length === 1 && newAtoms[0].isRoot) model.root = newAtoms[0];
++    if (newAtoms.length === 1 && newAtoms[0].isRoot) {
++      if (!insertLines(model, newAtoms[0])) model.root = newAtoms[0];
++    }
+     else {
+       const atom = model.at(model.position);
+       const parent = (_d2 = atom == null ? void 0 : atom.parent) != null ? _d2 : model.root;
+@@ -34901,10 +35011,7 @@ var MathModeEditor = class extends ModeEditor {
          const body = lastNewAtom.body;
          const hadEmptyBody = lastNewAtom.hasEmptyBranch("body");
          if (body && hadEmptyBody) {
@@ -133,7 +200,7 @@ index 47351c7..a8656ff 100644
          } else {
            model.position = model.offsetOf(lastNewAtom);
          }
-@@ -38850,7 +38921,7 @@ var _Model = class {
+@@ -38850,7 +38957,7 @@ var _Model = class {
          defaultMode: this.mathfield.options.defaultMode
        };
        return joinLatex(
@@ -142,7 +209,7 @@ index 47351c7..a8656ff 100644
        );
      }
      return ranges.map(
-@@ -38901,6 +38972,7 @@ var _Model = class {
+@@ -38901,6 +39008,7 @@ var _Model = class {
            parent = parent.parent;
          }
        }
@@ -150,7 +217,7 @@ index 47351c7..a8656ff 100644
        this._position = this.normalizeOffset(position);
        this._selection = {
          ranges: [[start, end]],
-@@ -39070,6 +39142,53 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
+@@ -39070,6 +39178,53 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
    }
    return false;
  }

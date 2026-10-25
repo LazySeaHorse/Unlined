@@ -214,6 +214,36 @@ test('math copied across lines keeps its line breaks', async ({ page }) => {
   );
 });
 
+test('math copied across lines pastes as lines, around the caret', async ({ page }) => {
+  await placeNode(page, 'Math', 400, 300);
+  await placeNode(page, 'Math', 900, 300);
+  const [source, target] = [
+    nodes(page).nth(0).locator('math-field'),
+    nodes(page).nth(1).locator('math-field'),
+  ];
+  await source.click();
+  await source.evaluate((el: HTMLElement & { setValue: (v: string) => void }, v) => el.setValue(v), LINES);
+  const [first, second] = await glyphLines(source);
+  const five = first[first.findIndex((g) => g.text === '=') + 1];
+  await page.mouse.move(five.x - 6, five.y);
+  await page.mouse.down();
+  await page.mouse.move(second[second.length - 1].right + 30, second[0].y, { steps: 10 });
+  await page.mouse.up();
+  await page.keyboard.press('ControlOrMeta+c');
+
+  await target.click();
+  await target.click();
+  await expect(target).toBeFocused();
+  await target.evaluate((el: HTMLElement & { setValue: (v: string) => void; position: number }) => {
+    el.setValue('x+y');
+    el.position = 1;
+  });
+  await page.keyboard.press('ControlOrMeta+v');
+  await expect
+    .poll(() => target.evaluate((el: HTMLElement & { value: string }) => el.value))
+    .toBe('\\displaylines{x5p_1+3p_2+6p_3\\\\ C_2=3p_1+5p_2+4p_3+y}');
+});
+
 test('Backspace at the start of a cell of aligned math joins it to the cell before', async ({ page }) => {
   await placeNode(page, 'Math');
   const field = nodes(page).locator('math-field');

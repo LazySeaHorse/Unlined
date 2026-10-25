@@ -21,6 +21,10 @@ the unminified `mathlive.mjs` in every mode (see `vite.config.ts`), so that is t
 - **Copying across lines.** `Model.getValue` serialized a range as one flat list of atoms, so math copied
   from several lines of a multi-line field came out on one line. `serializeLines` keeps the lines, as
   `\displaylines{a\\ b}`.
+- **Pasting lines.** A copy across lines carried MathLive's own atom list too, which paste prefers and
+  which knows no lines, so it pasted on one line. `onCopy` leaves it out then, and the LaTeX is pasted
+  instead, where a pasted `\displaylines` replaced the whole field. `insertLines` splits the line at the
+  caret around the pasted lines, or, with the caret deeper than a line, pastes their contents inline.
 - **Backspace between cells.** Backspace at the start of a cell (or Delete at its end) only joined the
   lines of a one-column field, and did nothing in `aligned` and the like. `joinCells` joins the cell to
   the one before (or after), as deleting the `&` would, and a line's first cell to the line above, cell by
