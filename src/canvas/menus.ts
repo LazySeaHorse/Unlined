@@ -24,6 +24,7 @@ import {
   MousePointer2,
   PaintBucket,
   PencilLine,
+  Pin,
   Play,
   Plus,
   Shapes,
@@ -55,6 +56,7 @@ import { nodeSpecs } from '@/nodes/catalog';
 import { mathPlusResultsText } from '@/nodes/mathPlus/useMathPlusResults';
 import { withFill } from '@/nodes/sheet/fills';
 import { sheetSelection } from '@/nodes/sheet/selection';
+import { stackLayouts } from '@/nodes/stack/spec';
 import {
   clearBlock,
   deleteBlockColumns,
@@ -67,7 +69,7 @@ import { type AlignEdge, alignSelected, bringToFront, sendToBack } from '@/store
 import { useCanvasStore } from '@/store/canvasStore';
 import { organiseCanvas } from '@/store/groups';
 import { deleteSectionWithContents } from '@/store/sections';
-import { stackSelection, takeOut, unstack } from '@/store/stacks';
+import { setStackLayout, stackSelection, takeOut, unstack } from '@/store/stacks';
 import { useUiStore } from '@/store/uiStore';
 import { askNumbers } from '@/ui/dialogs';
 import type { MenuEntry } from '@/ui/Menu';
@@ -351,6 +353,24 @@ export function stackMenu(stack: NodeOf<'stack'>, card: CardNode): MenuEntry[] {
     ...kindExtras(card),
     { label: 'Take out of stack', icon: SquareArrowOutUpRight, onSelect: () => takeOut(stack.id, card.id) },
     { label: 'Unstack all', icon: Ungroup, onSelect: () => unstack(stack.id) },
+    {
+      label: 'Pin open',
+      icon: Pin,
+      items: [
+        {
+          label: 'No, behind tabs',
+          icon: Layers,
+          checked: !stack.data.layout,
+          onSelect: () => setStackLayout(stack.id, undefined),
+        },
+        ...stackLayouts.map(({ layout, label, icon }) => ({
+          label,
+          icon,
+          checked: stack.data.layout === layout,
+          onSelect: () => setStackLayout(stack.id, layout),
+        })),
+      ],
+    },
     { separator: true },
     copy,
     duplicate,
@@ -519,10 +539,13 @@ export function menuFor(target: Element | null, at: XYPosition, actions: MenuAct
   const flowHit = nodes.find((n) => n.id === id);
   if (!flowHit) return canvasMenu(at, actions);
   if (!flowHit.selected) useCanvasStore.getState().setSelection((n) => n.id === flowHit.id);
-  // In a stack, the menu is about the card under the pointer: the tab right-clicked, else the one shown.
+  // In a stack, the menu is about the card under the pointer: the tab right-clicked, else the card (all show in a
+  // pinned stack), else the one shown.
   const stack = isStack(flowHit) ? flowHit : undefined;
   const cardId = stack
-    ? (target?.closest<HTMLElement>('[data-stack-tab]')?.dataset.stackTab ?? frontOf(stack, nodes, fronts))
+    ? (target?.closest<HTMLElement>('[data-stack-tab]')?.dataset.stackTab ??
+      target?.closest<HTMLElement>('[data-stack-card]')?.dataset.stackCard ??
+      frontOf(stack, nodes, fronts))
     : undefined;
   const hit = stack ? nodes.find((n) => n.id === cardId) : flowHit;
   if (!hit || hit.type === 'stack') return [];

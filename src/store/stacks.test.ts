@@ -3,7 +3,17 @@ import { membersOf, type StackNodeT } from '@/lib/stacks';
 import { DEFAULT_VIEWPORT } from '@/model/types';
 import { createNode } from '@/nodes/factory';
 import { getCanvasContent, undo, useCanvasStore } from './canvasStore';
-import { cycleFront, moveCard, stackOnto, stackSelection, takeOut, unstack } from './stacks';
+import {
+  cycleFront,
+  moveCard,
+  openFan,
+  setStackLayout,
+  stackOnto,
+  stackSelection,
+  takeOut,
+  unstack,
+} from './stacks';
+import { useUiStore } from './uiStore';
 
 const state = () => useCanvasStore.getState();
 const card = (x: number, y = 0) => createNode('text', { x, y }, {}, { width: 100, height: 50 });
@@ -103,6 +113,34 @@ describe('stacks in the store', () => {
     const id = stackOnto(a.id, [b.id, c.id]) as string;
     moveCard(id, c.id, 0);
     expect(cards(id)).toEqual([c.id, a.id, b.id]);
+  });
+
+  it('pins a stack open in a layout and back behind tabs, as undo steps, keeping it through card changes', () => {
+    const [a, b, c, d] = [card(0), card(100), card(200), card(300)];
+    state().load({ nodes: [a, b, c, d], viewport: DEFAULT_VIEWPORT });
+    const id = stackOnto(a.id, [b.id, c.id]) as string;
+    setStackLayout(id, 'masonry');
+    expect(stack(id).data.layout).toBe('masonry');
+    moveCard(id, c.id, 0);
+    takeOut(id, b.id);
+    stackOnto(id, [d.id]);
+    expect(stack(id).data).toEqual({ members: [c.id, a.id, d.id], layout: 'masonry' });
+    setStackLayout(id, undefined);
+    expect(stack(id).data).toEqual({ members: [c.id, a.id, d.id] });
+    undo();
+    expect(stack(id).data.layout).toBe('masonry');
+  });
+
+  it('does not fan out a pinned stack, and folds a fanned one up when pinning it', () => {
+    const [a, b] = [card(0), card(100)];
+    state().load({ nodes: [a, b], viewport: DEFAULT_VIEWPORT });
+    const id = stackOnto(a.id, [b.id]) as string;
+    openFan(id);
+    expect(useUiStore.getState().fanned).toBe(id);
+    setStackLayout(id, 'row');
+    expect(useUiStore.getState().fanned).toBeNull();
+    openFan(id);
+    expect(useUiStore.getState().fanned).toBeNull();
   });
 
   it('deleting a stack deletes its cards and their links; duplicating copies them', () => {

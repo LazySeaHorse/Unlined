@@ -61,7 +61,8 @@ export function NodeShell({
   children,
 }: NodeShellProps) {
   const readOnly = useReadOnly();
-  // Inside a stack, React Flow's node is the stack; the card is this node, and the stack draws the tabs.
+  // Inside a stack, React Flow's node is the stack; the card is this node, and the stack draws the tabs (unless
+  // pinned open, where each card wears its own).
   const card = useCardInStack();
   const flowId = useNodeId();
   const id = card?.cardId ?? flowId;
@@ -76,11 +77,12 @@ export function NodeShell({
       {resize && !card && <CornerResizer selected={selected} {...resize} />}
       <div
         className="node node-card flex h-full w-full flex-col"
+        data-selected={selected || undefined}
         data-live={live || undefined}
         style={{ '--tone-base': tone } as CSSProperties}
       >
         <div className="flex shrink-0 items-end" style={{ height: NODE_TAB_HEIGHT }}>
-          {card ? (
+          {card && card.tabs !== undefined ? (
             card.tabs
           ) : (
             <div className="node-tab cursor-grab">

@@ -8,6 +8,7 @@ import {
   fanLayout,
   frontOf,
   keepInView,
+  masonryColumns,
   membersOf,
   nearestSlot,
   placedId,
@@ -93,6 +94,18 @@ describe('stacks', () => {
       { x: 0, y: 10 },
       { x: 148, y: 10 },
     ]);
+  });
+});
+
+describe('masonryColumns', () => {
+  it('deals cards left to right into about as many columns as rows', () => {
+    expect(masonryColumns([1, 2, 3, 4, 5])).toEqual([[1, 4], [2, 5], [3]]);
+    expect(masonryColumns([1, 2, 3, 4])).toEqual([
+      [1, 3],
+      [2, 4],
+    ]);
+    expect(masonryColumns([1, 2])).toEqual([[1], [2]]);
+    expect(masonryColumns([])).toEqual([]);
   });
 });
 

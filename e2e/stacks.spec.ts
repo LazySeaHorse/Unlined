@@ -112,7 +112,7 @@ test('Space fans the cards out: arrows and Enter, or a click, pick one; Escape f
   await expect(picks).toHaveCount(0);
   await expect(frontTab(page)).toContainText('Math');
 
-  await stack(page).locator('.stack-fan').click();
+  await stack(page).getByRole('button', { name: 'Spread out the cards' }).click();
   await expect(picks).toHaveCount(3);
   await page.keyboard.press('Escape');
   await expect(picks).toHaveCount(0);
@@ -129,5 +129,47 @@ test('dragging a fanned card away from the row takes it out of the stack', async
   await page.mouse.move(card.x + card.width / 2, card.y + card.height / 2 + 350, { steps: 10 });
   await page.mouse.up();
   await expect(nodes(page)).toHaveCount(2);
+  await expect(backTabs(page)).toHaveCount(1);
+});
+
+test('a stack pins open with every card in sight, laid out as picked, and unpins back to tabs', async ({
+  page,
+}) => {
+  await stackThree(page);
+  await stack(page).getByRole('button', { name: 'Pin open' }).click();
+  const pinned = stack(page).locator('.stack-node[data-layout]');
+  const pinnedCards = pinned.locator('.stack-card');
+  await expect(pinned).toHaveAttribute('data-layout', 'row');
+  await expect(pinnedCards).toHaveCount(3);
+  for (const name of ['Text', 'Math', 'Graph'])
+    await expect(pinned.locator('.node-tab', { hasText: name })).toBeVisible();
+  const box = async () => (await stack(page).boundingBox()) ?? { width: 0, height: 0 };
+  const row = await box();
+  if (process.env.PIN_SHOTS) await page.screenshot({ path: `${process.env.PIN_SHOTS}/row.png` });
+
+  await pinned.getByRole('button', { name: 'Vertical' }).click();
+  await expect(pinned).toHaveAttribute('data-layout', 'column');
+  const column = await box();
+  expect(column.height).toBeGreaterThan(row.height);
+  expect(column.width).toBeLessThan(row.width);
+  if (process.env.PIN_SHOTS) await page.screenshot({ path: `${process.env.PIN_SHOTS}/column.png` });
+
+  await pinned.getByRole('button', { name: 'Masonry grid' }).click();
+  await expect(pinned.locator('.stack-column')).toHaveCount(2);
+  if (process.env.PIN_SHOTS) await page.screenshot({ path: `${process.env.PIN_SHOTS}/masonry.png` });
+
+  // Every card shows, so a right-click is about the card under the pointer.
+  await pinned.locator('.node-tab', { hasText: 'Graph' }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Take out of stack' }).click();
+  await expect(nodes(page)).toHaveCount(2);
+  await expect(pinnedCards).toHaveCount(2);
+  await expect(pinned.locator('.node-tab', { hasText: 'Graph' })).toHaveCount(0);
+
+  await page.waitForTimeout(800);
+  await page.reload();
+  await expect(pinned).toHaveAttribute('data-layout', 'masonry');
+
+  await pinned.getByRole('button', { name: 'Unpin, back to tabs' }).click();
+  await expect(pinned).toHaveCount(0);
   await expect(backTabs(page)).toHaveCount(1);
 });

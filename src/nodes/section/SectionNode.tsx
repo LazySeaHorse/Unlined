@@ -26,6 +26,7 @@ export function SectionNode({ id, data, selected }: NodeProps<NodeOf<'section'>>
       <CornerResizer selected={selected} minWidth={160} minHeight={100} />
       <div
         className="node flex h-full w-full flex-col"
+        data-selected={selected || undefined}
         style={
           // See-through, so the dot grid shows under the section.
           { '--tone-base': `color-mix(in srgb, ${swatch(data.color)} 18%, transparent)` } as CSSProperties

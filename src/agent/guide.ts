@@ -39,7 +39,9 @@ FIELDS (create_nodes takes them flat next to "kind"; update_nodes "set" replaces
 - image: uploaded by the user; you can move, resize or delete images but not create them or see them.
 - stack: several nodes the user put on one spot behind tabs, one shown at a time. Its cards are ordinary nodes
   you read and edit by their own handles; their place is the stack's ("in stack s3"). Moving or resizing a card
-  moves or resizes its stack; deleting the stack deletes its cards. You cannot create stacks.
+  moves or resizes its stack; deleting the stack deletes its cards. You cannot create stacks. A stack the user
+  pinned open ("pinned open in a row", a column or masonry) shows every card at its own size instead, and is as
+  big as they make it: resizing it only takes effect once it is back behind tabs.
 
 - pdf: a PDF the user linked from their disk. It shows the pages the user pinned, or its cover (page 1) while
   nothing is pinned. read_nodes gives you the text of the shown pages only; other pages are off limits and

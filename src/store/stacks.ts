@@ -10,7 +10,7 @@ import {
   stackSize,
   UNSTACK_GAP,
 } from '@/lib/stacks';
-import { type AppNode, isCard } from '@/model/types';
+import { type AppNode, isCard, type StackLayout } from '@/model/types';
 import { glide } from '@/motion/glide';
 import { createNode } from '@/nodes/factory';
 import { asUndoStep, useCanvasStore } from './canvasStore';
@@ -59,7 +59,7 @@ export function stackOnto(targetId: string, ids: string[], front?: string): stri
   if (isStack(target)) {
     const members = [...membersOf(target, nodes).map((m) => m.id), ...incoming];
     next = nodes.flatMap((n) =>
-      absorbed.has(n.id) ? [] : n.id === targetId ? [{ ...target, data: { members } }] : [n],
+      absorbed.has(n.id) ? [] : n.id === targetId ? [{ ...target, data: { ...target.data, members } }] : [n],
     );
   } else {
     const cards = [target, ...incoming.map((id) => byId.get(id) as AppNode)];
@@ -94,7 +94,7 @@ function release(stackId: string, cards: AppNode[], to: Map<string, XYPosition>,
   const stack = stackIndex(nodes).byId.get(stackId);
   if (!isStack(stack)) return;
   const next = nodes.flatMap((n): AppNode[] => {
-    if (n.id === stackId) return keep ? [{ ...stack, data: { members: keep } }] : [];
+    if (n.id === stackId) return keep ? [{ ...stack, data: { ...stack.data, members: keep } }] : [];
     const at = to.get(n.id);
     return at ? [{ ...n, position: at } as AppNode] : [n];
   });
@@ -158,7 +158,19 @@ export function moveCard(stackId: string, memberId: string, index: number): void
   if (from < 0 || from === to) return;
   ids.splice(from, 1);
   ids.splice(to, 0, memberId);
-  commit(nodes.map((n) => (n.id === stackId ? { ...stack, data: { members: ids } } : n)));
+  commit(nodes.map((n) => (n.id === stackId ? { ...stack, data: { ...stack.data, members: ids } } : n)));
+}
+
+/** Pins the stack open with its cards laid out in `layout`, or back behind tabs when undefined. */
+export function setStackLayout(stackId: string, layout: StackLayout | undefined): void {
+  const { nodes } = state();
+  const stack = stackIndex(nodes).byId.get(stackId);
+  if (!isStack(stack) || stack.data.layout === layout) return;
+  const { members } = stack.data;
+  if (useUiStore.getState().fanned === stackId) useUiStore.getState().closeFan();
+  commit(
+    nodes.map((n) => (n.id === stackId ? { ...stack, data: layout ? { members, layout } : { members } } : n)),
+  );
 }
 
 /** The ids of a stack's cards, in order. */
@@ -168,11 +180,11 @@ export function stackCardIds(stackId: string): string[] {
   return isStack(stack) ? membersOf(stack, nodes).map((m) => m.id) : [];
 }
 
-/** Spreads out the cards of stack `stackId` to pick from, highlighting the one shown. */
+/** Spreads out the cards of stack `stackId` to pick from, highlighting the one shown. A pinned stack shows them all. */
 export function openFan(stackId: string): void {
   const { nodes, fronts } = state();
   const stack = stackIndex(nodes).byId.get(stackId);
-  if (!isStack(stack)) return;
+  if (!isStack(stack) || stack.data.layout) return;
   const ids = membersOf(stack, nodes).map((m) => m.id);
   useUiStore.getState().openFan(stackId, Math.max(0, ids.indexOf(frontOf(stack, nodes, fronts) ?? '')));
 }

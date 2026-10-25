@@ -1,5 +1,5 @@
 import { stackOf } from '@/lib/stacks';
-import type { AppEdge, AppNode, NodeDataMap } from '@/model/types';
+import type { AppEdge, AppNode, NodeDataMap, StackLayout } from '@/model/types';
 import { searchTextOf } from '@/nodes/factory';
 import type { LineResult, LinkInput } from '@/nodes/mathPlus/evaluate';
 import { splitLines } from '@/nodes/mathPlus/evaluate';
@@ -105,6 +105,10 @@ export function linksOf(node: AppNode, links: AppEdge[]): string {
     .join('; ');
 }
 
+/** How a pinned stack lays out its cards, for its summary; nothing for one behind tabs. */
+const pinnedAs = (layout?: StackLayout) =>
+  layout ? `, pinned open ${layout === 'masonry' ? 'as masonry' : `in a ${layout}`}` : '';
+
 /** Where a node is: "x,y w×h", or for a card in a stack, "in stack n7". */
 export function placement(node: AppNode): string {
   const stack = stackOf(useCanvasStore.getState().nodes, node.id);
@@ -175,6 +179,6 @@ export function nodeBody(node: AppNode, mathPlusResults?: LineResult[], inputs?:
     case 'section':
       return node.data.title;
     case 'stack':
-      return `stack of ${node.data.members.map((id) => alias(id)).join(', ')}`;
+      return `stack of ${node.data.members.map((id) => alias(id)).join(', ')}${pinnedAs(node.data.layout)}`;
   }
 }

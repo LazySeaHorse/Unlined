@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { SECTION_Z } from '@/lib/sections';
-import { stackIndex } from '@/lib/stacks';
+import { isStack, stackIndex } from '@/lib/stacks';
 import type { AppEdge, AppNode } from '@/model/types';
 import { useMarks } from '@/motion/marks';
 import { useUiStore } from '@/store/uiStore';
@@ -43,7 +43,8 @@ export function projectNodes(nodes: AppNode[], view: View): AppNode[] {
       [miss && 'search-miss', n.id === view.dropTarget && 'stack-drop', fanned && 'fanned', marks]
         .filter(Boolean)
         .join(' ') || undefined;
-    const node = className ? { ...n, className, ...(fanned ? { zIndex: FANNED_Z } : {}) } : n;
+    const drawn = isStack(n) && n.data.layout ? pinnedOpen(n) : n;
+    const node = className ? { ...drawn, className, ...(fanned ? { zIndex: FANNED_Z } : {}) } : drawn;
     // Sections sit behind everything and only their header takes the pointer, so the canvas
     // underneath (marquee, double-click to add a node, panning) keeps working inside them.
     return node.type === 'section'
@@ -56,6 +57,12 @@ export function projectNodes(nodes: AppNode[], view: View): AppNode[] {
       : node;
   });
 }
+
+/**
+ * A stack pinned open takes the size its laid-out cards add up to, which React Flow measures like any node sized
+ * by its content. Its own size is kept for when it goes back behind tabs.
+ */
+const pinnedOpen = (stack: AppNode): AppNode => ({ ...stack, width: undefined, height: undefined });
 
 /** Marks by the id of the node drawn: a card's marks show on its stack. */
 function placedMarks(nodes: AppNode[], marks: ReadonlyMap<string, string>): ReadonlyMap<string, string> {

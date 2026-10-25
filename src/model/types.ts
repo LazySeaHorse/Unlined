@@ -53,8 +53,9 @@ export type NodeDataMap = {
   /**
    * Cards on one spot, one shown at a time behind tabs. The stack owns the place and size; its members are
    * ordinary nodes, in this order, whose own position and size wait unused until they leave the stack.
+   * Pinned open (`layout`), every card shows instead, at its own size, and the stack takes the size of them all.
    */
-  stack: { members: string[] };
+  stack: { members: string[]; layout?: StackLayout };
 };
 
 export type NodeKind = keyof NodeDataMap;
@@ -64,6 +65,10 @@ export type AppNode = NodeOf<NodeKind>;
 /** A node holding content of its own, with an optional title and tint: anything but a section or a stack. */
 export type CardNode = Exclude<AppNode, NodeOf<'section'> | NodeOf<'stack'>>;
 export const isCard = (node: AppNode): node is CardNode => node.type !== 'section' && node.type !== 'stack';
+
+/** How a stack pinned open lays out its cards: side by side, one under another, or in columns. */
+export const STACK_LAYOUTS = ['row', 'column', 'masonry'] as const;
+export type StackLayout = (typeof STACK_LAYOUTS)[number];
 
 /** What a link can have at either end. */
 export const LINK_ENDS = ['arrow', 'dot', 'bar', 'none'] as const;

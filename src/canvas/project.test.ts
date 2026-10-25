@@ -63,6 +63,21 @@ describe('stacks', () => {
     expect(searched.map((n) => n.className)).toEqual(['search-miss', undefined]);
   });
 
+  it('lets a pinned stack take the size of its cards, keeping its own for the tabs', () => {
+    const [a, b] = [card(), card()];
+    const tabbed = createNode(
+      'stack',
+      { x: 0, y: 0 },
+      { members: [a.id, b.id] },
+      { width: 400, height: 300 },
+    );
+    const pinned = { ...tabbed, data: { ...tabbed.data, layout: 'row' as const } };
+    expect(projectNodes([a, b, tabbed], view())[0]).toBe(tabbed);
+    const [drawn] = projectNodes([a, b, pinned], view());
+    expect([drawn.width, drawn.height]).toEqual([undefined, undefined]);
+    expect(pinned.width).toBe(400);
+  });
+
   it('draws links to a card to its stack, and none between cards of one stack', () => {
     const [a, b, c] = [card(), card(), card()];
     const stack = createNode('stack', { x: 0, y: 0 }, { members: [a.id, b.id] });

@@ -118,7 +118,7 @@ export function removeNodes(nodes: AppNode[], doomed: ReadonlySet<string>): AppN
         continue;
       }
       if (members.length < node.data.members.length) {
-        next.push({ ...node, data: { members: members.map((m) => m.id) } });
+        next.push({ ...node, data: { ...node.data, members: members.map((m) => m.id) } });
         continue;
       }
     }
@@ -150,6 +150,15 @@ export function rowFrom(from: XYPosition, cards: AppNode[]): Map<string, XYPosit
     x += nodeRect(card).width + UNSTACK_GAP;
   }
   return at;
+}
+
+/**
+ * A stack pinned open as masonry: its cards dealt into about as many columns as rows, left to right in stack
+ * order, so a card's column never depends on how tall the cards before it are and editing one never moves another.
+ */
+export function masonryColumns<T>(cards: readonly T[]): T[][] {
+  const columns = Math.ceil(Math.sqrt(cards.length));
+  return Array.from({ length: columns }, (_, c) => cards.filter((_, i) => i % columns === c));
 }
 
 /** Space between fanned-out cards, and the most a fanned card is scaled to, in canvas units. */

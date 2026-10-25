@@ -5,9 +5,9 @@ export interface CardInStack {
   stackId: string;
   /** The card's own id: React Flow's node id here is the stack's. */
   cardId: string;
-  /** Whether this is the card shown. */
-  front: boolean;
-  /** The stack's tab strip, drawn in place of the card's own tab. */
+  /** Whether the card is out of sight behind another card of its stack. */
+  hidden: boolean;
+  /** Drawn in place of the card's own tab (the stack's tab strip, say); undefined keeps the card's own. */
   tabs: ReactNode;
 }
 
@@ -19,7 +19,4 @@ export const useCardInStack = () => useContext(CardContext);
 export const usePlacedId = (id: string) => useContext(CardContext)?.stackId ?? id;
 
 /** Whether card `id` is out of sight behind another card of its stack. */
-export const useHiddenInStack = () => {
-  const card = useContext(CardContext);
-  return !!card && !card.front;
-};
+export const useHiddenInStack = () => !!useContext(CardContext)?.hidden;
