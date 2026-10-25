@@ -24,7 +24,8 @@ the unminified `mathlive.mjs` in every mode (see `vite.config.ts`), so that is t
 - **Pasting lines.** A copy across lines carried MathLive's own atom list too, which paste prefers and
   which knows no lines, so it pasted on one line. `onCopy` leaves it out then, and the LaTeX is pasted
   instead, where a pasted `\displaylines` replaced the whole field. `insertLines` splits the line at the
-  caret around the pasted lines, or, with the caret deeper than a line, pastes their contents inline.
+  caret around the pasted lines, or, with the caret deeper than a line (or one line pasted), pastes their
+  contents inline. It returns the atoms it pasted, so `insert` places the caret after them as for any paste.
 - **Backspace between cells.** Backspace at the start of a cell (or Delete at its end) only joined the
   lines of a one-column field, did nothing in `aligned` and the like, and at the start of a field's first
   line deleted that line. `joinCells` replaces `deleteRow` there: it joins the cell to

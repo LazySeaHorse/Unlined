@@ -242,6 +242,11 @@ test('math copied across lines pastes as lines, around the caret', async ({ page
   await expect
     .poll(() => target.evaluate((el: HTMLElement & { value: string }) => el.value))
     .toBe('\\displaylines{x5p_1+3p_2+6p_3\\\\ C_2=3p_1+5p_2+4p_3+y}');
+  // The caret ends after the pasted math, not at the end of the field.
+  await page.keyboard.type('q');
+  await expect
+    .poll(() => target.evaluate((el: HTMLElement & { value: string }) => el.value))
+    .toBe('\\displaylines{x5p_1+3p_2+6p_3\\\\ C_2=3p_1+5p_2+4p_3q+y}');
 });
 
 test('Backspace at the start of a cell of aligned math joins it to the cell before', async ({ page }) => {

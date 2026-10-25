@@ -1,5 +1,5 @@
 diff --git a/node_modules/mathlive/mathlive.mjs b/node_modules/mathlive/mathlive.mjs
-index 47351c7..c8fa3ed 100644
+index 47351c7..214951c 100644
 --- a/node_modules/mathlive/mathlive.mjs
 +++ b/node_modules/mathlive/mathlive.mjs
 @@ -12288,10 +12288,11 @@ var _ModeEditor = class _ModeEditor {
@@ -123,53 +123,55 @@ index 47351c7..c8fa3ed 100644
  }
  
 +function insertLines(model, lines) {
-+  if (!(lines instanceof ArrayAtom) || lines.environmentName !== "lines") return false;
++  if (!(lines instanceof ArrayAtom) || lines.environmentName !== "lines") return null;
 +  const root = model.root;
 +  const cursor = model.at(model.position);
-+  const content = (atoms) => atoms.filter((x) => x.type !== "first");
++  const pasted = lines.rows.map((r) => r[0].filter((x) => x.type !== "first"));
 +  let rows;
 +  let row = 0;
 +  if (root instanceof ArrayAtom && root.environmentName === "lines" && cursor.parent === root) {
 +    rows = root.rows.map((r) => r[0]);
 +    row = cursor.parentBranch[0];
 +  } else if (root.type === "root" && cursor.parent === root) rows = [root.body];
-+  else if (cursor.parent) {
-+    const flat = lines.rows.flatMap((r) => content(r[0]));
++  if (!rows || pasted.length === 1) {
++    if (!cursor.parent) return null;
++    const flat = pasted.flat();
 +    cursor.parent.addChildrenAfter(flat, cursor);
-+    model.position = model.offsetOf(flat.length > 0 ? flat[flat.length - 1] : cursor);
-+    return true;
-+  } else return false;
++    return flat;
++  }
 +  const line = rows[row];
 +  const split = line.indexOf(cursor) + 1;
-+  const before = content(line.slice(0, split));
-+  const pasted = lines.rows.map((r) => content(r[0]));
-+  const end = pasted[pasted.length - 1];
-+  const caret = end.length > 0 ? end[end.length - 1] : pasted.length === 1 ? before[before.length - 1] : void 0;
-+  pasted[0] = [...before, ...pasted[0]];
-+  pasted[pasted.length - 1] = [...pasted[pasted.length - 1], ...content(line.slice(split))];
-+  const all = [...rows.slice(0, row), ...pasted, ...rows.slice(row + 1)].map(content);
++  const last = pasted.length - 1;
++  const all = [
++    ...rows.slice(0, row),
++    [...line.slice(0, split), ...pasted[0]],
++    ...pasted.slice(1, last),
++    [...pasted[last], ...line.slice(split)],
++    ...rows.slice(row + 1)
++  ];
 +  while (lines.rowCount < all.length) lines.addRowAfter(lines.rowCount - 1);
 +  all.forEach((atoms, i) => lines.setCell(i, 0, atoms));
 +  model.root = lines;
-+  model.position = model.offsetOf(caret != null ? caret : lines.getCell(row + pasted.length - 1, 0)[0]);
-+  return true;
++  return pasted[last].length > 0 ? pasted.flat() : [...pasted.flat(), lines.getCell(row + last, 0)[0]];
 +}
 +
  // src/editor-mathfield/mode-editor-math.ts
  var MathModeEditor = class extends ModeEditor {
    constructor() {
-@@ -34838,7 +34925,9 @@ var MathModeEditor = class extends ModeEditor {
+@@ -34838,7 +34925,11 @@ var MathModeEditor = class extends ModeEditor {
        );
      }
      const implicitArgEndOffset = model.position;
 -    if (newAtoms.length === 1 && newAtoms[0].isRoot) model.root = newAtoms[0];
 +    if (newAtoms.length === 1 && newAtoms[0].isRoot) {
-+      if (!insertLines(model, newAtoms[0])) model.root = newAtoms[0];
++      const pasted = insertLines(model, newAtoms[0]);
++      if (pasted) newAtoms = pasted;
++      else model.root = newAtoms[0];
 +    }
      else {
        const atom = model.at(model.position);
        const parent = (_d2 = atom == null ? void 0 : atom.parent) != null ? _d2 : model.root;
-@@ -34901,10 +34990,7 @@ var MathModeEditor = class extends ModeEditor {
+@@ -34901,10 +34992,7 @@ var MathModeEditor = class extends ModeEditor {
          const body = lastNewAtom.body;
          const hadEmptyBody = lastNewAtom.hasEmptyBranch("body");
          if (body && hadEmptyBody) {
@@ -181,7 +183,7 @@ index 47351c7..c8fa3ed 100644
          } else {
            model.position = model.offsetOf(lastNewAtom);
          }
-@@ -38850,7 +38936,7 @@ var _Model = class {
+@@ -38850,7 +38938,7 @@ var _Model = class {
          defaultMode: this.mathfield.options.defaultMode
        };
        return joinLatex(
@@ -190,7 +192,7 @@ index 47351c7..c8fa3ed 100644
        );
      }
      return ranges.map(
-@@ -38901,6 +38987,7 @@ var _Model = class {
+@@ -38901,6 +38989,7 @@ var _Model = class {
            parent = parent.parent;
          }
        }
@@ -198,7 +200,7 @@ index 47351c7..c8fa3ed 100644
        this._position = this.normalizeOffset(position);
        this._selection = {
          ranges: [[start, end]],
-@@ -39070,6 +39157,53 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
+@@ -39070,6 +39159,53 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
    }
    return false;
  }
