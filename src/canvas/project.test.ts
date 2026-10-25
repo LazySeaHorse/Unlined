@@ -9,6 +9,7 @@ const view = (over: Partial<View> = {}): View => ({
   query: '',
   marks: new Map(),
   dropTarget: null,
+  fanned: null,
   ...over,
 });
 

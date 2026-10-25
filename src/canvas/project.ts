@@ -20,7 +20,12 @@ export interface View {
   marks: ReadonlyMap<string, string>;
   /** The node a dragged node would stack onto if dropped now. */
   dropTarget: string | null;
+  /** The stack whose cards are spread out, drawn above everything else. */
+  fanned: string | null;
 }
+
+/** A fanned stack spreads over its neighbours, so it is drawn above them (and above a selected node's 1000). */
+const FANNED_Z = 2000;
 
 /**
  * Cards inside stacks are left out: their stack draws them. A stack is a search miss only when none of its cards
@@ -33,10 +38,12 @@ export function projectNodes(nodes: AppNode[], view: View): AppNode[] {
   return placed.map((n) => {
     const miss = matches && !matches.has(n.id);
     const marks = marksOf.get(n.id);
+    const fanned = n.id === view.fanned;
     const className =
-      [miss && 'search-miss', n.id === view.dropTarget && 'stack-drop', marks].filter(Boolean).join(' ') ||
-      undefined;
-    const node = className ? { ...n, className } : n;
+      [miss && 'search-miss', n.id === view.dropTarget && 'stack-drop', fanned && 'fanned', marks]
+        .filter(Boolean)
+        .join(' ') || undefined;
+    const node = className ? { ...n, className, ...(fanned ? { zIndex: FANNED_Z } : {}) } : n;
     // Sections sit behind everything and only their header takes the pointer, so the canvas
     // underneath (marquee, double-click to add a node, panning) keeps working inside them.
     return node.type === 'section'
@@ -113,7 +120,11 @@ export function useView(nodes: AppNode[]): View {
   const query = useUiStore((s) => s.searchQuery.trim().toLowerCase());
   const marks = useMarks((s) => s.marks);
   const dropTarget = useUiStore((s) => s.stackDropTarget);
-  return useMemo(() => ({ matches, query, marks, dropTarget }), [matches, query, marks, dropTarget]);
+  const fanned = useUiStore((s) => s.fanned);
+  return useMemo(
+    () => ({ matches, query, marks, dropTarget, fanned }),
+    [matches, query, marks, dropTarget, fanned],
+  );
 }
 
 /** The nodes and links to hand React Flow. */

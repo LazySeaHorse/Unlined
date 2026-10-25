@@ -1,10 +1,20 @@
 import { useEffect } from 'react';
 import { kindForNumberKey } from '@/nodes/catalog';
 import { redo, undo, useCanvasStore } from '@/store/canvasStore';
-import { cycleFront, selectedStack, stackSelection } from '@/store/stacks';
+import {
+  cycleFront,
+  openFan,
+  pickFromFan,
+  selectedStack,
+  stackCardIds,
+  stackSelection,
+} from '@/store/stacks';
 import { useUiStore } from '@/store/uiStore';
 import { editsCanvas, isTextField, isTyping } from './keyboard';
 import { useWrapInSection } from './useSections';
+
+/** A Space press shorter than this is a tap (fan a stack out); held longer, Space is React Flow's pan key. */
+const SPACE_TAP_MS = 250;
 
 /** True inside a menu or dialog, where Delete and Backspace belong to that control. */
 const isInOverlay = (target: EventTarget | null) =>
@@ -13,10 +23,34 @@ const isInOverlay = (target: EventTarget | null) =>
 export function useShortcuts(readOnly: boolean) {
   const wrapInSection = useWrapInSection();
   useEffect(() => {
+    let spaceAt: number | undefined;
+
     const onKeyDown = (event: KeyboardEvent) => {
       const mod = event.ctrlKey || event.metaKey;
       const key = event.key.toLowerCase();
       const ui = useUiStore.getState();
+
+      if (key === ' ' && !mod && !event.repeat && !isTyping(event.target)) spaceAt = performance.now();
+
+      // Cards spread out: arrows move along them, Enter shows the one highlighted, Escape folds them up.
+      if (ui.fanned && !isTyping(event.target)) {
+        const cards = stackCardIds(ui.fanned);
+        if (key === 'arrowleft' || key === 'arrowright') {
+          event.preventDefault();
+          const step = key === 'arrowright' ? 1 : -1;
+          ui.setFanFocus(Math.max(0, Math.min(cards.length - 1, ui.fanFocus + step)));
+          return;
+        }
+        if (key === 'enter' && cards[ui.fanFocus]) {
+          event.preventDefault();
+          pickFromFan(ui.fanned, cards[ui.fanFocus]);
+          return;
+        }
+        if (key === 'escape') {
+          ui.closeFan();
+          return;
+        }
+      }
 
       if (mod && key === 'f') {
         event.preventDefault();
@@ -88,8 +122,25 @@ export function useShortcuts(readOnly: boolean) {
         canvas.setSelection(() => false);
       }
     };
+    // A tap of Space fans the selected stack out, or folds the fanned one up, like Quick Look.
+    const onKeyUp = (event: KeyboardEvent) => {
+      if (event.key !== ' ') return;
+      const tapped = spaceAt !== undefined && performance.now() - spaceAt < SPACE_TAP_MS;
+      spaceAt = undefined;
+      if (!tapped || isTyping(event.target)) return;
+      const ui = useUiStore.getState();
+      if (ui.fanned) ui.closeFan();
+      else {
+        const stack = selectedStack();
+        if (stack) openFan(stack);
+      }
+    };
     window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
+    window.addEventListener('keyup', onKeyUp);
+    return () => {
+      window.removeEventListener('keydown', onKeyDown);
+      window.removeEventListener('keyup', onKeyUp);
+    };
   }, [readOnly, wrapInSection]);
 
   useEffect(() => {

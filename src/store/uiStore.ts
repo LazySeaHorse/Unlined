@@ -23,6 +23,9 @@ interface UiState {
   renamingLink: string | null;
   /** The node that the nodes being dragged would stack onto if dropped now. */
   stackDropTarget: string | null;
+  /** The stack whose cards are spread out to pick from, if any, and the card highlighted there. */
+  fanned: string | null;
+  fanFocus: number;
   setTool: (tool: NodeKind) => void;
   setLinking: (linking: boolean) => void;
   toggleTheme: () => void;
@@ -43,6 +46,10 @@ interface UiState {
   /** Closes the label editor of link `id`, unless another link has taken over since. */
   stopRenamingLink: (id: string) => void;
   setStackDropTarget: (id: string | null) => void;
+  /** Spreads out the cards of stack `id`, highlighting card `focus` (by position). */
+  openFan: (id: string, focus: number) => void;
+  closeFan: () => void;
+  setFanFocus: (focus: number) => void;
 }
 
 const systemTheme = (): Theme =>
@@ -64,6 +71,8 @@ export const useUiStore = create<UiState>()(
       renamingNode: null,
       renamingLink: null,
       stackDropTarget: null,
+      fanned: null,
+      fanFocus: 0,
       // Picking a node to place ends linking, since a double-click on the canvas would otherwise do nothing.
       setTool: (tool) => set({ tool, linking: false }),
       setLinking: (linking) => set({ linking }),
@@ -80,6 +89,9 @@ export const useUiStore = create<UiState>()(
       stopRenamingNode: (id) => set((s) => (s.renamingNode === id ? { renamingNode: null } : s)),
       renameLink: (id) => set({ renamingLink: id }),
       stopRenamingLink: (id) => set((s) => (s.renamingLink === id ? { renamingLink: null } : s)),
+      openFan: (fanned, fanFocus) => set({ fanned, fanFocus }),
+      closeFan: () => set((s) => (s.fanned ? { fanned: null } : s)),
+      setFanFocus: (fanFocus) => set({ fanFocus }),
       setStackDropTarget: (stackDropTarget) =>
         set((s) => (s.stackDropTarget === stackDropTarget ? s : { stackDropTarget })),
     }),

@@ -21,7 +21,9 @@ async function stackThree(page: Page) {
   await expect(nodes(page)).toHaveCount(1);
 }
 
-test('Ctrl+Shift+G stacks the selection; tabs, ] and [ switch cards, and the choice is saved', async ({ page }) => {
+test('Ctrl+Shift+G stacks the selection; tabs, ] and [ switch cards, and the choice is saved', async ({
+  page,
+}) => {
   await stackThree(page);
   await expect(frontTab(page)).toContainText('Text');
   await expect(backTabs(page)).toHaveCount(2);
@@ -82,4 +84,42 @@ test('deleting a stack deletes its cards, and undo brings them back', async ({ p
   await page.keyboard.press('ControlOrMeta+z');
   await expect(nodes(page)).toHaveCount(1);
   await expect(backTabs(page)).toHaveCount(2);
+});
+
+test('Space fans the cards out: arrows and Enter, or a click, pick one; Escape folds them up', async ({
+  page,
+}) => {
+  await stackThree(page);
+  const picks = stack(page).locator('.stack-pick');
+  await page.keyboard.press('Space');
+  await expect(picks).toHaveCount(3);
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Enter');
+  await expect(picks).toHaveCount(0);
+  await expect(frontTab(page)).toContainText('Graph');
+
+  await page.keyboard.press('Space');
+  await picks.nth(1).click();
+  await expect(picks).toHaveCount(0);
+  await expect(frontTab(page)).toContainText('Math');
+
+  await stack(page).locator('.stack-fan').click();
+  await expect(picks).toHaveCount(3);
+  await page.keyboard.press('Escape');
+  await expect(picks).toHaveCount(0);
+  await expect(frontTab(page)).toContainText('Math');
+});
+
+test('dragging a fanned card away from the row takes it out of the stack', async ({ page }) => {
+  await stackThree(page);
+  await page.keyboard.press('Space');
+  const card = await stack(page).locator('.stack-pick').nth(0).boundingBox();
+  if (!card) throw new Error('no fanned card');
+  await page.mouse.move(card.x + card.width / 2, card.y + card.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(card.x + card.width / 2, card.y + card.height / 2 + 350, { steps: 10 });
+  await page.mouse.up();
+  await expect(nodes(page)).toHaveCount(2);
+  await expect(backTabs(page)).toHaveCount(1);
 });

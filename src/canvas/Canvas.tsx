@@ -109,6 +109,12 @@ export function Canvas({ readOnly }: { readOnly: boolean }) {
   const theme = useUiStore((s) => s.theme);
   const linkingOn = useUiStore((s) => s.linking);
   const linking = linkingOn && !readOnly;
+  // Spread-out cards fold up again when their stack goes (deleted, dissolved, undone).
+  const fanned = useUiStore((s) => s.fanned);
+  const fanning = !!fanned && nodes.some((n) => n.id === fanned);
+  useEffect(() => {
+    if (fanned && !fanning) useUiStore.getState().closeFan();
+  }, [fanned, fanning]);
   useGlide();
   const view = useView(nodes);
   useFitToMatches(view.matches, nodes);
@@ -187,6 +193,7 @@ export function Canvas({ readOnly }: { readOnly: boolean }) {
         defaultViewport={useCanvasStore.getState().viewport}
         onMoveEnd={(_, viewport) => setViewport(viewport)}
         onDoubleClick={placeNode}
+        onPaneClick={() => useUiStore.getState().closeFan()}
         onDragOver={onDragOver}
         onDrop={onDrop}
         zoomOnDoubleClick={false}
@@ -198,7 +205,12 @@ export function Canvas({ readOnly }: { readOnly: boolean }) {
         proOptions={proOptions}
         onConnect={connect}
         onEdgeDoubleClick={readOnly ? undefined : (_, edge) => useUiStore.getState().renameLink(edge.id)}
-        className={cn(readOnly && 'read-only', multipleSelected && 'multi-select', linking && 'linking')}
+        className={cn(
+          readOnly && 'read-only',
+          multipleSelected && 'multi-select',
+          linking && 'linking',
+          fanning && 'fanning',
+        )}
         data-zoom={tier}
         {...(readOnly ? readOnlyProps : linking ? { ...editableProps, ...linkingProps } : editableProps)}
       >

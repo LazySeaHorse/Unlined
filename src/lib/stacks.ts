@@ -151,3 +151,65 @@ export function rowFrom(from: XYPosition, cards: AppNode[]): Map<string, XYPosit
   }
   return at;
 }
+
+/** Space between fanned-out cards, and the most a fanned card is scaled to, in canvas units. */
+export const FAN_GAP = 24;
+export const FAN_SCALE = 0.62;
+
+export interface FanSlot {
+  /** Top-left of the card, relative to the stack's top-left. */
+  x: number;
+  y: number;
+  scale: number;
+}
+
+/**
+ * Where each of `count` cards of a stack sized `size` goes when the stack fans out: scaled down in a row centred
+ * on the stack, shrunk further if the row would be wider than `maxWidth`.
+ */
+export function fanLayout(
+  count: number,
+  size: { width: number; height: number },
+  maxWidth: number,
+): FanSlot[] {
+  const fit = (maxWidth - (count - 1) * FAN_GAP) / (count * size.width);
+  const scale = Math.max(0.15, Math.min(FAN_SCALE, fit));
+  const w = size.width * scale;
+  const h = size.height * scale;
+  const left = (size.width - (count * w + (count - 1) * FAN_GAP)) / 2;
+  const top = (size.height - h) / 2;
+  return Array.from({ length: count }, (_, i) => ({ x: left + i * (w + FAN_GAP), y: top, scale }));
+}
+
+/**
+ * Slides a fanned row sideways (all slots alike) so it lies within [`left`, `right`] in canvas units, given the
+ * stack's own left edge `x`: a stack near the edge of the screen fans out into view. A row wider than the room
+ * is centred on it.
+ */
+export function keepInView(
+  slots: FanSlot[],
+  width: number,
+  x: number,
+  left: number,
+  right: number,
+): FanSlot[] {
+  if (slots.length === 0) return slots;
+  const last = slots[slots.length - 1];
+  const from = x + slots[0].x;
+  const to = x + last.x + width * last.scale;
+  const shift =
+    to - from > right - left
+      ? (left + right) / 2 - (from + to) / 2
+      : Math.max(left - from, Math.min(0, right - to));
+  return shift === 0 ? slots : slots.map((s) => ({ ...s, x: s.x + shift }));
+}
+
+/** The slot of a fanned row nearest to `x` (relative to the stack), for dropping a card back into the row. */
+export function nearestSlot(slots: FanSlot[], width: number, x: number): number {
+  let best = 0;
+  slots.forEach((s, i) => {
+    const centre = (slot: FanSlot) => slot.x + (width * slot.scale) / 2;
+    if (Math.abs(centre(s) - x) < Math.abs(centre(slots[best]) - x)) best = i;
+  });
+  return best;
+}

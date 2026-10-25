@@ -3,8 +3,13 @@ import type { AppNode } from '@/model/types';
 import { createNode } from '@/nodes/factory';
 import {
   cardFor,
+  FAN_GAP,
+  FAN_SCALE,
+  fanLayout,
   frontOf,
+  keepInView,
   membersOf,
+  nearestSlot,
   placedId,
   placedNodes,
   placedPosition,
@@ -88,5 +93,40 @@ describe('stacks', () => {
       { x: 0, y: 10 },
       { x: 148, y: 10 },
     ]);
+  });
+});
+
+describe('fanLayout', () => {
+  it('scales cards down into a row centred on the stack', () => {
+    const slots = fanLayout(3, { width: 400, height: 300 }, 10_000);
+    expect(slots.map((s) => s.scale)).toEqual([FAN_SCALE, FAN_SCALE, FAN_SCALE]);
+    const w = 400 * FAN_SCALE;
+    const row = 3 * w + 2 * FAN_GAP;
+    expect(slots[0].x).toBeCloseTo((400 - row) / 2);
+    expect(slots[2].x + w).toBeCloseTo((400 + row) / 2);
+    expect(slots[1].y).toBeCloseTo((300 - 300 * FAN_SCALE) / 2);
+  });
+
+  it('shrinks the row to fit', () => {
+    const slots = fanLayout(4, { width: 400, height: 300 }, 1000);
+    const right = slots[3].x + 400 * slots[3].scale;
+    expect(right - slots[0].x).toBeCloseTo(1000);
+  });
+
+  it('slides a row into view, or centres one too wide for it', () => {
+    const slots = fanLayout(2, { width: 100, height: 100 }, 10_000);
+    const w = 100 * FAN_SCALE;
+    const moved = keepInView(slots, 100, 0, 0, 1000);
+    expect(moved[0].x).toBeCloseTo(0);
+    expect(keepInView(slots, 100, 500, 0, 1000)).toBe(slots);
+    const narrow = keepInView(slots, 100, 0, 0, w);
+    expect((narrow[0].x + narrow[1].x + w) / 2).toBeCloseTo(w / 2);
+  });
+
+  it('finds the slot nearest a point', () => {
+    const slots = fanLayout(3, { width: 400, height: 300 }, 10_000);
+    expect(nearestSlot(slots, 400, -1000)).toBe(0);
+    expect(nearestSlot(slots, 400, 200)).toBe(1);
+    expect(nearestSlot(slots, 400, 5000)).toBe(2);
   });
 });

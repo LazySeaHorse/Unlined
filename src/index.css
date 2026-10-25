@@ -689,6 +689,15 @@ math-field::part(virtual-keyboard-toggle) {
 .stack-card {
   position: absolute;
   inset: 0;
+  transform-origin: 0 0;
+}
+.stack-card-body {
+  width: 100%;
+  height: 100%;
+}
+/* Folding back up, the card that will show lands on top. */
+.stack-card[data-front] {
+  z-index: 1;
 }
 /* A card fills the stack's box whatever size it would take alone, and scrolls what does not fit. */
 .react-flow__node .stack-card .node-tile {
@@ -766,6 +775,76 @@ math-field::part(virtual-keyboard-toggle) {
 }
 [data-zoom="mid"] .stack-tab {
   visibility: hidden;
+}
+/*
+ * Fanned out: every card shows, spread in a row (positions come from useFan as transforms) and dimming the rest
+ * of the canvas. Each card is covered by a button that picks it; hovering one lifts it.
+ */
+.stack-node[data-fan] .stack-card {
+  visibility: visible;
+  content-visibility: visible;
+}
+.stack-node[data-fan]::before,
+.stack-node[data-fan]::after {
+  opacity: 0;
+}
+.stack-node[data-fan] .stack-card-body {
+  pointer-events: none;
+}
+.stack-node[data-fan] .node-actions {
+  visibility: hidden;
+}
+.stack-pick {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  border-radius: 0.8125rem;
+  cursor: pointer;
+}
+.stack-pick[data-focused] {
+  outline: 4px solid var(--accent);
+  outline-offset: 6px;
+}
+.stack-card[data-dragging] .stack-pick {
+  cursor: grabbing;
+}
+.stack-fan {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  align-self: center;
+  margin-left: 0.25rem;
+  padding: 0.25rem;
+  border-radius: 0.375rem;
+  color: var(--muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity var(--dur-fast);
+}
+.stack-fan:hover {
+  background: var(--surface-2);
+  color: var(--fg);
+}
+.node:hover .stack-fan,
+.react-flow__node.selected .stack-fan {
+  opacity: 1;
+}
+.react-flow.fanning :is(.react-flow__node:not(.fanned), .react-flow__edges, .react-flow__edgelabel-renderer) {
+  opacity: 0.15;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .stack-card {
+    transition:
+      transform var(--dur-move) var(--ease-spring),
+      translate var(--dur) var(--ease-spring);
+  }
+  .stack-card[data-dragging] {
+    transition: none;
+  }
+  .stack-node[data-fan="open"] .stack-card:not([data-dragging]):hover {
+    translate: 0 -6px;
+  }
 }
 /* The tab after the front one clears its fillet. */
 .stack-tabs > .node-tab + .stack-tab {

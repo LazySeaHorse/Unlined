@@ -14,6 +14,7 @@ import { type AppNode, isCard } from '@/model/types';
 import { glide } from '@/motion/glide';
 import { createNode } from '@/nodes/factory';
 import { asUndoStep, useCanvasStore } from './canvasStore';
+import { useUiStore } from './uiStore';
 
 /** Every change here but switching cards is one undo step. */
 
@@ -101,8 +102,10 @@ function release(stackId: string, cards: AppNode[], to: Map<string, XYPosition>,
   glide(() => commit(next), from);
 }
 
-/** Takes card `memberId` out of its stack, beside it. A stack left with one card dissolves into it. */
-export function takeOut(stackId: string, memberId: string): void {
+/**
+ * Takes card `memberId` out of its stack, to `at` or else beside it. A stack left with one card dissolves into it.
+ */
+export function takeOut(stackId: string, memberId: string, at?: XYPosition): void {
   const { nodes } = state();
   const stack = stackIndex(nodes).byId.get(stackId);
   if (!isStack(stack)) return;
@@ -115,7 +118,7 @@ export function takeOut(stackId: string, memberId: string): void {
     return;
   }
   const box = nodeRect(stack);
-  const to = new Map([[memberId, { x: box.x + box.width + UNSTACK_GAP, y: box.y }]]);
+  const to = new Map([[memberId, at ?? { x: box.x + box.width + UNSTACK_GAP, y: box.y }]]);
   release(
     stackId,
     [card],
@@ -156,6 +159,28 @@ export function moveCard(stackId: string, memberId: string, index: number): void
   ids.splice(from, 1);
   ids.splice(to, 0, memberId);
   commit(nodes.map((n) => (n.id === stackId ? { ...stack, data: { members: ids } } : n)));
+}
+
+/** The ids of a stack's cards, in order. */
+export function stackCardIds(stackId: string): string[] {
+  const { nodes } = state();
+  const stack = stackIndex(nodes).byId.get(stackId);
+  return isStack(stack) ? membersOf(stack, nodes).map((m) => m.id) : [];
+}
+
+/** Spreads out the cards of stack `stackId` to pick from, highlighting the one shown. */
+export function openFan(stackId: string): void {
+  const { nodes, fronts } = state();
+  const stack = stackIndex(nodes).byId.get(stackId);
+  if (!isStack(stack)) return;
+  const ids = membersOf(stack, nodes).map((m) => m.id);
+  useUiStore.getState().openFan(stackId, Math.max(0, ids.indexOf(frontOf(stack, nodes, fronts) ?? '')));
+}
+
+/** Shows card `memberId` of the fanned stack and folds the fan up. */
+export function pickFromFan(stackId: string, memberId: string): void {
+  state().setFront(stackId, memberId);
+  useUiStore.getState().closeFan();
 }
 
 /** The one selected stack, if exactly one node is selected and it is a stack. */
