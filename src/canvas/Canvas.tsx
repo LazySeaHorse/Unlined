@@ -17,6 +17,7 @@ import { cn } from '@/lib/cn';
 import { closesMathPlusLoop, findLink } from '@/lib/links';
 import { cardFor, placedId } from '@/lib/stacks';
 import type { AppNode } from '@/model/types';
+import { useGhostLayer } from '@/motion/ghosts';
 import { useGlide } from '@/motion/useGlide';
 import { nodeSpecs } from '@/nodes/catalog';
 import { nodeTypes } from '@/nodes/nodeTypes';
@@ -116,6 +117,7 @@ export function Canvas({ readOnly }: { readOnly: boolean }) {
     if (fanned && !fanning) useUiStore.getState().closeFan();
   }, [fanned, fanning]);
   useGlide();
+  useGhostLayer();
   const view = useView(nodes);
   useFitToMatches(view.matches, nodes);
   const { displayNodes, displayEdges } = useProjection(nodes, edges, view);

@@ -1,11 +1,15 @@
 import { BaseEdge, type EdgeProps, type EdgeTypes } from '@xyflow/react';
 import { memo, useMemo } from 'react';
 import { cn } from '@/lib/cn';
+import { stackIndex } from '@/lib/stacks';
 import type { AppEdge, LinkEnd } from '@/model/types';
+import { useMarks } from '@/motion/marks';
+import { useCanvasStore } from '@/store/canvasStore';
 import { useUiStore } from '@/store/uiStore';
 import { linkColor } from './actions';
 import { endPlacement, geom, type Pt, roundedPath } from './geometry';
 import { LinkLabel, LinkLabelEditor } from './LinkLabel';
+import { LinkPulse } from './LinkPulse';
 import { useLinkRoute } from './useLinkRoute';
 
 /** Width of the invisible strip around a link that takes clicks, in screen pixels. */
@@ -35,6 +39,12 @@ export const LinkEdge = memo(function LinkEdge({ id, source, target, data, selec
   const pts = useLinkRoute(id, source, target);
   const geometry = useMemo(() => (pts ? geom(pts) : null), [pts]);
   const editing = useUiStore((s) => s.renamingLink === id);
+  const drawing = useMarks((s) => !!s.marks.get(id)?.includes('link-new'));
+  // Only a link from one Math+ node to another carries a value, so only that one pulses.
+  const carries = useCanvasStore((s) => {
+    const { byId } = stackIndex(s.nodes);
+    return byId.get(source)?.type === 'mathPlus' && byId.get(target)?.type === 'mathPlus';
+  });
   if (!pts || !geometry) return null;
 
   const head = data?.head ?? 'arrow';
@@ -47,7 +57,15 @@ export const LinkEdge = memo(function LinkEdge({ id, source, target, data, selec
       style={{ '--link-color': `var(--link-${data?.color ?? 'auto'})` } as React.CSSProperties}
     >
       {selected && <path className="link-halo" d={d} fill="none" />}
-      <BaseEdge id={id} path={d} className="link-line" interactionWidth={HIT_WIDTH} />
+      <BaseEdge
+        id={id}
+        path={d}
+        className="link-line"
+        // While new, a solid link draws itself in: a dash as long as the path slides along it (see .link-new).
+        pathLength={drawing && !data?.dashed ? 1 : undefined}
+        interactionWidth={HIT_WIDTH}
+      />
+      {carries && <LinkPulse sourceId={source} path={d} />}
       <EndShape kind={head} to={pts[pts.length - 1]} from={pts[pts.length - 2]} />
       <EndShape kind={tail} to={pts[0]} from={pts[1]} />
       {editing ? (

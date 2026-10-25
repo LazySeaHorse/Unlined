@@ -106,7 +106,10 @@ function ResultLine({ result }: { result: LineResult }) {
   return (
     <li className="group flex min-h-7 items-center gap-2">
       <span className="text-muted">=</span>
-      <Tex latex={result.value ?? ''} />
+      {/* Keyed by value: a new result settles in rather than swapping in place. */}
+      <span key={result.value} className="result-tick">
+        <Tex latex={result.value ?? ''} />
+      </span>
       {result.approx && (
         <button
           type="button"

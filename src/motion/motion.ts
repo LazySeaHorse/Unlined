@@ -2,6 +2,8 @@
 export const DUR_FAST = 120;
 export const DUR = 180;
 export const DUR_MOVE = 320;
+/** How long a node an undo or redo changed stays marked. */
+export const HISTORY_FLASH_MS = 900;
 
 /** The --ease-spring and --ease-bounce curves, for animations started from script. */
 export const EASE_SPRING = 'cubic-bezier(0.16, 1, 0.3, 1)';
@@ -19,4 +21,9 @@ const reducedQuery =
  */
 export function motionOK(): boolean {
   return !reducedQuery?.matches && typeof Element !== 'undefined' && 'animate' in Element.prototype;
+}
+
+/** Runs `fn` once a change has been drawn: after React and the components below it (some sync in an effect). */
+export function afterRender(fn: () => void): void {
+  requestAnimationFrame(() => requestAnimationFrame(fn));
 }

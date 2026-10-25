@@ -36,7 +36,7 @@ import {
 } from 'lucide-react';
 import { copyText } from '@/lib/clipboard';
 import { MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, resizeGrid } from '@/lib/grid';
-import { applyGridOp, applyToAll, columnLabel, GridOpError } from '@/lib/gridOps';
+import { applyGridOp, applyToAll, columnLabel, GridOpError, gridOpLines } from '@/lib/gridOps';
 import { frontOf, isStack } from '@/lib/stacks';
 import {
   type AppEdge,
@@ -49,6 +49,8 @@ import {
   SECTION_COLORS,
   type SectionColor,
 } from '@/model/types';
+import { animateGridLines } from '@/motion/gridLines';
+import { afterRender } from '@/motion/motion';
 import { nodeSpecs } from '@/nodes/catalog';
 import { mathPlusResultsText } from '@/nodes/mathPlus/useMathPlusResults';
 import { withFill } from '@/nodes/sheet/fills';
@@ -236,6 +238,11 @@ export function sheetMenu(node: NodeOf<'sheet'>): MenuEntry[] {
     const command = /^[RrCc]\d/.test(text.trim()) ? text : `${line} ${text}`;
     try {
       update({ cells: applyGridOp(cells, command, node.data.fractions ? 'fraction' : 'decimal') });
+      const lines = gridOpLines(command);
+      if (lines)
+        afterRender(() =>
+          animateGridLines(document.querySelector(`[data-sheet-id="${CSS.escape(node.id)}"]`), lines),
+        );
     } catch (error) {
       if (error instanceof GridOpError) return error.message;
       throw error;

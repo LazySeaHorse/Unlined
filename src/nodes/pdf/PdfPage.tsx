@@ -126,7 +126,7 @@ export function PdfPage({
 
   return (
     <div
-      className={cn('relative shrink-0 bg-white', !drawn && 'animate-pulse', className)}
+      className={cn('relative shrink-0 bg-white', drawn ? 'page-drawn' : 'animate-pulse', className)}
       style={{ width: width || 120, height: height || 160 }}
     >
       <canvas

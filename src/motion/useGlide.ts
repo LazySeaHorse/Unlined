@@ -17,31 +17,50 @@ function remainingOffset(el: HTMLElement): XYPosition {
   return { x: Number.parseFloat(x) || 0, y: Number.parseFloat(y) || 0 };
 }
 
+interface Move {
+  id: string;
+  dx: number;
+  dy: number;
+  at: XYPosition;
+  delay: number;
+}
+
+/** Starts each move whose node is drawn; returns the ones whose node is not drawn yet. */
+function start(root: HTMLElement, moves: Move[]): Move[] {
+  return moves.filter(({ id, dx, dy, delay }) => {
+    const el = root.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
+    if (!el) return true;
+    const off = remainingOffset(el);
+    // Translations are in the node's own space, inside the viewport's zoom: canvas units, not screen pixels.
+    el.animate([{ translate: `${dx + off.x}px ${dy + off.y}px` }, { translate: '0px 0px' }], {
+      id: GLIDE_ID,
+      duration: DUR_MOVE,
+      easing: EASE_SPRING,
+      delay,
+      fill: 'backwards',
+    });
+    return false;
+  });
+}
+
 function play(before: Map<string, XYPosition>, state: ReactFlowState) {
   const root = state.domNode;
   if (!root) return;
-  const moved: { el: HTMLElement; dx: number; dy: number; at: XYPosition }[] = [];
+  const moved: Omit<Move, 'delay'>[] = [];
   for (const [id, was] of before) {
     const node = state.nodeLookup.get(id);
     if (!node || node.dragging) continue;
     const at = node.internals.positionAbsolute;
     if (at.x === was.x && at.y === was.y) continue;
-    const el = root.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`);
-    if (el) moved.push({ el, dx: was.x - at.x, dy: was.y - at.y, at });
+    moved.push({ id, dx: was.x - at.x, dy: was.y - at.y, at });
   }
   if (moved.length === 0) return;
   moved.sort((a, b) => a.at.y - b.at.y || a.at.x - b.at.x);
-  // Translations are in the node's own space, inside the viewport's zoom: canvas units, not screen pixels.
-  moved.forEach(({ el, dx, dy }, i) => {
-    const off = remainingOffset(el);
-    el.animate([{ translate: `${dx + off.x}px ${dy + off.y}px` }, { translate: '0px 0px' }], {
-      id: GLIDE_ID,
-      duration: DUR_MOVE,
-      easing: EASE_SPRING,
-      delay: Math.min(i * STAGGER_MS, MAX_STAGGER_MS),
-      fill: 'backwards',
-    });
-  });
+  const moves = moved.map((m, i) => ({ ...m, delay: Math.min(i * STAGGER_MS, MAX_STAGGER_MS) }));
+  // A node new to the canvas (a copy, a card leaving its stack) is drawn just after this; it starts then, which is
+  // still before the frame is painted.
+  const waiting = start(root, moves);
+  if (waiting.length > 0) requestAnimationFrame(() => start(root, waiting));
   // Links are routed from where nodes end up, so they would race ahead; they fade out until the nodes arrive.
   root.classList.add('gliding');
   clearTimeout(Number(root.dataset.glideTimer));

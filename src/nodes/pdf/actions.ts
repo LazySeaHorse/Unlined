@@ -1,6 +1,8 @@
 import type { XYPosition } from '@xyflow/react';
 import type { PDFDocumentProxy } from 'pdfjs-dist';
 import { nodeRect } from '@/lib/nodeRect';
+import { placedId } from '@/lib/stacks';
+import { glide } from '@/motion/glide';
 import { useCanvasStore } from '@/store/canvasStore';
 import { createNode } from '../factory';
 import { imageBox } from '../image/spec';
@@ -48,11 +50,17 @@ async function renderPagePng(doc: PDFDocumentProxy, pageNumber: number) {
 export async function popOutPage(nodeId: string, doc: PDFDocumentProxy, pageNumber: number): Promise<void> {
   const { src, width, height } = await renderPagePng(doc, pageNumber);
   const store = useCanvasStore.getState();
-  const origin = store.nodes.find((n) => n.id === nodeId);
+  // In a stack, the pdf is wherever its stack is.
+  const origin = store.nodes.find((n) => n.id === placedId(store.nodes, nodeId));
   const at = origin ? nodeRect(origin) : { x: 0, y: 0, width: 0, height: 0 };
-  store.addNodes([
-    createNode('image', { x: at.x + at.width + POP_OUT_GAP, y: at.y }, { src }, imageBox({ width, height })),
-  ]);
+  const image = createNode(
+    'image',
+    { x: at.x + at.width + POP_OUT_GAP, y: at.y },
+    { src },
+    imageBox({ width, height }),
+  );
+  // The page flies out of the pdf to its place beside it.
+  glide(() => store.addNodes([image]), new Map([[image.id, { x: at.x, y: at.y }]]));
 }
 
 /** Opens the linked file itself in a new tab. */

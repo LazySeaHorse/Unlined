@@ -271,6 +271,23 @@ function evaluate(tokens: Token[], lines: Lines): Value {
 
 const TARGET = /^([RrCc])(\d+)\s*(<->|\+=|-=|\*=|\/=|=)\s*(.+)$/;
 
+/** The lines a command writes, counted from 1: its target, and for a swap the other line too. */
+export interface GridOpLines {
+  axis: Axis;
+  index: number;
+  swap?: number;
+}
+
+/** Which lines `command` writes, or null when it does not parse. Says nothing of whether it would succeed. */
+export function gridOpLines(command: string): GridOpLines | null {
+  const match = TARGET.exec(normalise(command));
+  if (!match) return null;
+  const [, axisText, indexText, operator, rest] = match;
+  const axis = axisText.toUpperCase() as Axis;
+  const other = operator === '<->' ? /^[RrCc](\d+)$/.exec(rest.trim()) : null;
+  return { axis, index: Number(indexText), ...(other ? { swap: Number(other[1]) } : {}) };
+}
+
 /**
  * Applies one row or column command to a grid and returns the new grid, or throws a GridOpError.
  *

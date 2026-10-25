@@ -119,7 +119,11 @@ export default function SheetNode({ id, data, selected }: NodeProps<NodeOf<'shee
       }
     >
       {/* nokey: keep Delete/Backspace inside the grid instead of deleting the node. */}
-      <div className="nodrag nowheel nokey p-2 text-sm" onMouseDownCapture={keepSelectionOnRightClick}>
+      <div
+        className="nodrag nowheel nokey p-2 text-sm"
+        data-sheet-id={id}
+        onMouseDownCapture={keepSelectionOnRightClick}
+      >
         <Results value={results}>
           <Spreadsheet
             data={matrix}

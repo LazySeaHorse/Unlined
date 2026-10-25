@@ -10,7 +10,7 @@ import {
   Undo2,
   Upload,
 } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useLayoutEffect, useRef, useState } from 'react';
 import { useStore } from 'zustand';
 import { useAgentStore } from '@/agent';
 import { useCanvasActions } from '@/canvas/useCanvasActions';
@@ -129,26 +129,28 @@ export function TopBar() {
         <IconButton icon={Undo2} label="Undo" hint="Ctrl+Z" disabled={!canUndo} onClick={undo} />
         <IconButton icon={Redo2} label="Redo" hint="Ctrl+Shift+Z" disabled={!canRedo} onClick={redo} />
         <Divider />
-        {toolbarKinds().map((kind) => {
-          const spec = nodeSpecs[kind];
-          return spec.placement === 'place' ? (
-            <IconButton
-              key={kind}
-              icon={spec.icon}
-              label={spec.label}
-              hint={`${numberKeyFor(kind) ? `${numberKeyFor(kind)}, then ` : ''}double-click canvas to place`}
-              active={tool === kind}
-              onClick={() => setTool(kind)}
-            />
-          ) : (
-            <IconButton
-              key={kind}
-              icon={spec.icon}
-              label={`Insert ${spec.label.toLowerCase()}`}
-              onClick={() => void insertActions[kind as keyof typeof insertActions]()}
-            />
-          );
-        })}
+        <ToolGroup tool={tool}>
+          {toolbarKinds().map((kind) => {
+            const spec = nodeSpecs[kind];
+            return spec.placement === 'place' ? (
+              <IconButton
+                key={kind}
+                icon={spec.icon}
+                label={spec.label}
+                hint={`${numberKeyFor(kind) ? `${numberKeyFor(kind)}, then ` : ''}double-click canvas to place`}
+                active={tool === kind}
+                onClick={() => setTool(kind)}
+              />
+            ) : (
+              <IconButton
+                key={kind}
+                icon={spec.icon}
+                label={`Insert ${spec.label.toLowerCase()}`}
+                onClick={() => void insertActions[kind as keyof typeof insertActions]()}
+              />
+            );
+          })}
+        </ToolGroup>
         <Divider />
         <IconButton
           icon={LayoutGrid}
@@ -172,5 +174,35 @@ export function TopBar() {
       <Divider />
       <ThemeToggle />
     </Panel>
+  );
+}
+
+/** The node tools, with a highlight that slides to the tool picked instead of jumping there. */
+function ToolGroup({ tool, children }: { tool: string; children: ReactNode }) {
+  const group = useRef<HTMLDivElement>(null);
+  const pill = useRef<HTMLSpanElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the pressed button moves when `tool` changes.
+  useLayoutEffect(() => {
+    const el = pill.current;
+    const active = group.current?.querySelector<HTMLElement>('button[aria-pressed="true"]');
+    if (!el) return;
+    if (!active) {
+      el.style.opacity = '0';
+      return;
+    }
+    el.style.translate = `${active.offsetLeft}px 0`;
+    el.style.width = `${active.offsetWidth}px`;
+    el.style.opacity = '1';
+    // Put in place once without sliding; from then on it slides.
+    const frame = requestAnimationFrame(() => {
+      el.dataset.ready = '';
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [tool]);
+  return (
+    <div ref={group} className="tool-group relative flex items-center gap-1">
+      <span ref={pill} aria-hidden className="tool-pill" />
+      {children}
+    </div>
   );
 }

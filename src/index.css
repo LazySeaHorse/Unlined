@@ -320,6 +320,10 @@ body,
 .link-end {
   pointer-events: none;
 }
+.link-pulse {
+  fill: currentColor;
+  pointer-events: none;
+}
 
 /* Labels: the link's colour, a halo in the canvas colour behind the text, never selectable as text. */
 .link-label {
@@ -858,6 +862,99 @@ math-field::part(virtual-keyboard-toggle) {
 .react-flow__node.stack-drop .node-tile {
   outline: 2px dashed var(--accent);
   outline-offset: 3px;
+}
+
+/* New nodes grow into place; a new solid link draws itself from its source. */
+@keyframes node-enter {
+  from {
+    opacity: 0;
+    scale: 0.96;
+  }
+}
+@keyframes link-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+}
+/* Nodes an undo or redo changed flash, so it is plain what the step did. */
+@keyframes history-flash {
+  from {
+    outline: 3px solid color-mix(in srgb, var(--fg) 35%, transparent);
+  }
+  to {
+    outline: 3px solid transparent;
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .react-flow__node.entering .node {
+    animation: node-enter var(--dur) var(--ease-spring);
+  }
+  .react-flow__edge.link-new .link:not(.dashed) .link-line {
+    stroke-dasharray: 1;
+    animation: link-draw var(--dur-move) var(--ease-spring);
+  }
+  .react-flow__node.history-flash .node-tile {
+    animation: history-flash 0.9s ease-out;
+  }
+}
+/* What a deleted node leaves behind for a moment (motion/ghosts). */
+.exit-ghost {
+  position: absolute;
+  border: 1.5px solid color-mix(in srgb, var(--fg) 30%, transparent);
+  border-radius: 0 0.8125rem 0.8125rem 0.8125rem;
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+  pointer-events: none;
+}
+
+/* The toolbar's picked tool: one highlight that slides between tools (chrome/TopBar ToolGroup). */
+.tool-pill {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  height: 2.25rem;
+  margin-top: -1.125rem;
+  border-radius: 0.75rem;
+  background: var(--accent);
+  opacity: 0;
+  pointer-events: none;
+}
+.tool-group > button {
+  position: relative;
+  z-index: 1;
+}
+.tool-group > button[aria-pressed="true"] {
+  background-color: transparent;
+}
+/* A Math+ result that changed settles in; a pdf page fades in once drawn. */
+@keyframes result-tick {
+  from {
+    opacity: 0;
+    translate: 0 3px;
+  }
+}
+.result-tick {
+  display: inline-block;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tool-pill[data-ready] {
+    transition:
+      translate var(--dur) var(--ease-spring),
+      width var(--dur) var(--ease-spring);
+  }
+  .result-tick {
+    animation: result-tick var(--dur) var(--ease-spring);
+  }
+  .page-drawn {
+    animation: fade-in var(--dur) ease-out;
+  }
+  /* A canvas opening (switching canvases remounts it) fades in rather than cutting. */
+  .react-flow {
+    animation: fade-in var(--dur) ease-out;
+  }
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 0.2s;
 }
 
 /* Nodes an AI agent just changed. */

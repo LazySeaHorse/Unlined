@@ -24,7 +24,10 @@ import {
   type NodeDataMap,
   type NodeKind,
 } from '@/model/types';
+import { exitGhosts } from '@/motion/ghosts';
 import { glide } from '@/motion/glide';
+import { mark } from '@/motion/marks';
+import { DUR_MOVE, HISTORY_FLASH_MS } from '@/motion/motion';
 import { newId, stripTransient } from '@/nodes/factory';
 import { useUiStore } from './uiStore';
 
@@ -228,6 +231,17 @@ export const useCanvasStore = create<CanvasState>()(
           ],
           edges: [...deselectEdges(get().edges), ...edges.map((e) => ({ ...e, selected: true }))],
         });
+        // New nodes grow into place; new links draw themselves.
+        mark(
+          nodes.map((n) => n.id),
+          'entering',
+          DUR_MOVE,
+        );
+        mark(
+          edges.map((e) => e.id),
+          'link-new',
+          DUR_MOVE,
+        );
       },
 
       updateNodeData: (id, patch) => {
@@ -258,7 +272,9 @@ export const useCanvasStore = create<CanvasState>()(
         const selected = nodes.filter((n) => ids.has(n.id));
         if (selected.length === 0) return;
         const copy = cloneGraph(selected, edges, DUPLICATE_OFFSET);
-        get().addNodes(copy.nodes, copy.edges);
+        // Each copy slides out of its original to where it lands.
+        const from = new Map(copy.nodes.map((n, i) => [n.id, selected[i].position]));
+        glide(() => get().addNodes(copy.nodes, copy.edges), from);
       },
 
       linkNodes: (from, to, data) => {
@@ -287,6 +303,7 @@ export const useCanvasStore = create<CanvasState>()(
             ],
           }),
         );
+        mark([id], 'link-new', DUR_MOVE);
         return id;
       },
 
@@ -329,6 +346,11 @@ export const useCanvasStore = create<CanvasState>()(
           (e) => e.id === renaming && (doomedEdges.has(e.id) || doomed.has(e.source) || doomed.has(e.target)),
         );
         if (gone) useUiStore.getState().stopRenamingLink(gone.id);
+        exitGhosts(
+          placedNodes(get().nodes)
+            .filter((n) => doomed.has(n.id))
+            .map(nodeRect),
+        );
         const nodes = removeNodes(get().nodes, doomed);
         const alive = new Set(nodes.map((n) => n.id));
         asUndoStep(() =>
@@ -400,15 +422,30 @@ export const useCanvasStore = create<CanvasState>()(
   ),
 );
 
-/** Steps back through the history; nodes it moves glide back to where they were. */
-export const undo = () => {
-  glide(() => useCanvasStore.temporal.getState().undo());
+/** Undo or redo touching more nodes than this (Organise, say) shows by gliding alone, not by flashing them all. */
+const MAX_FLASHED = 24;
+
+/**
+ * Runs an undo or redo: nodes it moves glide back, and nodes whose content it changes or brings back flash
+ * briefly, so it is plain what the step did.
+ */
+function travel(step: () => void) {
+  const before = new Map(useCanvasStore.getState().nodes.map((n) => [n.id, n]));
+  glide(step);
   startNewUndoStep();
-};
-export const redo = () => {
-  glide(() => useCanvasStore.temporal.getState().redo());
-  startNewUndoStep();
-};
+  const changed = useCanvasStore
+    .getState()
+    .nodes.filter((n) => {
+      const was = before.get(n.id);
+      return !was || was.data !== n.data;
+    })
+    .map((n) => n.id);
+  if (changed.length <= MAX_FLASHED) mark(changed, 'history-flash', HISTORY_FLASH_MS);
+}
+
+/** Steps back through the history. */
+export const undo = () => travel(() => useCanvasStore.temporal.getState().undo());
+export const redo = () => travel(() => useCanvasStore.temporal.getState().redo());
 
 /** Snapshot of the open canvas in its persisted form. */
 export function getCanvasContent(): CanvasContent {

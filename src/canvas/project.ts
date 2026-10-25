@@ -103,12 +103,13 @@ export function projectEdges(edges: AppEdge[], nodes: AppNode[], view: View): Ap
       !matches.has(e.source) &&
       !matches.has(e.target) &&
       !e.data?.label?.toLowerCase().includes(query);
-    if (!lifted && !miss) return [e];
+    const className = [miss && 'search-miss', view.marks.get(e.id)].filter(Boolean).join(' ');
+    if (!lifted && !className) return [e];
     return [
       {
         ...e,
         ...(lifted ? { zIndex: SECTION_Z + 1 } : {}),
-        ...(miss ? { className: 'search-miss' } : {}),
+        ...(className ? { className } : {}),
       },
     ];
   });
