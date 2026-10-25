@@ -57,7 +57,9 @@ export function MathField({
     const latex = flattenDisplaylines(value);
     if (!field || flattenDisplaylines(field.value) === latex) return;
     try {
-      field.setValue(latex, { silenceNotifications: true });
+      // The value is LaTeX, read as math whatever mode the caret was left in: left in text (the end of a
+      // `\text{…}`), MathLive would type the new LaTeX in as literal characters.
+      field.setValue(latex, { silenceNotifications: true, mode: 'math' });
     } catch (error) {
       // A value MathLive cannot parse must not take the whole canvas down with this one node.
       console.error('Could not load math into the field', error);

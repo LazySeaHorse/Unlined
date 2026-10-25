@@ -130,6 +130,28 @@ test('table node rows and columns', async ({ page }) => {
   await expect(nodes(page).locator('math-field')).toHaveCount(16);
 });
 
+test('inserting a row keeps text cells as text', async ({ page }) => {
+  await placeNode(page, 'Table');
+  const fields = nodes(page).locator('math-field');
+  const value = (i: number) => fields.nth(i).evaluate((el: HTMLElement & { value: string }) => el.value);
+  // Typed in text mode, a cell is left with its caret inside the text.
+  for (const [i, word] of [
+    [0, 'one'],
+    [3, 'two'],
+  ] as const) {
+    await fields.nth(i).click();
+    await expect(fields.nth(i)).toBeFocused();
+    await nodes(page).getByRole('button', { name: 'Switch to text mode' }).click();
+    await page.keyboard.type(word);
+  }
+  await expect.poll(() => value(3)).toBe('\\text{two}');
+  // A row on top moves every cell's value down a row, into fields left in text mode.
+  await nodes(page).getByRole('button', { name: 'Insert row' }).first().dispatchEvent('click');
+  await expect(fields).toHaveCount(12);
+  await expect.poll(() => value(3)).toBe('\\text{one}');
+  await expect.poll(() => value(6)).toBe('\\text{two}');
+});
+
 test('search dims non-matching nodes', async ({ page }) => {
   await placeNode(page, 'Text', 400, 300);
   await placeNode(page, 'Script', 900, 300);
