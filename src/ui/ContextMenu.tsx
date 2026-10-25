@@ -19,7 +19,11 @@ export function ContextMenu({ at, items, onClose }: ContextMenuProps) {
     <DropdownMenu.Root open={at !== null} onOpenChange={(open) => !open && onClose()}>
       {/* A zero-size anchor at the point; the menu is only ever opened from code. */}
       <DropdownMenu.Trigger asChild>
-        <span aria-hidden className="pointer-events-none fixed size-0" style={{ left: shown.at?.x, top: shown.at?.y }} />
+        <span
+          aria-hidden
+          className="pointer-events-none fixed size-0"
+          style={{ left: shown.at?.x, top: shown.at?.y }}
+        />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
         <DropdownMenu.Content
