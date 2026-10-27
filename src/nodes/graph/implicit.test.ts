@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { implicitSegments, segmentsPath } from './implicit';
+import { implicitSegments, segmentsPath, shadedPath } from './implicit';
 
 const window = [-3, 3] as const;
 
@@ -52,7 +52,23 @@ describe('implicitSegments', () => {
 });
 
 describe('segmentsPath', () => {
-  it('writes each segment as its own piece', () => {
+  it('joins pieces that meet end to end, whichever way round they come', () => {
+    expect(
+      segmentsPath([
+        [0, 1, 2, 3],
+        [6, 7, 2, 3],
+        [6, 7, 8, 9],
+      ]),
+    ).toBe('M0 1L2 3L6 7L8 9');
+    expect(
+      segmentsPath([
+        [4, 5, 6, 7],
+        [0, 1, 4, 5],
+      ]),
+    ).toBe('M0 1L4 5L6 7');
+  });
+
+  it('keeps separate lines separate, and writes nothing for none', () => {
     expect(
       segmentsPath([
         [0, 1, 2, 3],
@@ -60,5 +76,49 @@ describe('segmentsPath', () => {
       ]),
     ).toBe('M0 1L2 3M4 5L6 7');
     expect(segmentsPath([])).toBe('');
+  });
+
+  it('turns a circle into a handful of lines, one per closed curve', () => {
+    const segments = implicitSegments((x, y) => x * x + y * y - 1, window, window);
+    expect(segmentsPath(segments).split('M').length - 1).toBe(1);
+  });
+});
+
+/** The area of a path made only of `M … L … Z` polygons, by the shoelace formula. */
+function area(path: string) {
+  let total = 0;
+  for (const polygon of path.split('M').filter(Boolean)) {
+    const points = polygon
+      .replace('Z', '')
+      .split('L')
+      .map((p) => p.split(' ').map(Number));
+    for (let i = 0; i < points.length; i++) {
+      const [xa, ya] = points[i];
+      const [xb, yb] = points[(i + 1) % points.length];
+      total += xa * yb - xb * ya;
+    }
+  }
+  return Math.abs(total) / 2;
+}
+
+describe('shadedPath', () => {
+  it('fills a disc to its area', () => {
+    expect(area(shadedPath((x, y) => 1 - x * x - y * y, window, window))).toBeCloseTo(Math.PI, 1);
+  });
+
+  it('fills the bands of 1 ≤ |x| ≤ 2 and nothing between them', () => {
+    const path = shadedPath((x) => Math.min(Math.abs(x) - 1, 2 - Math.abs(x)), window, window);
+    expect(area(path)).toBeCloseTo(2 * 1 * 6, 0);
+  });
+
+  it('joins whole cells in a row into one rectangle, so a half plane is a few hundred pieces, not 20,000 cells', () => {
+    const path = shadedPath((x) => x, window, window);
+    expect(path.split('M').length - 1).toBeLessThan(500);
+    expect(area(path)).toBeCloseTo(18, 5);
+  });
+
+  it('fills nothing where the function is never positive, or not a number', () => {
+    expect(shadedPath((x, y) => -1 - x * x - y * y, window, window)).toBe('');
+    expect(shadedPath(() => Number.NaN, window, window)).toBe('');
   });
 });

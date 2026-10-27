@@ -114,6 +114,26 @@ test('graph node traces an equation in x and y', async ({ page }) => {
   await expect.poll(() => plotted.count()).toBeGreaterThan(before);
 });
 
+test('graph node shades a chained inequality', async ({ page }) => {
+  await placeNode(page, 'Graph');
+  const plotted = nodes(page).locator('.MafsView path[d]');
+  await expect(plotted.first()).toBeAttached({ timeout: 20_000 });
+  const before = await plotted.count();
+  await nodes(page).getByRole('button', { name: 'Add equation' }).click();
+  await nodes(page).locator('math-field').nth(1).click();
+  await expect(nodes(page).locator('math-field').nth(1)).toBeFocused();
+  // Typing `|` in MathLive is its own matter; this is the LaTeX its absolute-value template gives.
+  await nodes(page)
+    .locator('math-field')
+    .nth(1)
+    .evaluate((field: HTMLElement & { setValue(latex: string): void }) => {
+      field.setValue('1\\le\\left|x\\right|\\le2');
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  // The fill and its edge are two paths.
+  await expect.poll(() => plotted.count()).toBeGreaterThanOrEqual(before + 2);
+});
+
 test('graph curves take a colour from the palette', async ({ page }) => {
   await placeNode(page, 'Graph');
   const curve = nodes(page).locator('.MafsView path[d]').first();

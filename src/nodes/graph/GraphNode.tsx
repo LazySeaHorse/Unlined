@@ -13,7 +13,7 @@ import { ColorSwatches, linkSwatch } from '../ColorSwatches';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
 import { newEquation } from './equations';
-import { implicitSegments, segmentsPath } from './implicit';
+import { implicitSegments, segmentsPath, shadedPath } from './implicit';
 import { classifyRelation, type PlotFn2, type Relation } from './relation';
 
 export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'graph'>>) {
@@ -138,9 +138,40 @@ function Curve({ relation, color }: { relation: Relation; color: string }) {
       return <Plot.OfY x={relation.fn} color={color} />;
     case 'implicit':
       return <ImplicitCurve fn={relation.fn} color={color} />;
+    case 'shade':
+      return <ShadedArea fn={relation.fn} strict={relation.strict} color={color} />;
     case 'region':
       return <Plot.Inequality {...{ [relation.axis]: { [relation.op]: relation.fn } }} color={color} />;
   }
+}
+
+/** Fills where the function is positive and outlines its edge, dashed when the edge itself is excluded. */
+function ShadedArea({ fn, strict, color }: { fn: PlotFn2; strict: boolean; color: string }) {
+  const { xPaneRange, yPaneRange } = usePaneContext();
+  const { fill, edge } = useMemo(
+    () => ({
+      fill: shadedPath(fn, xPaneRange, yPaneRange),
+      edge: segmentsPath(implicitSegments(fn, xPaneRange, yPaneRange)),
+    }),
+    [fn, xPaneRange, yPaneRange],
+  );
+  const style = { vectorEffect: 'non-scaling-stroke', transform: 'var(--mafs-view-transform)' } as const;
+  return (
+    <>
+      <path d={fill} style={{ ...style, fill: color, fillOpacity: 0.15, stroke: 'none' }} />
+      <path
+        d={edge}
+        strokeWidth={2}
+        strokeLinecap="round"
+        style={{
+          ...style,
+          fill: 'none',
+          stroke: color,
+          strokeDasharray: strict ? 'var(--mafs-line-stroke-dash-style)' : undefined,
+        }}
+      />
+    </>
+  );
 }
 
 /** Traces the curve over the part of the plane Mafs has panes for, so it follows pan and zoom. */

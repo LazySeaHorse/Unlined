@@ -7,11 +7,16 @@ export type PlotFn2 = (x: number, y: number) => number;
 /** The comparisons Mafs can shade, as it spells them. */
 export type Comparison = '<' | '<=' | '>' | '>=';
 
-/** What a row of the graph draws. `x`-kinds take y and give x, so `x=3` is a vertical line. `implicit` is where fn = 0. */
+/**
+ * What a row of the graph draws. `x`-kinds take y and give x, so `x=3` is a vertical line. `implicit` is where fn = 0.
+ * `shade` is where fn > 0: the margin by which every comparison in the row holds, `strict` when the boundary is not
+ * part of it.
+ */
 export type Relation =
   | { kind: 'y'; fn: PlotFn }
   | { kind: 'x'; fn: PlotFn }
   | { kind: 'implicit'; fn: PlotFn2 }
+  | { kind: 'shade'; fn: PlotFn2; strict: boolean }
   | { kind: 'region'; axis: 'x' | 'y'; op: Comparison; fn: PlotFn };
 
 const COMPARISONS: Record<string, Comparison | '='> = {
@@ -59,7 +64,8 @@ function compileXY({ compile }: Engine, expr: Expression): PlotFn2 | null {
 
 /**
  * Reads a row as a graphing calculator would: `y=x^2`, `f(x)=…` or a bare `x^2` is a curve y of x; `x=3` is x of y;
- * `y>x`, `x≤2y` shade a side of one; `x^2+y^2=1` is the curve where both sides agree. Anything it cannot draw (empty, invalid, other letters) gives null.
+ * `y>x`, `x≤2y` shade a side of one; `x^2+y^2=1` is the curve where both sides agree, and `1≤|x|≤2` or `x^2+y^2<4`
+ * shade where every comparison holds. Anything it cannot draw (empty, invalid, other letters) gives null.
  */
 export function classifyRelation(engine: Engine, latex: string): Relation | null {
   if (!latex.trim()) return null;
@@ -69,8 +75,10 @@ export function classifyRelation(engine: Engine, latex: string): Relation | null
     const comparison = COMPARISONS[expr.operator];
     if (!comparison) return onlyUses(expr, 'x') ? curve(engine, expr, 'y') : null;
 
-    const [left, right] = expr.ops ?? [];
-    if (!left || !right) return null;
+    const operands = expr.ops ?? [];
+    // More than two operands is a chain, `1<x<2`.
+    if (operands.length !== 2) return comparison === '=' ? null : shade(engine, expr, comparison, operands);
+    const [left, right] = operands;
     // Solved for y if it can be (so `y>x` is a region of y though the engine stores it as `x<y`), else for x,
     // with the variable on either side: `y<x+1`, or `x+1>y` written the other way round.
     const sides = [
@@ -92,7 +100,7 @@ export function classifyRelation(engine: Engine, latex: string): Relation | null
       const fn = compileXY(engine, left.sub(right));
       return fn && { kind: 'implicit', fn };
     }
-    return null;
+    return comparison === '=' ? null : shade(engine, expr, comparison, operands);
   } catch {
     return null;
   }
@@ -107,4 +115,27 @@ function build(engine: Engine, axis: 'x' | 'y', expr: Expression, op: Comparison
   const fn = compileIn(engine, expr, axis === 'y' ? 'x' : 'y');
   if (!fn) return null;
   return op === '=' ? { kind: axis, fn } : { kind: 'region', axis, op, fn };
+}
+
+/** Where every comparison of the row holds, as the smallest margin by which any one does. */
+function shade(
+  engine: Engine,
+  expr: Expression,
+  op: Comparison,
+  operands: readonly Parts[],
+): Relation | null {
+  if (expr.unknowns.length === 0 || !expr.unknowns.every(isXorY)) return null;
+  const ascending = op === '<' || op === '<=';
+  const margins: PlotFn2[] = [];
+  for (let i = 0; i + 1 < operands.length; i++) {
+    const [a, b] = [operands[i], operands[i + 1]];
+    const margin = compileXY(engine, ascending ? b.sub(a) : a.sub(b));
+    if (!margin) return null;
+    margins.push(margin);
+  }
+  return {
+    kind: 'shade',
+    fn: (x, y) => Math.min(...margins.map((margin) => margin(x, y))),
+    strict: op === '<' || op === '>',
+  };
 }

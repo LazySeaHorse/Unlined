@@ -12,7 +12,8 @@ const must = (latex: string): Relation => {
 /** A row that plots one variable against the other, so its function takes one number. */
 const curve = (latex: string) => {
   const relation = must(latex);
-  if (relation.kind === 'implicit') throw new Error(`${latex} is implicit`);
+  if (relation.kind === 'implicit' || relation.kind === 'shade')
+    throw new Error(`${latex} is ${relation.kind}`);
   return relation;
 };
 
@@ -81,6 +82,37 @@ describe('classifyRelation: implicit curves', () => {
   });
 });
 
+describe('classifyRelation: shaded areas', () => {
+  const shade = (latex: string) => {
+    const relation = must(latex);
+    if (relation.kind !== 'shade') throw new Error(`${latex} is ${relation.kind}`);
+    return relation;
+  };
+
+  it('shades where every comparison of a chain holds', () => {
+    const band = shade('1\\le\\left|x\\right|\\le2');
+    expect(band.strict).toBe(false);
+    expect(band.fn(1.5, 0)).toBeCloseTo(0.5);
+    expect(band.fn(-1.5, 7)).toBeCloseTo(0.5);
+    expect(band.fn(0, 0)).toBeLessThan(0);
+    expect(band.fn(3, 0)).toBeLessThan(0);
+    expect(shade('0\\le y\\le x^2').fn(2, 1)).toBeGreaterThan(0);
+    expect(shade('0\\le y\\le x^2').fn(2, 5)).toBeLessThan(0);
+  });
+
+  it('reads chains written downwards, and strict ones', () => {
+    expect(shade('2>x>1').fn(1.5, 0)).toBeGreaterThan(0);
+    expect(shade('2>x>1').strict).toBe(true);
+  });
+
+  it('shades inequalities that cannot be solved for x or for y', () => {
+    expect(shade('|x|<2').fn(1, 0)).toBeGreaterThan(0);
+    expect(shade('|x|<2').fn(3, 0)).toBeLessThan(0);
+    expect(shade('x^2+y^2<4').fn(0, 0)).toBe(4);
+    expect(shade('x^2+y^2\\ge4').fn(3, 0)).toBe(5);
+  });
+});
+
 describe('classifyRelation: what it cannot draw', () => {
   it('gives null for empty, invalid and unsupported rows', () => {
     expect(read('')).toBeNull();
@@ -89,7 +121,8 @@ describe('classifyRelation: what it cannot draw', () => {
     expect(read('y')).toBeNull();
     expect(read('y=a x')).toBeNull();
     expect(read('t^2')).toBeNull();
-    expect(read('x^2+y^2<4')).toBeNull();
+    expect(read('t<2')).toBeNull();
+    expect(read('1<2')).toBeNull();
     expect(read('1=1')).toBeNull();
   });
 });
