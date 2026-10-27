@@ -90,6 +90,16 @@ test('graph node plots a function', async ({ page }) => {
   await expect(nodes(page).locator('.MafsView path[d]').first()).toBeAttached({ timeout: 20_000 });
 });
 
+test('graph curves take a colour from the palette', async ({ page }) => {
+  await placeNode(page, 'Graph');
+  const curve = nodes(page).locator('.MafsView path[d]').first();
+  await expect(curve).toBeAttached({ timeout: 20_000 });
+  const before = await curve.evaluate((el) => getComputedStyle(el).stroke);
+  await nodes(page).getByRole('button', { name: 'Curve colour' }).click();
+  await page.getByRole('button', { name: 'pink', exact: true }).click();
+  await expect.poll(() => curve.evaluate((el) => getComputedStyle(el).stroke)).not.toBe(before);
+});
+
 test('script node runs code in the sandbox', async ({ page }) => {
   await placeNode(page, 'Script');
   await nodes(page).getByRole('button', { name: 'Run' }).click();
