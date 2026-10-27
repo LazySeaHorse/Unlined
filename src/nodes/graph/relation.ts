@@ -2,14 +2,16 @@ import type { Expression } from '@cortex-js/compute-engine';
 import type { Engine } from '@/lib/math/engine';
 
 export type PlotFn = (t: number) => number;
+export type PlotFn2 = (x: number, y: number) => number;
 
 /** The comparisons Mafs can shade, as it spells them. */
 export type Comparison = '<' | '<=' | '>' | '>=';
 
-/** What a row of the graph draws. `x`-kinds take y and give x, so `x=3` is a vertical line. */
+/** What a row of the graph draws. `x`-kinds take y and give x, so `x=3` is a vertical line. `implicit` is where fn = 0. */
 export type Relation =
   | { kind: 'y'; fn: PlotFn }
   | { kind: 'x'; fn: PlotFn }
+  | { kind: 'implicit'; fn: PlotFn2 }
   | { kind: 'region'; axis: 'x' | 'y'; op: Comparison; fn: PlotFn };
 
 const COMPARISONS: Record<string, Comparison | '='> = {
@@ -28,6 +30,8 @@ const FLIPPED: Record<Comparison, Comparison> = { '<': '>', '<=': '>=', '>': '<'
  */
 type Parts = Expression & { symbol?: string; ops?: readonly Parts[] };
 
+const isXorY = (name: string) => name === 'x' || name === 'y';
+
 const onlyUses = (expr: Expression, allowed: string) =>
   expr.unknowns.every((name: string) => name === allowed);
 
@@ -44,9 +48,18 @@ function compileIn({ compile }: Engine, expr: Expression, variable: 'x' | 'y'): 
   };
 }
 
+function compileXY({ compile }: Engine, expr: Expression): PlotFn2 | null {
+  const compiled = compile(expr);
+  if (!compiled.success) return null;
+  return (x, y) => {
+    const value = compiled.run({ x, y });
+    return typeof value === 'number' ? value : Number.NaN;
+  };
+}
+
 /**
  * Reads a row as a graphing calculator would: `y=x^2`, `f(x)=…` or a bare `x^2` is a curve y of x; `x=3` is x of y;
- * `y>x`, `x≤2y` shade a side of one. Anything it cannot draw (empty, invalid, other letters) gives null.
+ * `y>x`, `x≤2y` shade a side of one; `x^2+y^2=1` is the curve where both sides agree. Anything it cannot draw (empty, invalid, other letters) gives null.
  */
 export function classifyRelation(engine: Engine, latex: string): Relation | null {
   if (!latex.trim()) return null;
@@ -75,6 +88,10 @@ export function classifyRelation(engine: Engine, latex: string): Relation | null
     // `f(x)=…`: only an equation, and only of x.
     if (comparison === '=' && isNamedCall(left, 'x') && onlyUses(right, 'x'))
       return curve(engine, right, 'y');
+    if (comparison === '=' && expr.unknowns.length > 0 && expr.unknowns.every(isXorY)) {
+      const fn = compileXY(engine, left.sub(right));
+      return fn && { kind: 'implicit', fn };
+    }
     return null;
   } catch {
     return null;

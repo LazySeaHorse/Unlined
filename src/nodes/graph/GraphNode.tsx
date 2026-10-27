@@ -1,6 +1,6 @@
 import type { NodeProps } from '@xyflow/react';
 import { Plus, X } from 'lucide-react';
-import { Coordinates, Mafs, Plot } from 'mafs';
+import { Coordinates, Mafs, Plot, usePaneContext } from 'mafs';
 import 'mafs/core.css';
 import { Popover } from 'radix-ui';
 import { useMemo, useRef } from 'react';
@@ -13,7 +13,8 @@ import { ColorSwatches, linkSwatch } from '../ColorSwatches';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
 import { newEquation } from './equations';
-import { classifyRelation, type Relation } from './relation';
+import { implicitSegments, segmentsPath } from './implicit';
+import { classifyRelation, type PlotFn2, type Relation } from './relation';
 
 export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'graph'>>) {
   const readOnly = useReadOnly();
@@ -135,7 +136,31 @@ function Curve({ relation, color }: { relation: Relation; color: string }) {
       return <Plot.OfX y={relation.fn} color={color} />;
     case 'x':
       return <Plot.OfY x={relation.fn} color={color} />;
+    case 'implicit':
+      return <ImplicitCurve fn={relation.fn} color={color} />;
     case 'region':
       return <Plot.Inequality {...{ [relation.axis]: { [relation.op]: relation.fn } }} color={color} />;
   }
+}
+
+/** Traces the curve over the part of the plane Mafs has panes for, so it follows pan and zoom. */
+function ImplicitCurve({ fn, color }: { fn: PlotFn2; color: string }) {
+  const { xPaneRange, yPaneRange } = usePaneContext();
+  const d = useMemo(
+    () => segmentsPath(implicitSegments(fn, xPaneRange, yPaneRange)),
+    [fn, xPaneRange, yPaneRange],
+  );
+  return (
+    <path
+      d={d}
+      strokeWidth={2}
+      strokeLinecap="round"
+      style={{
+        fill: 'none',
+        stroke: color,
+        vectorEffect: 'non-scaling-stroke',
+        transform: 'var(--mafs-view-transform)',
+      }}
+    />
+  );
 }

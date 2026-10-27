@@ -97,7 +97,20 @@ test('graph node plots rows that are not y=', async ({ page }) => {
   const before = await plotted.count();
   await nodes(page).getByRole('button', { name: 'Add equation' }).click();
   await nodes(page).locator('math-field').nth(1).click();
+  await expect(nodes(page).locator('math-field').nth(1)).toBeFocused();
   await page.keyboard.type('x=3', { delay: 30 });
+  await expect.poll(() => plotted.count()).toBeGreaterThan(before);
+});
+
+test('graph node traces an equation in x and y', async ({ page }) => {
+  await placeNode(page, 'Graph');
+  const plotted = nodes(page).locator('.MafsView path[d]');
+  await expect(plotted.first()).toBeAttached({ timeout: 20_000 });
+  const before = await plotted.count();
+  await nodes(page).getByRole('button', { name: 'Add equation' }).click();
+  await nodes(page).locator('math-field').nth(1).click();
+  await expect(nodes(page).locator('math-field').nth(1)).toBeFocused();
+  await page.keyboard.type('x^2+y^2=1', { delay: 30 });
   await expect.poll(() => plotted.count()).toBeGreaterThan(before);
 });
 
