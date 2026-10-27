@@ -2,10 +2,37 @@
 import { fileURLToPath } from 'node:url';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv, type Plugin } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
-export default defineConfig({
+/**
+ * Umami page-view analytics (cookieless, no cross-site tracking) in the landing page and the app, when
+ * UMAMI_WEBSITE_ID is set (the id is public, it ships in the page). Only the production host reports, and
+ * Do Not Track is honoured.
+ */
+function umami(websiteId: string | undefined): Plugin {
+  return {
+    name: 'umami',
+    transformIndexHtml: () =>
+      websiteId
+        ? [
+            {
+              tag: 'script',
+              injectTo: 'head',
+              attrs: {
+                defer: true,
+                src: 'https://cloud.umami.is/script.js',
+                'data-website-id': websiteId,
+                'data-domains': 'unlined.1azy.ink',
+                'data-do-not-track': 'true',
+              },
+            },
+          ]
+        : [],
+  };
+}
+
+export default defineConfig(({ mode }) => ({
   base: '/',
   resolve: {
     alias: [
@@ -30,6 +57,7 @@ export default defineConfig({
     chunkSizeWarningLimit: 4500,
   },
   plugins: [
+    umami(loadEnv(mode, process.cwd(), ['UMAMI_']).UMAMI_WEBSITE_ID),
     react(),
     tailwindcss(),
     VitePWA({
@@ -65,4 +93,4 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.{ts,tsx}'],
   },
-});
+}));

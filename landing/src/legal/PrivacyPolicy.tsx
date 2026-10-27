@@ -148,14 +148,14 @@ export function PrivacyPolicy() {
             </h2>
           </div>
           <p className="text-muted">
-            We use the PostHog analytics service to measure aggregate site performance.
+            We use the Umami analytics service to measure aggregate site performance. Umami sets no cookies
+            and does not follow you across other sites.
           </p>
           <p className="text-muted">We collect only these aggregate metrics:</p>
           <ul className="list-inside list-disc space-y-1.5 pl-2 text-muted">
-            <li>The number of visits to each page.</li>
+            <li>The number of visits to each page, and how long visits last.</li>
             <li>The type of your device, operating system, and web browser.</li>
             <li>Your approximate geographic location (country and city only).</li>
-            <li>Application crash reports and software error codes.</li>
           </ul>
           <p className="text-muted">We do not collect these types of data:</p>
           <ul className="list-inside list-disc space-y-1.5 pl-2 text-muted">
