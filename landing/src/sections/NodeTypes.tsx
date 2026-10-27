@@ -24,7 +24,7 @@ const BLURB: Record<Kind, string> = {
   text: 'Write notes in Markdown with inline LaTeX math.',
   math: 'Typeset LaTeX formulas for clean problem statements and proofs.',
   mathPlus: 'Evaluate expressions to exact fractions and decimals. Shared variables pass from top to bottom.',
-  graph: 'Plot multiple mathematical functions of x on one coordinate grid.',
+  graph: 'Plot functions, equations and inequalities on one coordinate grid.',
   table: 'Format mathematical cells with integrals, sums, and matrix notation.',
   sheet: 'Spreadsheet with exact fractions. Run row and column operations for matrix reductions.',
   code: 'Execute sandboxed JavaScript on the canvas without network access.',

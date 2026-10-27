@@ -90,6 +90,17 @@ test('graph node plots a function', async ({ page }) => {
   await expect(nodes(page).locator('.MafsView path[d]').first()).toBeAttached({ timeout: 20_000 });
 });
 
+test('graph node plots rows that are not y=', async ({ page }) => {
+  await placeNode(page, 'Graph');
+  const plotted = nodes(page).locator('.MafsView path[d]');
+  await expect(plotted.first()).toBeAttached({ timeout: 20_000 });
+  const before = await plotted.count();
+  await nodes(page).getByRole('button', { name: 'Add equation' }).click();
+  await nodes(page).locator('math-field').nth(1).click();
+  await page.keyboard.type('x=3', { delay: 30 });
+  await expect.poll(() => plotted.count()).toBeGreaterThan(before);
+});
+
 test('graph curves take a colour from the palette', async ({ page }) => {
   await placeNode(page, 'Graph');
   const curve = nodes(page).locator('.MafsView path[d]').first();

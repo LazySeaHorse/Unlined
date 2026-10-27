@@ -67,7 +67,7 @@ export const KIND_META: Record<Kind, { label: string; icon: LucideIcon; hint: st
   text: { label: 'Text', icon: Type, hint: 'Markdown + LaTeX' },
   math: { label: 'Math', icon: Sigma, hint: 'Typeset LaTeX' },
   mathPlus: { label: 'Math+', icon: Calculator, hint: 'Evaluates expressions' },
-  graph: { label: 'Graph', icon: ChartSpline, hint: 'Plot several functions of x' },
+  graph: { label: 'Graph', icon: ChartSpline, hint: 'Plot functions, equations and inequalities' },
   table: { label: 'Table', icon: Table, hint: 'Math cells' },
   sheet: { label: 'Sheet', icon: Sheet, hint: 'Spreadsheet with formulas' },
   code: { label: 'Script', icon: SquareTerminal, hint: 'Sandboxed JavaScript' },

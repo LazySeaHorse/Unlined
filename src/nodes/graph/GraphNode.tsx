@@ -12,8 +12,8 @@ import type { GraphEquation, NodeOf, SectionColor } from '@/model/types';
 import { ColorSwatches, linkSwatch } from '../ColorSwatches';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
-import { compileFunction } from './compileFunction';
 import { newEquation } from './equations';
+import { classifyRelation, type Relation } from './relation';
 
 export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'graph'>>) {
   const readOnly = useReadOnly();
@@ -38,7 +38,7 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
           type="button"
           className="cursor-pointer rounded p-1 hover:bg-surface hover:text-fg"
           onClick={() => update({ equations: [...equations, newEquation(equations)] })}
-          aria-label="Add function"
+          aria-label="Add equation"
         >
           <Plus className="size-3.5" />
         </button>
@@ -49,11 +49,11 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
           // biome-ignore lint/suspicious/noArrayIndexKey: rows are edited in place by position.
           <li key={index} className="flex items-center gap-2 px-3 py-1">
             <ColorDot color={color} onChange={readOnly ? undefined : (c) => setRow(index, { color: c })} />
-            <span className="text-xs text-muted">y =</span>
             <MathField
               value={latex}
               onChange={(value) => setRow(index, { latex: value })}
               readOnly={readOnly}
+              placeholder="y=…"
               className="min-w-0 flex-1 text-base"
             />
             {!readOnly && equations.length > 1 && (
@@ -61,7 +61,7 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
                 type="button"
                 className="nodrag cursor-pointer rounded p-0.5 text-muted hover:text-fg"
                 onClick={() => update({ equations: equations.filter((_, i) => i !== index) })}
-                aria-label="Remove function"
+                aria-label="Remove equation"
               >
                 <X className="size-3.5" />
               </button>
@@ -86,15 +86,17 @@ function Plot2D({
   height: number;
 }) {
   const compiled = useMemo(
-    () => equations.map(({ latex }) => compileFunction(engine, latex)),
+    () => equations.map(({ latex }) => classifyRelation(engine, latex)),
     [engine, equations],
   );
   return (
     <Mafs height={height} pan zoom viewBox={{ x: [-5, 5], y: [-5, 5] }} preserveAspectRatio={false}>
       <Coordinates.Cartesian />
-      {compiled.map((fn, index) =>
-        // biome-ignore lint/suspicious/noArrayIndexKey: one plot per function slot.
-        fn ? <Plot.OfX key={index} y={fn} color={linkSwatch(equations[index].color)} /> : null,
+      {compiled.map((relation, index) =>
+        relation ? (
+          // biome-ignore lint/suspicious/noArrayIndexKey: one plot per row.
+          <Curve key={index} relation={relation} color={linkSwatch(equations[index].color)} />
+        ) : null,
       )}
     </Mafs>
   );
@@ -125,4 +127,15 @@ function ColorDot({ color, onChange }: { color: SectionColor; onChange?: (color:
       </Popover.Portal>
     </Popover.Root>
   );
+}
+
+function Curve({ relation, color }: { relation: Relation; color: string }) {
+  switch (relation.kind) {
+    case 'y':
+      return <Plot.OfX y={relation.fn} color={color} />;
+    case 'x':
+      return <Plot.OfY x={relation.fn} color={color} />;
+    case 'region':
+      return <Plot.Inequality {...{ [relation.axis]: { [relation.op]: relation.fn } }} color={color} />;
+  }
 }
