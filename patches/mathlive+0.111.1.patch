@@ -1,5 +1,5 @@
 diff --git a/node_modules/mathlive/mathlive.mjs b/node_modules/mathlive/mathlive.mjs
-index 47351c7..8e363ce 100644
+index 47351c7..cc88939 100644
 --- a/node_modules/mathlive/mathlive.mjs
 +++ b/node_modules/mathlive/mathlive.mjs
 @@ -12288,10 +12288,11 @@ var _ModeEditor = class _ModeEditor {
@@ -167,7 +167,7 @@ index 47351c7..8e363ce 100644
      else {
        const atom = model.at(model.position);
        const parent = (_d2 = atom == null ? void 0 : atom.parent) != null ? _d2 : model.root;
-@@ -34901,10 +34988,7 @@ var MathModeEditor = class extends ModeEditor {
+@@ -34901,10 +34988,12 @@ var MathModeEditor = class extends ModeEditor {
          const body = lastNewAtom.body;
          const hadEmptyBody = lastNewAtom.hasEmptyBranch("body");
          if (body && hadEmptyBody) {
@@ -175,11 +175,16 @@ index 47351c7..8e363ce 100644
 -            model.offsetOf(body[0]),
 -            model.offsetOf(body[body.length - 1]) + 1
 -          );
-+          model.position = model.offsetOf(body[0]);
++          if (lastNewAtom instanceof LeftRightAtom)
++            model.setSelection(
++              model.offsetOf(body[0]),
++              model.offsetOf(body[body.length - 1]) + 1
++            );
++          else model.position = model.offsetOf(body[0]);
          } else {
            model.position = model.offsetOf(lastNewAtom);
          }
-@@ -38850,7 +38934,7 @@ var _Model = class {
+@@ -38850,7 +38939,7 @@ var _Model = class {
          defaultMode: this.mathfield.options.defaultMode
        };
        return joinLatex(
@@ -188,7 +193,7 @@ index 47351c7..8e363ce 100644
        );
      }
      return ranges.map(
-@@ -38901,6 +38985,7 @@ var _Model = class {
+@@ -38901,6 +38990,7 @@ var _Model = class {
            parent = parent.parent;
          }
        }
@@ -196,7 +201,7 @@ index 47351c7..8e363ce 100644
        this._position = this.normalizeOffset(position);
        this._selection = {
          ranges: [[start, end]],
-@@ -39070,6 +39155,53 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
+@@ -39070,6 +39160,53 @@ function atomIsInRange(model, atom, first, last, includeFirstAtoms) {
    }
    return false;
  }

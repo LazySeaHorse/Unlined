@@ -32,6 +32,19 @@ for (const tool of ['Math', 'Math+']) {
   });
 }
 
+for (const tool of ['Math', 'Math+']) {
+  test(`${tool}: "(" wraps what follows it in parentheses`, async ({ page }) => {
+    await placeNode(page, tool);
+    const field = nodes(page).locator('math-field');
+    await field.click();
+    await expect(field).toBeFocused();
+    await page.keyboard.type('1+(2+3');
+    await expect
+      .poll(() => field.evaluate((el: HTMLElement & { value: string }) => el.value))
+      .toBe('1+\\left(2+3\\right)');
+  });
+}
+
 test('Math+: copy button puts the result LaTeX on the clipboard', async ({ page }) => {
   await placeNode(page, 'Math+');
   const field = nodes(page).locator('math-field');
