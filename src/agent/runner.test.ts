@@ -182,9 +182,9 @@ describe('writing', () => {
 
   it('places nodes right of everything by default and validates kinds', async () => {
     load([createNode('math', at(0, 0))]);
-    expect(await call('create_nodes', { nodes: [{ kind: 'graph', functions: ['x'] }] })).toContain(
-      'at 400,0',
-    );
+    expect(
+      await call('create_nodes', { nodes: [{ kind: 'graph', equations: [{ latex: 'y=x' }] }] }),
+    ).toContain('at 400,0');
     expect((await callError('create_nodes', { nodes: [{ kind: 'image', src: 'x' }] })).error).toBe(
       'invalid_input',
     );

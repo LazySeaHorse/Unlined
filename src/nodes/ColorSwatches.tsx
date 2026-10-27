@@ -2,7 +2,7 @@ import { Check } from 'lucide-react';
 import { SECTION_COLORS, type SectionColor } from '@/model/types';
 
 export const swatch = (color: SectionColor) => `var(--section-${color})`;
-const linkSwatch = (color: SectionColor) => `var(--link-${color})`;
+export const linkSwatch = (color: SectionColor) => `var(--link-${color})`;
 
 /**
  * A row of colour buttons. With `onClear`, a plain swatch first restores the default.

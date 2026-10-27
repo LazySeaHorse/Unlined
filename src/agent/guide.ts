@@ -26,7 +26,9 @@ FIELDS (create_nodes takes them flat next to "kind"; update_nodes "set" replaces
   the name fail. Two links with the same name into one node fail only if that node uses the name. If the target
   assigns the name itself (k := 3) its own value wins from that line on. Links can form loops (allowed): the loop
   is broken at its node earliest in reading order, whose link from the loop is ignored ("loop: link ignored"). Links touching other kinds of node carry nothing.
-- graph: functions, a list of functions of x such as "x^2" or "\\sin(x)".
+- graph: equations, a list of rows {latex, color}, each plotted on one grid in its colour (a section colour name; omit
+  to get a free one). A row is typed as on a graphing calculator: "y=x^2" or just "x^2", "x=3", "y>x+1",
+  "x^2+y^2=1".
 - table: cells, rows of LaTeX math cells.
 - sheet: cells, rows of spreadsheet cells; formulas start with "=" and use A1 references (=SUM(A1:A3)).
 - code: source, JavaScript. run_code runs it in a sandbox and returns console output and the last value.

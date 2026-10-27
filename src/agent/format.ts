@@ -56,7 +56,7 @@ const gridSize = (cells: string[][]) => `${cells.length}×${cells[0]?.length ?? 
 export function preview(node: AppNode): string {
   switch (node.type) {
     case 'graph':
-      return oneLine(node.data.functions.map((f) => `y=${f}`).join('; '));
+      return oneLine(node.data.equations.map((e) => e.latex).join('; '));
     case 'table':
     case 'sheet':
       return `${gridSize(node.data.cells)}: ${oneLine(node.data.cells.flat().filter(Boolean).join(' | ') || '(empty)')}`;
@@ -163,7 +163,7 @@ export function nodeBody(node: AppNode, mathPlusResults?: LineResult[], inputs?:
     case 'mathPlus':
       return mathPlusBody(node.data.latex, mathPlusResults, inputs);
     case 'graph':
-      return node.data.functions.map((f) => `y = ${f}`).join('\n');
+      return node.data.equations.map((e) => `${e.latex} (${e.color})`).join('\n');
     case 'table':
     case 'sheet':
       return gridBody(node.data.cells);

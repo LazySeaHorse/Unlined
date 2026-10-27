@@ -5,7 +5,7 @@ describe('createNode', () => {
   it('fills defaults and spec size', () => {
     const node = createNode('graph', { x: 1, y: 2 });
     expect(node).toMatchObject({ type: 'graph', position: { x: 1, y: 2 }, width: 380, height: 360 });
-    expect(node.data).toEqual({ functions: ['x^2'] });
+    expect(node.data).toEqual({ equations: [{ latex: 'y=x^2', color: 'blue' }] });
   });
 
   it('merges provided data over defaults', () => {

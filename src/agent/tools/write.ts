@@ -5,6 +5,7 @@ import { sectionContents } from '@/lib/sections';
 import { placedId, placedNodes } from '@/lib/stacks';
 import { type AppNode, type NodeDataMap, type NodeKind, SECTION_COLORS } from '@/model/types';
 import { createNode } from '@/nodes/factory';
+import { withColors } from '@/nodes/graph/equations';
 import { splitLines } from '@/nodes/mathPlus/evaluate';
 import { toEmbedUrl } from '@/nodes/video/embedUrl';
 import { normaliseWebUrl } from '@/nodes/web/url';
@@ -54,11 +55,16 @@ const content = {
       ),
   },
   graph: {
-    functions: z
-      .array(z.string().max(500))
+    equations: z
+      .array(
+        z.object({
+          latex: z.string().max(500).describe('As typed: "y=x^2", "x^2", "x=3", "y>x", "x^2+y^2=1".'),
+          color: z.enum(SECTION_COLORS).optional().describe('Curve colour; omit for the next free one.'),
+        }),
+      )
       .min(1)
       .max(20)
-      .describe('Functions of x, e.g. "x^2", "\\sin(x)".'),
+      .transform(withColors),
     title,
     color: tint,
   },
@@ -224,7 +230,7 @@ const updateSchema = z.object({
       latex: z.string().max(20_000),
       source: z.string().max(100_000),
       url: z.string().max(2000),
-      functions: z.array(z.string().max(500)).min(1).max(20),
+      equations: content.graph.equations,
       cells: cellsSchema,
       title: z.string().max(200),
       color: z.enum(SECTION_COLORS),

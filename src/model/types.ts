@@ -10,6 +10,9 @@ export type SectionColor = (typeof SECTION_COLORS)[number];
  */
 export type Titled = { title?: string; color?: SectionColor };
 
+/** One row of a graph: what the user typed (`y=x^2`, `x=3`, `y>x`, `x^2+y^2=1`) and the colour it is drawn in. */
+export type GraphEquation = { latex: string; color: SectionColor };
+
 /** Per-kind payload stored in `node.data`. This is the single source of truth for node shapes. */
 export type NodeDataMap = {
   text: Titled & {
@@ -19,7 +22,7 @@ export type NodeDataMap = {
   };
   math: Titled & { latex: string };
   mathPlus: Titled & { latex: string };
-  graph: Titled & { functions: string[] };
+  graph: Titled & { equations: GraphEquation[] };
   table: Titled & { cells: string[][] };
   sheet: Titled & {
     cells: string[][];
