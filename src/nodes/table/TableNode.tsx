@@ -1,15 +1,19 @@
 import type { NodeProps } from '@xyflow/react';
 import { Minus, Plus } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
+import { AskSlot } from '@/ai/AskSlot';
+import { useInlineAsk } from '@/ai/useInlineAsk';
 import { useReadOnly } from '@/canvas/readOnly';
 import { cn } from '@/lib/cn';
 import { insertColumn, insertRow, removeColumnAt, removeRowAt, setCell } from '@/lib/grid';
 import { columnLabel } from '@/lib/gridOps';
 import { MathField } from '@/lib/math/MathField';
+import { Tex } from '@/lib/math/Tex';
 import type { NodeOf } from '@/model/types';
 import { WithTooltip } from '@/ui/Button';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
+import { tableAsk } from './ask';
 import { inBlock } from './blocks';
 import { useTableSelection } from './useTableSelection';
 
@@ -185,6 +189,20 @@ export default function TableNode({ id, data, selected }: NodeProps<NodeOf<'tabl
   const preview = (axis: 'row' | 'col', index: number) => (on: boolean) =>
     setDoomed(on ? { axis, index } : null);
   const [layout, setLayout] = useState<Layout | null>(null);
+  // The cell an ask is open in, as `row:col`, which the model is told along with the whole table.
+  const [asked, setAsked] = useState({ row: 0, col: 0 });
+  const ask = useInlineAsk(tableAsk, {
+    context: { cells, ...asked },
+    apply: (latex, at: `${number}:${number}`) => {
+      const [r, c] = at.split(':').map(Number);
+      edit((grid) => setCell(grid, r, c, latex));
+    },
+  });
+  // Adding or removing a row or column moves the cells under an open ask.
+  const reshape = (transform: (grid: string[][]) => string[][]) => {
+    ask.close();
+    edit(transform);
+  };
   const rowCount = cells.length;
   const colCount = cells[0]?.length ?? 0;
   const { block, selectRows, selectColumns, selectAll, cellHandlers } = useTableSelection({
@@ -228,13 +246,23 @@ export default function TableNode({ id, data, selected }: NodeProps<NodeOf<'tabl
                       (doomed?.axis === 'row' ? doomed.index === r : doomed?.index === c) && 'bg-danger/15',
                     )}
                   >
-                    <MathField
-                      value={value}
-                      onChange={(latex) => edit((grid) => setCell(grid, r, c, latex))}
-                      readOnly={readOnly}
-                      modeToggle
-                      className="min-h-8 px-1.5 py-1 text-base"
-                    />
+                    <AskSlot
+                      ask={ask}
+                      at={`${r}:${c}`}
+                      renderGhost={(latex) => <Tex latex={latex} className="px-1.5 text-base" />}
+                      className="ask-fit"
+                    >
+                      <MathField
+                        value={value}
+                        onChange={(latex) => {
+                          if (ask.trigger(`${r}:${c}`, value, latex)) setAsked({ row: r, col: c });
+                          else edit((grid) => setCell(grid, r, c, latex));
+                        }}
+                        readOnly={readOnly}
+                        modeToggle
+                        className="min-h-8 px-1.5 py-1 text-base"
+                      />
+                    </AskSlot>
                   </td>
                 ))}
               </tr>
@@ -298,8 +326,8 @@ export default function TableNode({ id, data, selected }: NodeProps<NodeOf<'tabl
                 position={y}
                 length={layout.width}
                 canRemove={rowCount > 1}
-                onInsert={() => edit((grid) => insertRow(grid, b))}
-                onRemove={() => edit((grid) => removeRowAt(grid, Math.max(0, b - 1)))}
+                onInsert={() => reshape((grid) => insertRow(grid, b))}
+                onRemove={() => reshape((grid) => removeRowAt(grid, Math.max(0, b - 1)))}
                 onPreview={preview('row', Math.max(0, b - 1))}
               />
             ))}
@@ -311,8 +339,8 @@ export default function TableNode({ id, data, selected }: NodeProps<NodeOf<'tabl
                 position={x}
                 length={layout.height}
                 canRemove={colCount > 1}
-                onInsert={() => edit((grid) => insertColumn(grid, b))}
-                onRemove={() => edit((grid) => removeColumnAt(grid, Math.max(0, b - 1)))}
+                onInsert={() => reshape((grid) => insertColumn(grid, b))}
+                onRemove={() => reshape((grid) => removeColumnAt(grid, Math.max(0, b - 1)))}
                 onPreview={preview('col', Math.max(0, b - 1))}
               />
             ))}
