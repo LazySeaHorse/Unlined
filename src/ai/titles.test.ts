@@ -79,6 +79,16 @@ describe('suggestTitles', () => {
     expect(useTitleSuggestions.getState().ghosts).toEqual({});
   });
 
+  it('titles linked notes in one request, numbered as they were given', async () => {
+    fake = installFakeLanguageModel(['Both are greetings.\n```\n(1) Hello note\n(2) World note\n```']);
+    twoNotes();
+    useCanvasStore.setState({ edges: [{ id: 'l', source: 'a', target: 'b' }] as never });
+    suggestTitles(['a', 'b']);
+    await wait(50);
+    expect(fake.prompts).toEqual(['(1)\n[text]\nhello\n\n(2)\n[text]\nworld']);
+    expect(useTitleSuggestions.getState().ghosts).toEqual({ a: 'Hello note', b: 'World note' });
+  });
+
   it('does nothing until the model is on the device', () => {
     fake = installFakeLanguageModel([]);
     useAiAssist.setState({ availability: 'downloadable' });

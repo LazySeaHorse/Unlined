@@ -48,6 +48,10 @@ const system = `You name notes on a canvas. For each note give a title of at mos
 const EXAMPLES: Array<[string, string]> = [
   ['[text]\nBuy milk, eggs and flour. Also call the plumber about the kitchen tap.', 'Shopping and errands'],
   ['[math]\nx = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}', 'Quadratic formula'],
+  [
+    '(1)\n[mathPlus]\nr := 3 \\\\ A := \\pi r^2\n\n(2)\n[text]\nThe garden pond is round, 3 m across.',
+    '1: Pond area\n2: Garden pond',
+  ],
 ];
 
 const reply = z.string();
@@ -64,7 +68,7 @@ const grouped =
   async (text) => {
     const titles: string[] = [];
     for (const line of text.split('\n')) {
-      const m = line.match(/^\s*(\d+)\s*[:.)-]\s*(.+)$/);
+      const m = line.match(/^\s*\(?(\d+)\s*[:.)-]\s*(.+)$/);
       const title = m?.[2] ? cleanTitle(m[2]) : undefined;
       if (m && title) titles[Number(m[1]) - 1] = title;
     }

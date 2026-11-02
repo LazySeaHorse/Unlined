@@ -115,7 +115,7 @@ Type `?` in an empty field (or at the start of an empty line), say what you want
 | Sheet formula bar | a formula and its value |
 | Script | JavaScript (never run until you run it) |
 
-Right-click one or more nodes and choose Suggest title for a brief title each (it replaces an existing title). The model sees only the node it is working on (a Math+ node also sees the values its links pass in), and it is small: it writes the syntax and the app does the computing, but check what it gives you. A single model call is cut off after 30 seconds. The prompts share their syntax descriptions with the AI-control guide (`src/nodes/syntax.ts`).
+Right-click one or more nodes and choose Suggest title for a brief title each (it replaces an existing title). The model sees only the node it is working on (a Math+ node also sees the values its links pass in); for Suggest title, chosen nodes that are linked to each other are sent together in one request, up to four at a time. It is small: it writes the syntax and the app does the computing, but check what it gives you. A single model call is cut off after 30 seconds. The prompts share their syntax descriptions with the AI-control guide (`src/nodes/syntax.ts`).
 
 ### Project Layout
 ```
