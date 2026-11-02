@@ -197,17 +197,13 @@ export default function TableNode({ id, data, selected }: NodeProps<NodeOf<'tabl
   const [layout, setLayout] = useState<Layout | null>(null);
   // An ask is for a cell, as `row:col`; the model is told which, along with the whole table.
   const ask = useInlineAsk(tableAsk, {
+    data,
     context: (at: CellAt) => ({ cells, ...cellAt(at) }),
     apply: (latex, at) => {
       const { row, col } = cellAt(at);
       edit((grid) => setCell(grid, row, col, latex));
     },
   });
-  // Adding or removing a row or column moves the cells under an open ask.
-  const reshape = (transform: (grid: string[][]) => string[][]) => {
-    ask.close();
-    edit(transform);
-  };
   const rowCount = cells.length;
   const colCount = cells[0]?.length ?? 0;
   const { block, selectRows, selectColumns, selectAll, cellHandlers } = useTableSelection({
@@ -331,8 +327,8 @@ export default function TableNode({ id, data, selected }: NodeProps<NodeOf<'tabl
                 position={y}
                 length={layout.width}
                 canRemove={rowCount > 1}
-                onInsert={() => reshape((grid) => insertRow(grid, b))}
-                onRemove={() => reshape((grid) => removeRowAt(grid, Math.max(0, b - 1)))}
+                onInsert={() => edit((grid) => insertRow(grid, b))}
+                onRemove={() => edit((grid) => removeRowAt(grid, Math.max(0, b - 1)))}
                 onPreview={preview('row', Math.max(0, b - 1))}
               />
             ))}
@@ -344,8 +340,8 @@ export default function TableNode({ id, data, selected }: NodeProps<NodeOf<'tabl
                 position={x}
                 length={layout.height}
                 canRemove={colCount > 1}
-                onInsert={() => reshape((grid) => insertColumn(grid, b))}
-                onRemove={() => reshape((grid) => removeColumnAt(grid, Math.max(0, b - 1)))}
+                onInsert={() => edit((grid) => insertColumn(grid, b))}
+                onRemove={() => edit((grid) => removeColumnAt(grid, Math.max(0, b - 1)))}
                 onPreview={preview('col', Math.max(0, b - 1))}
               />
             ))}

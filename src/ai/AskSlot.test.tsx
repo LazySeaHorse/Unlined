@@ -32,7 +32,11 @@ function Harness() {
   const text = useCanvasStore((s) => (s.nodes[0].data as { markdown: string }).markdown);
   const set = (value: string) =>
     useCanvasStore.getState().updateNodeData<'text'>(node.id, { markdown: value });
-  const ask = useInlineAsk(spec, { context: () => 'ctx', apply: (value, _at: number) => set(value) });
+  const ask = useInlineAsk(spec, {
+    data: text,
+    context: () => 'ctx',
+    apply: (value, _at: number) => set(value),
+  });
   return (
     <AskSlot ask={ask} at={0} renderGhost={(value) => <span data-testid="ghost">{value}</span>}>
       <input
@@ -140,6 +144,18 @@ describe('AskSlot', () => {
     await waitFor(() => expect(fake?.running).toBe(0));
   });
 
+  it('closes, writing nothing, when the node changes under it', async () => {
+    fake = installFakeLanguageModel(['{"text":"hello"}']);
+    render(<Harness />);
+    await userEvent.type(field(), '?');
+    await userEvent.type(words(), 'say hello{Enter}');
+    await screen.findByTestId('ghost');
+    act(() => useCanvasStore.getState().updateNodeData<'text'>(node.id, { markdown: 'other' }));
+    expect(screen.queryByLabelText('Describe it')).toBeNull();
+    await userEvent.keyboard('{Enter}');
+    expect(markdown()).toBe('other');
+  });
+
   it('closes when on-device AI stops being ready', async () => {
     render(<Harness />);
     await userEvent.type(field(), '?');
@@ -154,6 +170,7 @@ function LinesHarness() {
   const set = (value: string) =>
     useCanvasStore.getState().updateNodeData<'text'>(node.id, { markdown: value });
   const ask = useInlineAsk(spec, {
+    data: text,
     context: () => 'ctx',
     apply: (value, at: number) => set(replaceLine(text, at, value)),
   });
@@ -202,5 +219,19 @@ describe('AskSlot with lines', () => {
     expect(markdown()).toBe('top\nMID\nend');
     expect(pastSteps()).toBe(before + 1);
     expect(document.activeElement).toBe(field());
+  });
+
+  it('does not put the answer on another line when lines above it go', async () => {
+    useCanvasStore.getState().updateNodeData<'text'>(node.id, { markdown: 'top\n\nend' });
+    fake = installFakeLanguageModel(['{"text":"mid"}']);
+    render(<LinesHarness />);
+    await userEvent.click(field());
+    (field() as HTMLTextAreaElement).setSelectionRange(4, 4);
+    await userEvent.keyboard('?');
+    await userEvent.type(words(), 'middle{Enter}');
+    await screen.findByTestId('ghost');
+    act(() => useCanvasStore.getState().updateNodeData<'text'>(node.id, { markdown: '\nend' }));
+    await userEvent.keyboard('{Enter}');
+    expect(markdown()).toBe('\nend');
   });
 });

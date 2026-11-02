@@ -31,6 +31,7 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
   const setRow = (index: number, patch: Partial<GraphEquation>) =>
     update({ equations: equations.map((e, i) => (i === index ? { ...e, ...patch } : e)) });
   const ask = useInlineAsk(graphAsk, {
+    data,
     context: () => equations,
     apply: (latex, index: number) => setRow(index, { latex }),
   });
@@ -84,11 +85,7 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
               <button
                 type="button"
                 className="nodrag cursor-pointer rounded p-0.5 text-muted hover:text-fg"
-                onClick={() => {
-                  // An open ask is for a row by position, which this shifts.
-                  ask.close();
-                  update({ equations: equations.filter((_, i) => i !== index) });
-                }}
+                onClick={() => update({ equations: equations.filter((_, i) => i !== index) })}
                 aria-label="Remove equation"
               >
                 <X className="size-3.5" />

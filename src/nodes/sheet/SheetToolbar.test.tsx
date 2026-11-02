@@ -23,6 +23,7 @@ let written: string[][] = start;
 function Bar({ label, cell }: { label: string; cell: string }) {
   const [cells, setCells] = useState(start);
   const ask = useInlineAsk(sheetAsk, {
+    data: cells,
     context: (at: string) => ({ cells, at, fractions: false }),
     apply: ({ formula }, at) => {
       const target = parseCellKey(at);

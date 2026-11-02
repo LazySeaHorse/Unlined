@@ -80,6 +80,7 @@ export default function SheetNode({ id, data, selected }: NodeProps<NodeOf<'shee
   };
   // An ask is for the cell that was active when `?` was typed, wherever the selection goes after.
   const ask = useInlineAsk(sheetAsk, {
+    data,
     context: (at: string) => ({ cells, at, fractions }),
     apply: ({ formula }, at) => {
       const cell = parseCellKey(at);

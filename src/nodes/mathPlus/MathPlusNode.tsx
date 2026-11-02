@@ -35,6 +35,7 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
   const inputs = useMathPlusInputs(id);
   // `?` at the start of an empty line asks for lines in words; they go in that line's place.
   const ask = useInlineAsk(mathPlusAsk, {
+    data,
     context: () => ({
       lines: splitLines(data.latex),
       inputs: inputs.flatMap(({ name, value }) => (value === null ? [] : [{ name, value }])),

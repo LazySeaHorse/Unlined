@@ -21,6 +21,11 @@ export type AskState<Key, Value> =
   | { phase: 'ghost'; at: Key; words: string; value: Value };
 
 export interface InlineAskOptions<Context, Key, Value> {
+  /**
+   * The node's data (its `data` prop). An open ask closes when it changes, as nothing but accepting changes it
+   * while an ask is open: an undo, a row removed or an agent may have moved or filled the field it is for.
+   */
+  data: unknown;
   /** The node's own data as the model is told it for an ask at `at`, read when the words are sent. */
   context: (at: Key) => Context;
   /** Writes an accepted answer into the field at `at`, as one undo step. */
@@ -74,12 +79,12 @@ export function useInlineAsk<Context, Answer, Value, Key extends string | number
   };
 
   useEffect(() => () => abort(request), []);
-  // Switched off, or the canvas turned read-only, mid-ask.
+  // Switched off, the canvas turned read-only, or the node changed under the ask (see `data`).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: closes whenever either changes.
   useEffect(() => {
-    if (ready) return;
     abort(request);
     setState((s) => (s.phase === 'closed' ? s : CLOSED));
-  }, [ready]);
+  }, [ready, options.data]);
 
   const open = (at: Key) => {
     if (!ready) return false;

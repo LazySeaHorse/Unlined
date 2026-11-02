@@ -16,6 +16,7 @@ export function TextNode({ id, data, selected }: NodeProps<NodeOf<'text'>>) {
   const [editing, setEditing] = useState(false);
   // `?` at the start of an empty line asks for text in words; it goes in that line's place.
   const ask = useInlineAsk(textAsk, {
+    data,
     context: () => data.markdown,
     apply: (text, at: number) => update({ markdown: replaceLine(data.markdown, at, text) }),
   });
