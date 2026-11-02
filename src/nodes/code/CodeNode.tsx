@@ -4,6 +4,8 @@ import CodeMirror from '@uiw/react-codemirror';
 import type { NodeProps } from '@xyflow/react';
 import { Play } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { AskSlot } from '@/ai/AskSlot';
+import { askedLine, replaceLine, useInlineAsk } from '@/ai/useInlineAsk';
 import { useReadOnly } from '@/canvas/readOnly';
 import { cn } from '@/lib/cn';
 import type { NodeOf } from '@/model/types';
@@ -11,6 +13,7 @@ import { useUiStore } from '@/store/uiStore';
 import { Button } from '@/ui/Button';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
+import { codeAsk } from './ask';
 import { type LogLevel, type LogLine, runScript } from './sandbox';
 
 const extensions = [javascript()];
@@ -36,6 +39,12 @@ export default function CodeNode({ id, data, selected }: NodeProps<NodeOf<'code'
   const readOnly = useReadOnly();
   const dark = useUiStore((s) => s.theme === 'dark');
   const update = useUpdateNodeData<'code'>(id);
+  // `?` at the start of an empty line asks for code in words; it goes in that line's place.
+  const ask = useInlineAsk(codeAsk, {
+    context: data.source,
+    apply: (code, at: number) => update({ source: replaceLine(data.source, at, code) }),
+  });
+  const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;
   const [output, setOutput] = useState<LogLine[]>([]);
   const stopRef = useRef<() => void>(undefined);
   const outputRef = useRef<HTMLDivElement>(null);
@@ -75,17 +84,34 @@ export default function CodeNode({ id, data, selected }: NodeProps<NodeOf<'code'
         </>
       }
     >
-      <CodeMirror
-        value={data.source}
-        onChange={(source) => update({ source })}
-        extensions={extensions}
-        theme={dark ? darkTheme : lightTheme}
-        editable={!readOnly}
-        // Undo is the canvas's (canvas-history), so the code's edits interleave with the rest in one history.
-        basicSetup={{ foldGutter: false, history: false, historyKeymap: false }}
-        height="100%"
-        className="nodrag nowheel nokey canvas-history min-h-0 flex-1 overflow-hidden text-[13px]"
-      />
+      <AskSlot
+        ask={ask}
+        className="nodrag nowheel nokey flex min-h-0 flex-1 flex-col overflow-auto font-mono text-[13px] leading-[1.4]"
+        lines={
+          asking === undefined
+            ? undefined
+            : {
+                above: <PlainLines lines={data.source.split('\n').slice(0, asking)} />,
+                below: <PlainLines lines={data.source.split('\n').slice(asking + 1)} />,
+              }
+        }
+        renderGhost={(code) => <PlainLines lines={code.split('\n')} />}
+      >
+        <CodeMirror
+          value={data.source}
+          onChange={(source, change) => {
+            const line = askedLine(change.startState.doc.toString(), source);
+            if (!line || readOnly || !ask.open(line.index)) update({ source });
+          }}
+          extensions={extensions}
+          theme={dark ? darkTheme : lightTheme}
+          editable={!readOnly}
+          // Undo is the canvas's (canvas-history), so the code's edits interleave with the rest in one history.
+          basicSetup={{ foldGutter: false, history: false, historyKeymap: false }}
+          height="100%"
+          className="canvas-history min-h-0 flex-1 overflow-hidden"
+        />
+      </AskSlot>
       <div
         ref={outputRef}
         className="nodrag nowheel h-28 shrink-0 overflow-y-auto border-t border-border bg-surface-2 font-mono text-xs select-text"
@@ -106,4 +132,14 @@ export default function CodeNode({ id, data, selected }: NodeProps<NodeOf<'code'
       </div>
     </NodeShell>
   );
+}
+
+/** Lines of the script as plain text, for while the editor gives way to an ask. */
+function PlainLines({ lines }: { lines: string[] }) {
+  return lines.map((line, index) => (
+    // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional.
+    <div key={index} className="min-h-[1lh] px-9 whitespace-pre">
+      {line}
+    </div>
+  ));
 }

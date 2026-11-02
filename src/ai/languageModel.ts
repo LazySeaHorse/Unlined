@@ -105,11 +105,14 @@ export const TURN_LIMIT_MS = 30_000;
 /** How the model answers: constrained JSON (for syntax), or free text whose last fenced block is the answer. */
 export type ReplyFormat = 'json' | 'fenced';
 
-/** The text of the last ``` block in a free-text reply, or undefined when there is none. */
+/** The text of the last ``` block in a free-text reply (blank lines around it dropped, indentation kept), or undefined when there is none. */
 export function lastFence(reply: string): string | undefined {
   const blocks = [...reply.matchAll(/```[^\n`]*\n?([\s\S]*?)```/g)];
-  const text = blocks.at(-1)?.[1]?.trim();
-  return text || undefined;
+  const text = blocks
+    .at(-1)?.[1]
+    ?.replace(/^\s*\n/, '')
+    .trimEnd();
+  return text?.trim() ? text : undefined;
 }
 
 export type AskResult<T> =
