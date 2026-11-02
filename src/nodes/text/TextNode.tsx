@@ -61,7 +61,7 @@ export function TextNode({ id, data, selected }: NodeProps<NodeOf<'text'>>) {
               if (node) node.focus();
               else e.currentTarget.blur();
             }}
-            className="nowheel nokey canvas-history block min-h-24 w-full resize-none bg-transparent outline-none [field-sizing:content]"
+            className="nodrag nowheel nokey canvas-history min-h-32 w-[32rem] max-w-full resize-none bg-surface p-4 font-mono text-sm leading-relaxed text-fg outline-none [field-sizing:content]"
           />
         </AskSlot>
       ) : (

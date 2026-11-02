@@ -12,7 +12,10 @@ interface AskSlotProps<Key extends string | number, Value> {
   at?: Key;
   /** The answer as it would look in the field, drawn faintly until it is accepted. */
   renderGhost: (value: Value) => ReactNode;
-  /** The field's own layout classes (flex-1, min-w-0, …): the slot takes its place in the layout. */
+  /**
+   * The slot's classes while an ask is open, when it takes the field's place in the layout (flex-1, padding, …).
+   * Otherwise the slot has no box of its own, so the field lays out exactly as without it.
+   */
   className?: string;
   /**
    * For a field of several lines (see askedLine): the field's lines above and below the one asked from, drawn
@@ -42,7 +45,7 @@ export function AskSlot<Key extends string | number, Value>({
   // and unscaled by the canvas zoom.
   const fieldHeight = useRef<number>(undefined);
   const measure = () => {
-    const element = slot.current;
+    const element = slot.current?.firstElementChild;
     if (element) fieldHeight.current = Number.parseFloat(getComputedStyle(element).height) || undefined;
   };
   const refocus = useRef(false);
@@ -61,7 +64,7 @@ export function AskSlot<Key extends string | number, Value>({
   if (!open) {
     return (
       // Measured as a key goes down, before it changes the field (a math field shrinks once its placeholder goes).
-      <div ref={slot} className={className} onKeyDownCapture={measure}>
+      <div ref={slot} className="contents" onKeyDownCapture={ask.ready ? measure : undefined}>
         {children}
       </div>
     );

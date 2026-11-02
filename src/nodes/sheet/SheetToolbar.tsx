@@ -4,8 +4,7 @@ import type { InlineAsk } from '@/ai/useInlineAsk';
 import { cn } from '@/lib/cn';
 import type { SheetFormula } from './ask';
 
-const field =
-  'min-w-0 rounded border border-border bg-surface px-2 py-0.5 text-xs text-fg focus-within:border-accent';
+const field = 'min-w-0 flex-1 rounded border border-border bg-surface px-2 py-0.5 font-mono text-xs text-fg';
 
 /**
  * Name box and formula bar for the active cell, sized for the node's header. Edits land on the cell that
@@ -44,7 +43,7 @@ export function FormulaBar({
       <span className="shrink-0 text-xs font-semibold text-muted italic">fx</span>
       <AskSlot
         ask={ask}
-        className={cn(field, 'flex-1 font-mono')}
+        className={cn(field, 'focus-within:border-accent')}
         renderGhost={({ formula, shown }) => (
           <span className="truncate px-2">
             {formula}
@@ -65,7 +64,7 @@ export function FormulaBar({
             if (e.key === 'Enter') commit();
             if (e.key === 'Escape') setDraft(null);
           }}
-          className="w-full min-w-0 bg-transparent outline-none placeholder:text-muted"
+          className={cn(field, 'outline-none placeholder:text-muted focus:border-accent')}
         />
       </AskSlot>
     </div>

@@ -110,7 +110,7 @@ export default function CodeNode({ id, data, selected }: NodeProps<NodeOf<'code'
           // Undo is the canvas's (canvas-history), so the code's edits interleave with the rest in one history.
           basicSetup={{ foldGutter: false, history: false, historyKeymap: false }}
           height="100%"
-          className="canvas-history min-h-0 flex-1 overflow-hidden"
+          className="nodrag nowheel nokey canvas-history min-h-0 flex-1 overflow-hidden text-[13px]"
         />
       </AskSlot>
       <div

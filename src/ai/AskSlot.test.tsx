@@ -1,6 +1,6 @@
-import { act, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { DEFAULT_VIEWPORT } from '@/model/types';
 import { createNode } from '@/nodes/factory';
@@ -38,7 +38,12 @@ function Harness() {
     apply: (value, _at: number) => set(value),
   });
   return (
-    <AskSlot ask={ask} at={0} renderGhost={(value) => <span data-testid="ghost">{value}</span>}>
+    <AskSlot
+      ask={ask}
+      at={0}
+      className="slot-box"
+      renderGhost={(value) => <span data-testid="ghost">{value}</span>}
+    >
       <input
         aria-label="field"
         value={text}
@@ -72,6 +77,25 @@ describe('AskSlot', () => {
     await userEvent.type(field(), '?');
     expect(markdown()).toBe('?');
     expect(screen.queryByLabelText('Describe it')).toBeNull();
+  });
+
+  it('leaves the field laid out as without it, and unmeasured, while on-device AI is not ready', () => {
+    useAiAssist.setState({ availability: 'downloadable' });
+    render(<Harness />);
+    expect(field().closest('.slot-box')).toBeNull();
+    const style = vi.spyOn(window, 'getComputedStyle');
+    try {
+      fireEvent.keyDown(field(), { key: 'a' });
+      expect(style).not.toHaveBeenCalled();
+    } finally {
+      style.mockRestore();
+    }
+  });
+
+  it("takes the field's place in the layout while open", async () => {
+    render(<Harness />);
+    await userEvent.type(field(), '?');
+    expect(words().closest('.slot-box')).not.toBeNull();
   });
 
   it('opens on ? in an empty field only, without saving the ?', async () => {

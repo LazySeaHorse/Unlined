@@ -34,6 +34,8 @@ export interface InlineAskOptions<Context, Key, Value> {
 
 export interface InlineAsk<Key, Value> {
   state: AskState<Key, Value>;
+  /** On-device AI is ready: `?` can open an ask. */
+  ready: boolean;
   /**
    * For a field's change handler, with its value before and after the edit. True when the edit was `?` typed into
    * the empty field and an ask opened at `at`: the edit is then dropped, not saved. Always false while on-device
@@ -134,7 +136,7 @@ export function useInlineAsk<Context, Answer, Value, Key extends string | number
     setState({ phase: 'typing', at: state.at, words: state.words });
   };
 
-  return { state, trigger, open, setWords, submit, accept, back, close };
+  return { state, ready, trigger, open, setWords, submit, accept, back, close };
 }
 
 /**

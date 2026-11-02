@@ -78,7 +78,7 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
                 }}
                 readOnly={readOnly}
                 placeholder="y=…"
-                className="text-base"
+                className="min-w-0 flex-1 text-base"
               />
             </AskSlot>
             {!readOnly && equations.length > 1 && (
