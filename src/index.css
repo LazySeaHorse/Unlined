@@ -1161,10 +1161,6 @@ math-field::part(virtual-keyboard-toggle) {
   color: inherit;
   caret-color: auto;
 }
-/* A previewed curve is dashed too; the in-field answer's paths are fills, which a dash leaves alone. */
-.ask-ghost path {
-  stroke-dasharray: var(--mafs-line-stroke-dash-style);
-}
 
 /* MathLive's popovers live outside the fields; flat in dark mode like the rest. */
 .dark {

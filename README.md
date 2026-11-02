@@ -104,11 +104,11 @@ Agents get a small fixed-size overview (counts, groups of nearby nodes, links, t
 ### On-device writing help
 Off by default and per device. Needs desktop Chrome with its built-in AI; turn it on in the AI panel's On-device tab, which also shows whether your device supports it and downloads the model once (about 2 GB). It runs on your computer, so nothing leaves the device.
 
-Type `?` in an empty field (or at the start of an empty line), say what you want and press Enter. The answer shows faintly; Tab or Enter accepts it (one undo step), Esc dismisses it.
+Type `?` in an empty field (or at the start of an empty line), say what you want and press Enter. The answer shows faintly; Tab or Enter accepts it (one undo step), Esc dismisses it. (A graph row takes its answer straight away, as a normal row you can edit; Ctrl+Z takes it back.)
 
 | Where | What `?` gives you |
 | --- | --- |
-| Graph row | an equation or inequality, drawn dashed until accepted |
+| Graph row | an equation or inequality, put straight into the row for you to adjust |
 | Math node, table cell | LaTeX |
 | Math+ | lines that Math+ computes itself, with their results shown |
 | Text | Markdown, with `$LaTeX$` |

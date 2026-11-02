@@ -17,36 +17,36 @@ test.beforeEach(async ({ page }) => {
   await openApp(page);
 });
 
-test('a graph row typed as ? and words is offered faintly, then accepted as one undo step', async ({
+test('a graph row typed as ? and words takes the equation as a normal row, in one undo step', async ({
   page,
 }) => {
   await placeNode(page, 'Graph');
   await nodes(page).getByRole('button', { name: 'Add equation' }).click();
   const row = nodes(page).locator('li').nth(1);
-  await row.locator('math-field').click();
-  await expect(row.locator('math-field')).toBeFocused();
+  const field = row.locator('math-field');
+  await field.click();
+  await expect(field).toBeFocused();
   const height = (await row.boundingBox())?.height;
   await page.keyboard.press('Shift+Slash');
-  const words = row.getByLabel('Describe it');
-  await expect(words).toBeFocused();
+  await expect(row.getByLabel('Describe it')).toBeFocused();
   expect((await row.boundingBox())?.height).toBe(height);
   await page.keyboard.type('downward parabola');
   await page.keyboard.press('Enter');
-  await expect(row.locator('.ask-ghost .katex')).toBeVisible();
-  await expect(nodes(page).locator('.MafsView .ask-ghost path[d]')).toBeAttached();
 
-  await page.keyboard.press('Tab');
-  const field = row.locator('math-field');
+  await expect(row.getByLabel('Describe it')).toHaveCount(0);
   await expect(field).toBeFocused();
-  await expect.poll(() => field.evaluate((f: HTMLElement & { value: string }) => f.value)).toBe('y=-2x^2');
-  await expect(nodes(page).locator('.MafsView .ask-ghost')).toHaveCount(0);
+  const value = () => field.evaluate((f: HTMLElement & { value: string }) => f.value);
+  await expect.poll(value).toBe('y=-2x^2');
 
-  await page.keyboard.press('Escape');
+  // It is an ordinary row: typing carries on from the end.
+  await page.keyboard.type('+1');
+  await expect.poll(value).toBe('y=-2x^2+1');
   await page.keyboard.press('ControlOrMeta+z');
-  await expect.poll(() => field.evaluate((f: HTMLElement & { value: string }) => f.value)).toBe('');
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect.poll(value).toBe('');
 });
 
-test('Escape goes back to the words, then to the empty row', async ({ page }) => {
+test('Escape leaves the words and goes back to the empty row', async ({ page }) => {
   await placeNode(page, 'Graph');
   await nodes(page).getByRole('button', { name: 'Add equation' }).click();
   const row = nodes(page).locator('li').nth(1);
@@ -55,10 +55,6 @@ test('Escape goes back to the words, then to the empty row', async ({ page }) =>
   await page.keyboard.press('Shift+Slash');
   await expect(row.getByLabel('Describe it')).toBeFocused();
   await page.keyboard.type('a parabola');
-  await page.keyboard.press('Enter');
-  await expect(row.locator('.ask-ghost')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(row.getByLabel('Describe it')).toHaveValue('a parabola');
   await page.keyboard.press('Escape');
   await expect(row.getByLabel('Describe it')).toHaveCount(0);
   await expect(row.locator('math-field')).toBeFocused();

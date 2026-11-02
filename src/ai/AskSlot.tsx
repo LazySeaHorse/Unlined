@@ -1,5 +1,6 @@
 import { type KeyboardEvent, type ReactNode, useLayoutEffect, useRef } from 'react';
 import { cn } from '@/lib/cn';
+import { Tex } from '@/lib/math/Tex';
 import type { InlineAsk } from './useInlineAsk';
 
 /** What the slot focuses when it hands back to its field. */
@@ -50,16 +51,21 @@ export function AskSlot<Key extends string | number, Value>({
   };
   const refocus = useRef(false);
   const { state } = ask;
+  // An answer that went straight into the field (see `review`) ends the wait with the field to carry on in.
+  const waiting = useRef(false);
   const open = state.phase !== 'closed' && (at === undefined || state.at === at);
 
   useLayoutEffect(() => {
     if (open) {
       input.current?.focus();
-    } else if (refocus.current) {
+    } else if (refocus.current || waiting.current) {
       refocus.current = false;
       slot.current?.querySelector<HTMLElement>(FIELD)?.focus();
     }
   }, [open]);
+  useLayoutEffect(() => {
+    waiting.current = state.phase === 'running';
+  });
 
   if (!open) {
     return (
@@ -123,6 +129,16 @@ export function PlainLines({ lines, className }: { lines: string[]; className?: 
     // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional.
     <div key={index} className={cn('min-h-[1lh]', className)}>
       {line}
+    </div>
+  ));
+}
+
+/** Typeset lines of a math field, for the lines around an ask while the field gives way to it. */
+export function TexLines({ lines }: { lines: string[] }) {
+  return lines.map((line, index) => (
+    // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional.
+    <div key={index} className="min-h-6">
+      <Tex latex={line} />
     </div>
   ));
 }

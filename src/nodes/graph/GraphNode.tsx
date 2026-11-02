@@ -34,13 +34,9 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
     data,
     context: () => equations,
     apply: (latex, index: number) => setRow(index, { latex }),
+    // A row is something to tweak: the equation goes straight in, as typed text would.
+    review: false,
   });
-  // The answer an ask offers, drawn on the plot in its row's colour until it is accepted.
-  const { state } = ask;
-  const preview: GraphEquation | undefined =
-    state.phase === 'ghost' && equations[state.at]
-      ? { latex: state.value, color: equations[state.at].color }
-      : undefined;
 
   return (
     <NodeShell
@@ -95,34 +91,25 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
         ))}
       </ul>
       <div ref={plotRef} className="nodrag nopan nowheel min-h-0 flex-1">
-        {engine && height > 0 && (
-          <Plot2D engine={engine} equations={equations} preview={preview} height={height} />
-        )}
+        {engine && height > 0 && <Plot2D engine={engine} equations={equations} height={height} />}
       </div>
     </NodeShell>
   );
 }
 
-/** Plots every row, and faintly the row an ask is offering (`preview`) until it is accepted. */
+/** Plots every row. */
 function Plot2D({
   engine,
   equations,
-  preview,
   height,
 }: {
   engine: Engine;
   equations: GraphEquation[];
-  preview?: GraphEquation;
   height: number;
 }) {
   const compiled = useMemo(
     () => equations.map(({ latex }) => classifyRelation(engine, latex)),
     [engine, equations],
-  );
-  const previewLatex = preview?.latex;
-  const previewed = useMemo(
-    () => previewLatex !== undefined && classifyRelation(engine, previewLatex),
-    [engine, previewLatex],
   );
   return (
     <Mafs height={height} pan zoom viewBox={{ x: [-5, 5], y: [-5, 5] }} preserveAspectRatio={false}>
@@ -132,11 +119,6 @@ function Plot2D({
           // biome-ignore lint/suspicious/noArrayIndexKey: one plot per row.
           <Curve key={index} relation={relation} color={linkSwatch(equations[index].color)} />
         ) : null,
-      )}
-      {preview && previewed && (
-        <g className="ask-ghost">
-          <Curve relation={previewed} color={linkSwatch(preview.color)} />
-        </g>
       )}
     </Mafs>
   );

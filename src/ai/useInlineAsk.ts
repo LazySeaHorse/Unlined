@@ -30,6 +30,11 @@ export interface InlineAskOptions<Context, Key, Value> {
   context: (at: Key) => Context;
   /** Writes an accepted answer into the field at `at`, as one undo step. */
   apply: (value: Value, at: Key) => void;
+  /**
+   * False for a field the user will want to adjust: the answer then goes straight into it, as soon as it arrives,
+   * and the field is a normal one again, instead of waiting faintly for Tab. Undo takes it back. Defaults to true.
+   */
+  review?: boolean;
 }
 
 export interface InlineAsk<Key, Value> {
@@ -116,6 +121,11 @@ export function useInlineAsk<Context, Answer, Value, Key extends string | number
       // Superseded by newer words, Escape, closing or unmounting.
       if (controller.signal.aborted || result.status === 'aborted') return;
       request.current = undefined;
+      if (result.status === 'ok' && options.review === false) {
+        asUndoStep(() => options.apply(result.value, at));
+        setState(CLOSED);
+        return;
+      }
       setState(
         result.status === 'ok'
           ? { phase: 'ghost', at, words, value: result.value }
