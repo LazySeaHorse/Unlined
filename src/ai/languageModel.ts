@@ -99,6 +99,19 @@ const enqueue = <T>(job: () => Promise<T>): Promise<T> => {
   return run;
 };
 
+/** The longest one call to the model may take. A small model can loop; this ends it. */
+export const TURN_LIMIT_MS = 30_000;
+
+/** How the model answers: constrained JSON (for syntax), or free text whose last fenced block is the answer. */
+export type ReplyFormat = 'json' | 'fenced';
+
+/** The text of the last ``` block in a free-text reply, or undefined when there is none. */
+export function lastFence(reply: string): string | undefined {
+  const blocks = [...reply.matchAll(/```[^\n`]*\n?([\s\S]*?)```/g)];
+  const text = blocks.at(-1)?.[1]?.trim();
+  return text || undefined;
+}
+
 export type AskResult<T> =
   | { status: 'ok'; value: T }
   | { status: 'invalid'; reason: string }
@@ -118,6 +131,8 @@ export interface AskOptions<T, U> {
   schema: z.ZodType<T>;
   /** Validates the answer with the app's own engine. A failure is sent back to the model once. */
   check: Check<T, U>;
+  /** `json` (the default) constrains the reply to `schema`. `fenced` lets the model reason first and reads the last ``` block; `T` is then a string. */
+  format?: ReplyFormat;
   signal?: AbortSignal;
 }
 
@@ -125,27 +140,41 @@ const isAbort = (e: unknown, signal?: AbortSignal) =>
   signal?.aborted || (e instanceof DOMException && e.name === 'AbortError');
 
 export function ask<T, U>(options: AskOptions<T, U>): Promise<AskResult<U>> {
-  const { feature, system, examples, input, schema, check, signal } = options;
+  const { feature, system, examples, input, schema, check, signal, format = 'json' } = options;
   if (signal?.aborted) return Promise.resolve({ status: 'aborted' });
   return enqueue(async (): Promise<AskResult<U>> => {
     if (signal?.aborted) return { status: 'aborted' };
     if (!getApi()) return { status: 'unavailable' };
     let session: Session | undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let timedOut = false;
     try {
       const initialPrompts: Turn[] = [
         { role: 'system', content: system },
         ...examples.flatMap(([user, out]): Turn[] => [
           { role: 'user', content: user },
-          { role: 'assistant', content: JSON.stringify(out) },
+          {
+            role: 'assistant',
+            content: format === 'fenced' ? `\`\`\`\n${out}\n\`\`\`` : JSON.stringify(out),
+          },
         ]),
       ];
       session = await (await baseSession(feature, initialPrompts)).clone({ signal });
-      const responseConstraint = z.toJSONSchema(schema);
+      const responseConstraint = format === 'json' ? z.toJSONSchema(schema) : undefined;
       let message = input;
       let reason = 'no answer';
       for (let attempt = 0; attempt < 2; attempt++) {
-        const raw = await session.prompt(message, { signal, responseConstraint });
-        const parsed = schema.safeParse(safeJson(raw));
+        const turn = new AbortController();
+        timer = setTimeout(() => {
+          timedOut = true;
+          turn.abort();
+        }, TURN_LIMIT_MS);
+        const raw = await session.prompt(message, {
+          signal: signal ? AbortSignal.any([signal, turn.signal]) : turn.signal,
+          responseConstraint,
+        });
+        clearTimeout(timer);
+        const parsed = schema.safeParse(format === 'fenced' ? lastFence(raw) : safeJson(raw));
         const checked = parsed.success
           ? await check(parsed.data)
           : { ok: false as const, reason: 'The answer did not match the required shape.' };
@@ -155,8 +184,11 @@ export function ask<T, U>(options: AskOptions<T, U>): Promise<AskResult<U>> {
       }
       return { status: 'invalid', reason };
     } catch (e) {
-      return isAbort(e, signal) ? { status: 'aborted' } : { status: 'unavailable' };
+      if (timedOut) return { status: 'invalid', reason: 'It took too long.' };
+      if (isAbort(e, signal)) return { status: 'aborted' };
+      return { status: 'unavailable' };
     } finally {
+      clearTimeout(timer);
       session?.destroy();
     }
   });

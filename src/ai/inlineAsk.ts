@@ -1,5 +1,5 @@
 import type { z } from 'zod';
-import { type AskResult, ask, type Check } from './languageModel';
+import { type AskResult, ask, type Check, type ReplyFormat } from './languageModel';
 
 /**
  * What one kind of field asks the model when `?` is typed into it (see useInlineAsk). Kept free of React so the
@@ -15,6 +15,8 @@ export interface AskSpec<Context, Answer, Value> {
   /** Worked examples. Each answer must pass `check` (a test holds every spec to that). */
   examples: Array<{ context: Context; words: string; answer: Answer }>;
   schema: z.ZodType<Answer>;
+  /** `json` (the default) for syntax; `fenced` when the model should reason first, with `Answer` a string. */
+  format?: ReplyFormat;
   check: Check<Answer, Value>;
   /** The message for one request: the node's data first, then the user's words. Used for the examples too. */
   input: (context: Context, words: string) => string;
@@ -33,6 +35,7 @@ export function askFor<Context, Answer, Value>(
     examples: spec.examples.map((e) => [spec.input(e.context, e.words), e.answer]),
     input: spec.input(context, words),
     schema: spec.schema,
+    format: spec.format,
     check: spec.check,
     signal,
   });

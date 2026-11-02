@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { installFakeLanguageModel } from '@/test/fakeLanguageModel';
-import { ask, checkAvailability, releaseSessions } from './languageModel';
+import { ask, checkAvailability, lastFence, releaseSessions, TURN_LIMIT_MS } from './languageModel';
 
 const schema = z.object({ word: z.string() });
 const base = {
@@ -86,5 +86,48 @@ describe('ask', () => {
     const third = ask({ ...base, signal: running.signal });
     setTimeout(() => running.abort(), 5);
     expect(await third).toEqual({ status: 'aborted' });
+  });
+});
+
+describe('lastFence', () => {
+  it('takes the last fenced block and ignores the reasoning before it', () => {
+    expect(lastFence('so ```\nnot this\n``` and then\n```\n(1/2)e^x\n```')).toBe('(1/2)e^x');
+    expect(lastFence('```latex\nx^2\n```')).toBe('x^2');
+  });
+  it('is undefined without a block', () => {
+    expect(lastFence('just words')).toBeUndefined();
+    expect(lastFence('```\n\n```')).toBeUndefined();
+  });
+});
+
+describe('ask, fenced and timed', () => {
+  const fenced = {
+    feature: 'fenced',
+    system: 'Reason, then fence the answer.',
+    examples: [['2+2', '4']] as Array<[string, string]>,
+    input: 'integrate x',
+    schema: z.string(),
+    format: 'fenced' as const,
+    check: async (v: string) => ({ ok: true as const, value: v }),
+  };
+
+  it('lets the model reason and reads the last fenced block', async () => {
+    fake = installFakeLanguageModel(['Let me think. x^2/2 it is.\n```\nx^2/2+C\n```']);
+    expect(await ask(fenced)).toEqual({ status: 'ok', value: 'x^2/2+C' });
+  });
+
+  it('asks again when the reply has no fenced block', async () => {
+    fake = installFakeLanguageModel(['rambling', '```\nx^2/2\n```']);
+    expect(await ask(fenced)).toEqual({ status: 'ok', value: 'x^2/2' });
+    expect(fake.prompts).toHaveLength(2);
+  });
+
+  it('ends a call that runs past the turn limit', async () => {
+    vi.useFakeTimers();
+    fake = installFakeLanguageModel(['{"word":"good"}'], 'available', 60_000);
+    const result = ask(base);
+    await vi.advanceTimersByTimeAsync(TURN_LIMIT_MS + 1);
+    expect(await result).toEqual({ status: 'invalid', reason: 'It took too long.' });
+    vi.useRealTimers();
   });
 });

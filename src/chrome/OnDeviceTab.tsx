@@ -5,7 +5,7 @@ import { Modal } from '@/ui/Modal';
 import { Switch } from '@/ui/Switch';
 
 const THINGS = [
-  ['Graph', 'In a row, "? downward parabola through (1,2)" becomes an equation.'],
+  ['Graph', 'In a row, "? downward parabola through (1,-2)" becomes an equation.'],
   ['Math', 'In a field, "? integral of x squared from 0 to 1" becomes LaTeX.'],
   ['Math+', 'Words and values become lines Math+ computes itself, e.g. "? sum the numbers above".'],
   [
