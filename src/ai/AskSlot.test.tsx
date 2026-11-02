@@ -115,6 +115,7 @@ describe('AskSlot', () => {
     await userEvent.type(field(), '?');
     await userEvent.type(words(), 'say hello{Enter}');
     expect((await screen.findByTestId('ghost')).textContent).toBe('HELLO');
+    expect(screen.getByTestId('ghost').closest('[aria-live="polite"]')).not.toBeNull();
     expect(fake.prompts).toEqual(['ctx|say hello']);
     expect(markdown()).toBe('');
     const before = pastSteps();
@@ -145,6 +146,7 @@ describe('AskSlot', () => {
     await userEvent.type(field(), '?');
     await userEvent.type(words(), 'nonsense{Enter}');
     await waitFor(() => expect(words().getAttribute('data-state')).toBe('failed'));
+    expect(words().getAttribute('aria-invalid')).toBe('true');
     expect(words().getAttribute('title')).toBeTruthy();
     expect((words() as HTMLInputElement).value).toBe('nonsense');
     await userEvent.type(words(), '!');

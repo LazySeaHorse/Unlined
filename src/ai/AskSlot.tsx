@@ -99,6 +99,7 @@ export function AskSlot<Key extends string | number, Value>({
         aria-label="Describe it"
         className="ask-input nodrag nopan nokey"
         data-state={error ? 'failed' : state.phase}
+        aria-invalid={error ? true : undefined}
         title={error}
         value={state.words}
         onChange={(event) => ask.setWords(event.target.value)}
@@ -107,9 +108,10 @@ export function AskSlot<Key extends string | number, Value>({
         spellCheck={false}
         autoComplete="off"
       />
-      {state.phase === 'ghost' && (
-        <div className={cn('ask-ghost', !lines && 'ask-ghost-over')}>{renderGhost(state.value)}</div>
-      )}
+      {/* There while the ask is open, so a screen reader reads the answer out when it comes. */}
+      <div className={cn('ask-ghost', !lines && 'ask-ghost-over')} aria-live="polite">
+        {state.phase === 'ghost' && renderGhost(state.value)}
+      </div>
       {lines?.below}
     </div>
   );
