@@ -1070,6 +1070,78 @@ math-field::part(virtual-keyboard-toggle) {
   }
 }
 
+/*
+ * A field asking for its content in words (ai/AskSlot). The input takes the field's place and looks like it; it
+ * shimmers while the answer is worked out, then the answer shows faintly over it until accepted. A failure
+ * underlines it in red for a moment.
+ */
+.ask-slot {
+  position: relative;
+  display: flex;
+}
+.ask-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  border: none;
+  outline: none;
+  border-radius: 0.25rem;
+}
+.ask-input[data-state="ghost"] {
+  color: transparent;
+  caret-color: transparent;
+}
+.ask-input[data-state="running"] {
+  background:
+    linear-gradient(
+      90deg,
+      transparent 30%,
+      color-mix(in srgb, var(--accent) 14%, transparent) 50%,
+      transparent 70%
+    )
+    0 0 / 300% 100%;
+}
+.ask-input[data-state="failed"] {
+  animation: ask-failed 1.6s ease-out;
+}
+@keyframes ask-shimmer {
+  from {
+    background-position-x: 100%;
+  }
+  to {
+    background-position-x: 0%;
+  }
+}
+@keyframes ask-failed {
+  from,
+  50% {
+    box-shadow: inset 0 -2px 0 var(--danger);
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ask-input[data-state="running"] {
+    animation: ask-shimmer 1.4s linear infinite;
+  }
+}
+/* The answer waiting to be accepted: in the field, and wherever else the node previews it (a graph's curve). */
+.ask-ghost {
+  opacity: 0.5;
+}
+.ask-ghost-over {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+/* A previewed curve is dashed too; the in-field answer's paths are fills, which a dash leaves alone. */
+.ask-ghost path {
+  stroke-dasharray: var(--mafs-line-stroke-dash-style);
+}
+
 /* MathLive's popovers live outside the fields; flat in dark mode like the rest. */
 .dark {
   --environment-shadow: transparent;

@@ -4,14 +4,18 @@ import { Coordinates, Mafs, Plot, usePaneContext } from 'mafs';
 import 'mafs/core.css';
 import { Popover } from 'radix-ui';
 import { useMemo, useRef } from 'react';
+import { AskSlot } from '@/ai/AskSlot';
+import { useInlineAsk } from '@/ai/useInlineAsk';
 import { useReadOnly } from '@/canvas/readOnly';
 import { type Engine, useEngine } from '@/lib/math/engine';
 import { MathField } from '@/lib/math/MathField';
+import { Tex } from '@/lib/math/Tex';
 import { useElementSize } from '@/lib/useElementSize';
 import type { GraphEquation, NodeOf, SectionColor } from '@/model/types';
 import { ColorSwatches, linkSwatch } from '../ColorSwatches';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
+import { graphAsk } from './ask';
 import { newEquation } from './equations';
 import { implicitSegments, segmentsPath, shadedPath } from './implicit';
 import { classifyRelation, type PlotFn2, type Relation } from './relation';
@@ -26,6 +30,16 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
 
   const setRow = (index: number, patch: Partial<GraphEquation>) =>
     update({ equations: equations.map((e, i) => (i === index ? { ...e, ...patch } : e)) });
+  const ask = useInlineAsk(graphAsk, {
+    context: equations,
+    apply: (latex, index: number) => setRow(index, { latex }),
+  });
+  // The answer an ask offers, drawn on the plot in its row's colour until it is accepted.
+  const { state } = ask;
+  const preview: GraphEquation | undefined =
+    state.phase === 'ghost' && equations[state.at]
+      ? { latex: state.value, color: equations[state.at].color }
+      : undefined;
 
   return (
     <NodeShell
@@ -50,18 +64,31 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
           // biome-ignore lint/suspicious/noArrayIndexKey: rows are edited in place by position.
           <li key={index} className="flex items-center gap-2 px-3 py-1">
             <ColorDot color={color} onChange={readOnly ? undefined : (c) => setRow(index, { color: c })} />
-            <MathField
-              value={latex}
-              onChange={(value) => setRow(index, { latex: value })}
-              readOnly={readOnly}
-              placeholder="y=…"
-              className="min-w-0 flex-1 text-base"
-            />
+            <AskSlot
+              ask={ask}
+              at={index}
+              renderGhost={(answer) => <Tex latex={answer} className="text-base" />}
+              className="min-w-0 flex-1"
+            >
+              <MathField
+                value={latex}
+                onChange={(value) => {
+                  if (!ask.trigger(index, latex, value)) setRow(index, { latex: value });
+                }}
+                readOnly={readOnly}
+                placeholder="y=…"
+                className="text-base"
+              />
+            </AskSlot>
             {!readOnly && equations.length > 1 && (
               <button
                 type="button"
                 className="nodrag cursor-pointer rounded p-0.5 text-muted hover:text-fg"
-                onClick={() => update({ equations: equations.filter((_, i) => i !== index) })}
+                onClick={() => {
+                  // An open ask is for a row by position, which this shifts.
+                  ask.close();
+                  update({ equations: equations.filter((_, i) => i !== index) });
+                }}
                 aria-label="Remove equation"
               >
                 <X className="size-3.5" />
@@ -71,24 +98,34 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
         ))}
       </ul>
       <div ref={plotRef} className="nodrag nopan nowheel min-h-0 flex-1">
-        {engine && height > 0 && <Plot2D engine={engine} equations={equations} height={height} />}
+        {engine && height > 0 && (
+          <Plot2D engine={engine} equations={equations} preview={preview} height={height} />
+        )}
       </div>
     </NodeShell>
   );
 }
 
+/** Plots every row, and faintly the row an ask is offering (`preview`) until it is accepted. */
 function Plot2D({
   engine,
   equations,
+  preview,
   height,
 }: {
   engine: Engine;
   equations: GraphEquation[];
+  preview?: GraphEquation;
   height: number;
 }) {
   const compiled = useMemo(
     () => equations.map(({ latex }) => classifyRelation(engine, latex)),
     [engine, equations],
+  );
+  const previewLatex = preview?.latex;
+  const previewed = useMemo(
+    () => previewLatex !== undefined && classifyRelation(engine, previewLatex),
+    [engine, previewLatex],
   );
   return (
     <Mafs height={height} pan zoom viewBox={{ x: [-5, 5], y: [-5, 5] }} preserveAspectRatio={false}>
@@ -98,6 +135,11 @@ function Plot2D({
           // biome-ignore lint/suspicious/noArrayIndexKey: one plot per row.
           <Curve key={index} relation={relation} color={linkSwatch(equations[index].color)} />
         ) : null,
+      )}
+      {preview && previewed && (
+        <g className="ask-ghost">
+          <Curve relation={previewed} color={linkSwatch(preview.color)} />
+        </g>
       )}
     </Mafs>
   );
