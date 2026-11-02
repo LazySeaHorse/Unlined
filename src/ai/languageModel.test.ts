@@ -120,8 +120,21 @@ describe('lastFence', () => {
     expect(lastFence('so ```\nnot this\n``` and then\n```\n(1/2)e^x\n```')).toBe('(1/2)e^x');
     expect(lastFence('```latex\nx^2\n```')).toBe('x^2');
   });
+  it('takes a block on one line, with no language tag to drop', () => {
+    expect(lastFence('```Quadratic formula```')).toBe('Quadratic formula');
+    expect(lastFence('So: ```x^2``` it is')).toBe('x^2');
+  });
+  it('is not thrown off by a ``` mentioned before the block', () => {
+    expect(lastFence('the ``` fence\n```\nans\n```')).toBe('ans');
+  });
+  it('keeps indentation and lines after the first', () => {
+    expect(lastFence('```js\n\n  a();\n  b();\n\n```')).toBe('  a();\n  b();');
+    expect(lastFence('```\n1: Errands\n2: Formula\n```')).toBe('1: Errands\n2: Formula');
+  });
   it('is undefined without a block', () => {
     expect(lastFence('just words')).toBeUndefined();
+    expect(lastFence('one ``` only')).toBeUndefined();
+    expect(lastFence('``````')).toBeUndefined();
     expect(lastFence('```\n\n```')).toBeUndefined();
   });
 });
