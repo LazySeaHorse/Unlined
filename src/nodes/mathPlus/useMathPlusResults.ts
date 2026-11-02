@@ -67,6 +67,21 @@ export const mathPlusEvaluation = (
   state: Pick<CanvasState, 'nodes' | 'edges'>,
 ): Evaluation => evaluationFor(ce, JSON.stringify(mathPlusInput(state)));
 
+/**
+ * The results one Math+ node would have with `latex` for its own, everything else as it is (an answer offered
+ * before it is accepted). Evaluated apart, so the shared evaluation stays cached.
+ */
+export function resultsWith(
+  ce: Engine['ce'],
+  state: Pick<CanvasState, 'nodes' | 'edges'>,
+  id: string,
+  latex: string,
+): LineResult[] {
+  const { docs, links } = mathPlusInput(state);
+  const changed = docs.map((doc) => (doc.id === id ? { id, latex } : doc));
+  return evaluateLinked(ce, changed, links).lines[id] ?? [];
+}
+
 /** The evaluation of the open canvas; `undefined` while the engine loads. */
 function useEvaluation(): Evaluation | undefined {
   const engine = useEngine();

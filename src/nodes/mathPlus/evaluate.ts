@@ -11,10 +11,20 @@ export interface LineResult {
   assigned: boolean;
 }
 
-/** MathLive stores multi-line input as `\displaylines{a \\ b}`. */
+/** What separates lines in Math+ LaTeX. */
+export const LINE_BREAK = '\\\\';
+
+/** MathLive stores multi-line input as `\displaylines{a \\ b}`: the lines inside, blank ones included. */
+export const linesBody = (latex: string): string =>
+  latex.trim().match(/^\\displaylines\s*\{([\s\S]*)\}$/)?.[1] ?? latex;
+
+/** Lines (as linesBody gives them) stored the way MathLive writes them. */
+export const fromLinesBody = (body: string): string =>
+  body.includes(LINE_BREAK) ? `\\displaylines{${body}}` : body;
+
+/** The lines that hold something, trimmed. */
 export function splitLines(latex: string): string[] {
-  const body = latex.trim().match(/^\\displaylines\s*\{([\s\S]*)\}$/)?.[1] ?? latex;
-  return body
+  return linesBody(latex)
     .split(/\\\\/)
     .map((line) => line.trim())
     .filter(Boolean);
