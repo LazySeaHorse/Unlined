@@ -30,6 +30,7 @@ Most digital study tools require a tablet and stylus. Computational notebooks hi
 - **Stacks**: put several nodes on one spot behind tabs, one shown at a time, e.g. a problem, its textbook page and your working. Each card keeps its scroll and state while hidden. Tap Space to fan the cards out and pick one. See [Controls](#controls).
 - **Links**: connect nodes with grid-snapped orthogonal pipes (arrow, dot or bar ends, colour, dashed, a label that may contain `$math$`). Turn on linking mode (toolbar button next to Organise, or `L`), drag from one node to another; click a link for its options, double-click it to name it, right-click for the menu. Between two Math+ nodes a link passes the source's result to the target as a variable: name it `k` (a single letter other than `e` or `i`) to use `k`, or leave it as `ans`. See [Links](#links).
 - **AI control**: let a coding agent (Claude Code, Codex, Gemini CLI, …) read and edit the open canvas through a small local bridge, or a browser agent through WebMCP. See [AI control](#ai-control).
+- **On-device writing help** (opt-in, desktop Chrome): start a line with `?` and say what you want, and Chrome's built-in model writes it in the node's own syntax. See [On-device writing help](#on-device-writing-help).
 - **Dark mode**, **offline PWA**.
 - **Mobile**: read-only viewer. Pan, zoom and switch canvases; editing is desktop-only.
 
@@ -100,6 +101,22 @@ Off on every page load. Open the AI panel (robot button in the toolbar) and turn
 
 Agents get a small fixed-size overview (counts, groups of nearby nodes, links, the selection), then list, search and read only what they need, using short handles (`n3`, `g2`, `l1`) instead of ids. Edits are find/replace, cell updates or whole fields; each call is one undo step. While an agent is editing, the canvas is read-only for you (Take over turns AI control off), changed nodes flash, and the panel keeps the session's activity.
 
+### On-device writing help
+Off by default and per device. Needs desktop Chrome with its built-in AI; turn it on in the AI panel's On-device tab, which also shows whether your device supports it and downloads the model once (about 2 GB). It runs on your computer, so nothing leaves the device.
+
+Type `?` in an empty field (or at the start of an empty line), say what you want and press Enter. The answer shows faintly; Tab or Enter accepts it (one undo step), Esc dismisses it.
+
+| Where | What `?` gives you |
+| --- | --- |
+| Graph row | an equation or inequality, drawn dashed until accepted |
+| Math node, table cell | LaTeX |
+| Math+ | lines that Math+ computes itself, with their results shown |
+| Text | Markdown, with `$LaTeX$` |
+| Sheet formula bar | a formula and its value |
+| Script | JavaScript (never run until you run it) |
+
+Right-click one or more nodes and choose Suggest title for a brief title each (it replaces an existing title). The model sees only the node it is working on (a Math+ node also sees the values its links pass in), and it is small: it writes the syntax and the app does the computing, but check what it gives you. A single model call is cut off after 30 seconds. The prompts share their syntax descriptions with the AI-control guide (`src/nodes/syntax.ts`).
+
 ### Project Layout
 ```
 src/
@@ -111,6 +128,7 @@ src/
   chrome/       toolbar, canvas manager, search bar, zoom controls, mobile bar
   ui/           Radix-based primitives and prompt/confirm dialogs
   lib/          small shared helpers (MathField, Markdown, files, grid, clusters, …)
+  ai/           on-device model wrapper, the `?` ask (hook, slot), title suggestions
   agent/        AI tools (transport-agnostic), bridge client, WebMCP adapter, activity log
 app/            HTML entry for the app, served at /app/
 landing/        the marketing page served at / (its own entry, styles and static UI mocks)
