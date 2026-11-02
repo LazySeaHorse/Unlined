@@ -126,7 +126,7 @@ export function nodeLine(node: AppNode, groupId?: string): string {
   return `${alias(node.id)} ${node.type} ${placement(node)}${group} "${preview(node)}"${size}`;
 }
 
-function gridBody(cells: string[][]): string {
+export function gridBody(cells: string[][]): string {
   const cols = cells[0]?.length ?? 0;
   const header = `  | ${Array.from({ length: cols }, (_, c) => columnName(c)).join(' | ')}`;
   return [header, ...cells.map((row, r) => `${r + 1} | ${row.join(' | ')}`)].join('\n');

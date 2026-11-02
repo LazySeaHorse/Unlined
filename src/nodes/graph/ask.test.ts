@@ -14,12 +14,12 @@ afterEach(() => {
 describe('graphAsk', () => {
   it.each(graphAsk.examples)('teaches only rows the graph draws: $words', async ({ answer }) => {
     expect(graphAsk.schema.safeParse(answer).success).toBe(true);
-    expect(await graphAsk.check(answer)).toEqual({ ok: true, value: answer.latex });
+    expect(await graphAsk.check(answer, [])).toEqual({ ok: true, value: answer.latex });
   });
 
   it('rejects rows the graph cannot draw, and words', async () => {
     for (const latex of ['y=x+z', 'x^2+', '\\text{a parabola}', ''])
-      expect((await graphAsk.check({ latex })).ok).toBe(false);
+      expect((await graphAsk.check({ latex }, [])).ok).toBe(false);
   });
 
   it("shows the model the graph's other rows, then the words", () => {

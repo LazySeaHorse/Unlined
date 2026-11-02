@@ -7,12 +7,17 @@ const FIELD = 'math-field, input, textarea, [contenteditable="true"]';
 
 interface AskSlotProps<Key extends string | number, Value> {
   ask: InlineAsk<Key, Value>;
-  /** Which of the node's fields this is. */
-  at: Key;
+  /** Which of the node's fields this is. Left out for a field of several lines, where the key is a line. */
+  at?: Key;
   /** The answer as it would look in the field, drawn faintly until it is accepted. */
   renderGhost: (value: Value) => ReactNode;
   /** The field's own layout classes (flex-1, min-w-0, …): the slot takes its place in the layout. */
   className?: string;
+  /**
+   * For a field of several lines (see askedLine): the field's lines above and below the one asked from, drawn
+   * in its place while it gives way. The input then takes just that line and the answer shows under it.
+   */
+  lines?: { above: ReactNode; below: ReactNode };
   /** The field. It is unmounted while an ask is open here, and focused again when the ask ends by key. */
   children: ReactNode;
 }
@@ -27,6 +32,7 @@ export function AskSlot<Key extends string | number, Value>({
   at,
   renderGhost,
   className,
+  lines,
   children,
 }: AskSlotProps<Key, Value>) {
   const slot = useRef<HTMLDivElement>(null);
@@ -40,7 +46,7 @@ export function AskSlot<Key extends string | number, Value>({
   };
   const refocus = useRef(false);
   const { state } = ask;
-  const open = state.phase !== 'closed' && state.at === at;
+  const open = state.phase !== 'closed' && (at === undefined || state.at === at);
 
   useLayoutEffect(() => {
     if (open) {
@@ -78,7 +84,12 @@ export function AskSlot<Key extends string | number, Value>({
 
   const error = state.phase === 'typing' ? state.error : undefined;
   return (
-    <div ref={slot} className={cn('ask-slot', className)} style={{ minHeight: fieldHeight.current }}>
+    <div
+      ref={slot}
+      className={cn('ask-slot', lines && 'ask-lines', className)}
+      style={{ minHeight: fieldHeight.current }}
+    >
+      {lines?.above}
       <input
         ref={input}
         aria-label="Describe it"
@@ -92,7 +103,10 @@ export function AskSlot<Key extends string | number, Value>({
         spellCheck={false}
         autoComplete="off"
       />
-      {state.phase === 'ghost' && <div className="ask-ghost ask-ghost-over">{renderGhost(state.value)}</div>}
+      {state.phase === 'ghost' && (
+        <div className={cn('ask-ghost', !lines && 'ask-ghost-over')}>{renderGhost(state.value)}</div>
+      )}
+      {lines?.below}
     </div>
   );
 }

@@ -1137,6 +1137,30 @@ math-field::part(virtual-keyboard-toggle) {
   overflow: hidden;
   pointer-events: none;
 }
+/* A field that grows with its content (a Math node, a table cell) grows with the answer too, rather than clip it. */
+.ask-slot.ask-fit {
+  display: grid;
+}
+.ask-slot.ask-fit > * {
+  grid-area: 1 / 1;
+}
+.ask-fit .ask-ghost-over {
+  position: static;
+}
+.ask-fit .ask-input {
+  field-sizing: content;
+}
+/* A field of several lines asks from one line: its other lines stay, the words keep showing, the answer goes under. */
+.ask-slot.ask-lines {
+  flex-direction: column;
+}
+.ask-lines .ask-input {
+  flex: none;
+}
+.ask-lines .ask-input[data-state="ghost"] {
+  color: inherit;
+  caret-color: auto;
+}
 /* A previewed curve is dashed too; the in-field answer's paths are fills, which a dash leaves alone. */
 .ask-ghost path {
   stroke-dasharray: var(--mafs-line-stroke-dash-style);
@@ -1214,4 +1238,25 @@ math-field::part(virtual-keyboard-toggle) {
 .link-preview polygon,
 .link-preview circle {
   fill: currentColor;
+}
+
+/* A node's title while a suggestion is worked out (shimmer) and while it waits to be accepted (faint). */
+.node-tab [data-pending] {
+  background:
+    linear-gradient(
+      90deg,
+      transparent 30%,
+      color-mix(in srgb, var(--accent) 18%, transparent) 50%,
+      transparent 70%
+    )
+    0 0 / 300% 100%;
+  border-radius: 0.25rem;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .node-tab [data-pending] {
+    animation: ask-shimmer 1.4s linear infinite;
+  }
+}
+.title-ghost {
+  opacity: 0.5;
 }

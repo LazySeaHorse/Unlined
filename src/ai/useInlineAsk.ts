@@ -35,6 +35,9 @@ export interface InlineAsk<Key, Value> {
    * AI is not ready, so `?` types as usual.
    */
   trigger: (at: Key, before: string, after: string) => boolean;
+  /** Opens an ask at `at`, for a field that decides itself when `?` asks (see askedLine). False, and nothing
+   * opens, while on-device AI is not ready. */
+  open: (at: Key) => boolean;
   setWords: (words: string) => void;
   submit: () => void;
   accept: () => void;
@@ -78,12 +81,14 @@ export function useInlineAsk<Context, Answer, Value, Key extends string | number
     setState((s) => (s.phase === 'closed' ? s : CLOSED));
   }, [ready]);
 
-  const trigger = (at: Key, before: string, after: string) => {
-    if (!ready || before !== '' || after !== '?') return false;
+  const open = (at: Key) => {
+    if (!ready) return false;
     cancel();
     setState({ phase: 'typing', at, words: '' });
     return true;
   };
+
+  const trigger = (at: Key, before: string, after: string) => before === '' && after === '?' && open(at);
 
   const setWords = (words: string) => {
     if (state.phase === 'closed') return;
@@ -124,5 +129,44 @@ export function useInlineAsk<Context, Answer, Value, Key extends string | number
     setState({ phase: 'typing', at: state.at, words: state.words });
   };
 
-  return { state, trigger, setWords, submit, accept, back, close };
+  return { state, trigger, open, setWords, submit, accept, back, close };
+}
+
+/**
+ * A field of several lines (a Math+ node, a note, code) asks from a line instead: `?` typed at the start of an
+ * empty line. Its change handler hands the text before and after the edit to askedLine, and opens the ask at the
+ * line's index (the hook's Key is then a number):
+ *
+ *   const line = askedLine(before, after);   // lines split on '\n'; Math+ passes '\\\\'
+ *   if (!line || !ask.open(line.index)) save(after);
+ *
+ * Like `trigger`, the `?` is dropped, not saved: the text keeps the empty line, which `apply` replaces with the
+ * answer, by index. Only the inserted character is compared, so a caret is not needed (a CodeMirror update gives
+ * both docs).
+ */
+export interface AskedLine {
+  /** The line's index in `before.split(separator)`. */
+  index: number;
+  /** The empty line's range in `before`: [start, end), separators excluded. */
+  start: number;
+  end: number;
+}
+
+/** The line an edit asks from, when the edit was `?` typed into an empty (or blank) line. */
+export function askedLine(before: string, after: string, separator = '\n'): AskedLine | undefined {
+  if (after.length !== before.length + 1) return undefined;
+  let at = 0;
+  while (at < before.length && before[at] === after[at]) at++;
+  if (after[at] !== '?' || after.slice(at + 1) !== before.slice(at)) return undefined;
+  const previous = at < separator.length ? -1 : before.lastIndexOf(separator, at - separator.length);
+  const start = previous < 0 ? 0 : previous + separator.length;
+  const next = before.indexOf(separator, at);
+  const end = next < 0 ? before.length : next;
+  if (before.slice(start, end).trim() !== '') return undefined;
+  return { index: before.slice(0, start).split(separator).length - 1, start, end };
+}
+
+/** `text` with its line at `index` (see askedLine) replaced by `replacement`, which may hold several lines. */
+export function replaceLine(text: string, index: number, replacement: string, separator = '\n'): string {
+  return text.split(separator).toSpliced(index, 1, replacement).join(separator);
 }

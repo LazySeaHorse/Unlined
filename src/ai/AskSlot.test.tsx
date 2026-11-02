@@ -10,7 +10,7 @@ import { AskSlot } from './AskSlot';
 import type { AskSpec } from './inlineAsk';
 import { releaseSessions } from './languageModel';
 import { useAiAssist } from './store';
-import { useInlineAsk } from './useInlineAsk';
+import { askedLine, replaceLine, useInlineAsk } from './useInlineAsk';
 
 // Shouts the words back; "bad" never passes.
 const spec: AskSpec<string, { text: string }, string> = {
@@ -145,5 +145,62 @@ describe('AskSlot', () => {
     await userEvent.type(field(), '?');
     act(() => useAiAssist.setState({ enabled: false }));
     expect(screen.queryByLabelText('Describe it')).toBeNull();
+  });
+});
+
+/** A field of several lines, asking from a line the way a note does. */
+function LinesHarness() {
+  const text = useCanvasStore((s) => (s.nodes[0].data as { markdown: string }).markdown);
+  const set = (value: string) =>
+    useCanvasStore.getState().updateNodeData<'text'>(node.id, { markdown: value });
+  const ask = useInlineAsk(spec, {
+    context: 'ctx',
+    apply: (value, at: number) => set(replaceLine(text, at, value)),
+  });
+  const lines = text.split('\n');
+  const at = ask.state.phase === 'closed' ? undefined : ask.state.at;
+  return (
+    <AskSlot
+      ask={ask}
+      lines={
+        at === undefined
+          ? undefined
+          : { above: lines.slice(0, at).join('|'), below: lines.slice(at + 1).join('|') }
+      }
+      renderGhost={(value) => <span data-testid="ghost">{value}</span>}
+    >
+      <textarea
+        aria-label="field"
+        value={text}
+        onChange={(e) => {
+          const line = askedLine(text, e.target.value);
+          if (!line || !ask.open(line.index)) set(e.target.value);
+        }}
+      />
+    </AskSlot>
+  );
+}
+
+describe('AskSlot with lines', () => {
+  it('asks from an empty line, keeps the other lines in view, and puts the answer in its place', async () => {
+    useCanvasStore.getState().updateNodeData<'text'>(node.id, { markdown: 'top\n\nend' });
+    fake = installFakeLanguageModel(['{"text":"mid"}']);
+    render(<LinesHarness />);
+    await userEvent.type(field(), 'x?');
+    expect(markdown()).toBe('top\n\nendx?');
+    useCanvasStore.getState().updateNodeData<'text'>(node.id, { markdown: 'top\n\nend' });
+    await userEvent.click(field());
+    (field() as HTMLTextAreaElement).setSelectionRange(4, 4);
+    await userEvent.keyboard('?');
+    expect(markdown()).toBe('top\n\nend');
+    expect(words().parentElement?.textContent).toBe('topend');
+    await userEvent.type(words(), 'middle{Enter}');
+    expect((await screen.findByTestId('ghost')).textContent).toBe('MID');
+    expect(words().getAttribute('data-state')).toBe('ghost');
+    const before = pastSteps();
+    await userEvent.keyboard('{Enter}');
+    expect(markdown()).toBe('top\nMID\nend');
+    expect(pastSteps()).toBe(before + 1);
+    expect(document.activeElement).toBe(field());
   });
 });

@@ -17,7 +17,8 @@ export interface AskSpec<Context, Answer, Value> {
   schema: z.ZodType<Answer>;
   /** `json` (the default) for syntax; `fenced` when the model should reason first, with `Answer` a string. */
   format?: ReplyFormat;
-  check: Check<Answer, Value>;
+  /** Sees the node's context too, for answers that only make sense in it (a formula in its grid). */
+  check: (answer: Answer, context: Context) => ReturnType<Check<Answer, Value>>;
   /** The message for one request: the node's data first, then the user's words. Used for the examples too. */
   input: (context: Context, words: string) => string;
 }
@@ -36,7 +37,7 @@ export function askFor<Context, Answer, Value>(
     input: spec.input(context, words),
     schema: spec.schema,
     format: spec.format,
-    check: spec.check,
+    check: (answer) => spec.check(answer, context),
     signal,
   });
 }
