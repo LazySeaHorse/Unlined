@@ -31,7 +31,7 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
   const setRow = (index: number, patch: Partial<GraphEquation>) =>
     update({ equations: equations.map((e, i) => (i === index ? { ...e, ...patch } : e)) });
   const ask = useInlineAsk(graphAsk, {
-    context: equations,
+    context: () => equations,
     apply: (latex, index: number) => setRow(index, { latex }),
   });
   // The answer an ask offers, drawn on the plot in its row's colour until it is accepted.

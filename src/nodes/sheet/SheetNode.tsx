@@ -78,10 +78,10 @@ export default function SheetNode({ id, data, selected }: NodeProps<NodeOf<'shee
     if (event.button !== 2 || !selection || !cell || !(row instanceof HTMLTableRowElement)) return;
     if (selection.has(matrix, { row: row.rowIndex - 1, column: cell.cellIndex - 1 })) event.stopPropagation();
   };
+  // An ask is for the cell that was active when `?` was typed, wherever the selection goes after.
   const ask = useInlineAsk(sheetAsk, {
-    context: { cells, at: active ? cellKey(active) : '', fractions },
-    // The cell the ask began in, wherever the selection has gone since.
-    apply: ({ formula }, at: string) => {
+    context: (at: string) => ({ cells, at, fractions }),
+    apply: ({ formula }, at) => {
       const cell = parseCellKey(at);
       if (cell) update({ cells: setCell(cells, cell.row, cell.column, formula) });
     },
@@ -98,6 +98,7 @@ export default function SheetNode({ id, data, selected }: NodeProps<NodeOf<'shee
       toolbar={
         <FormulaBar
           label={label}
+          cell={active ? cellKey(active) : ''}
           value={active ? (cells[active.row]?.[active.column] ?? '') : ''}
           readOnly={readOnly}
           ask={ask}

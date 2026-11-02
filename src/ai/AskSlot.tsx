@@ -7,7 +7,8 @@ const FIELD = 'math-field, input, textarea, [contenteditable="true"]';
 
 interface AskSlotProps<Key extends string | number, Value> {
   ask: InlineAsk<Key, Value>;
-  /** Which of the node's fields this is. Left out for a field of several lines, where the key is a line. */
+  /** Which of the node's fields this is. Left out when the slot is the only place the node asks from (a field of
+   * several lines, where the key is a line; a sheet's formula bar, where it is a cell). */
   at?: Key;
   /** The answer as it would look in the field, drawn faintly until it is accepted. */
   renderGhost: (value: Value) => ReactNode;

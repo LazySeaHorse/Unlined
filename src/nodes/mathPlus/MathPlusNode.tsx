@@ -35,10 +35,10 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
   const inputs = useMathPlusInputs(id);
   // `?` at the start of an empty line asks for lines in words; they go in that line's place.
   const ask = useInlineAsk(mathPlusAsk, {
-    context: {
+    context: () => ({
       lines: splitLines(data.latex),
       inputs: inputs.flatMap(({ name, value }) => (value === null ? [] : [{ name, value }])),
-    },
+    }),
     apply: (lines, at: number) => update({ latex: withLines(data.latex, at, lines) }),
   });
   const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;

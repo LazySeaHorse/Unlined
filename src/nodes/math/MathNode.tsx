@@ -12,7 +12,10 @@ import { mathAsk } from './ask';
 export default function MathNode({ id, data, selected }: NodeProps<NodeOf<'math'>>) {
   const readOnly = useReadOnly();
   const update = useUpdateNodeData<'math'>(id);
-  const ask = useInlineAsk(mathAsk, { context: data.latex, apply: (latex, _at: 0) => update({ latex }) });
+  const ask = useInlineAsk(mathAsk, {
+    context: () => data.latex,
+    apply: (latex, _at: 0) => update({ latex }),
+  });
   return (
     <NodeShell
       kind="math"

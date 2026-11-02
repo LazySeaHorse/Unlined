@@ -32,7 +32,7 @@ function Harness() {
   const text = useCanvasStore((s) => (s.nodes[0].data as { markdown: string }).markdown);
   const set = (value: string) =>
     useCanvasStore.getState().updateNodeData<'text'>(node.id, { markdown: value });
-  const ask = useInlineAsk(spec, { context: 'ctx', apply: (value, _at: number) => set(value) });
+  const ask = useInlineAsk(spec, { context: () => 'ctx', apply: (value, _at: number) => set(value) });
   return (
     <AskSlot ask={ask} at={0} renderGhost={(value) => <span data-testid="ghost">{value}</span>}>
       <input
@@ -154,7 +154,7 @@ function LinesHarness() {
   const set = (value: string) =>
     useCanvasStore.getState().updateNodeData<'text'>(node.id, { markdown: value });
   const ask = useInlineAsk(spec, {
-    context: 'ctx',
+    context: () => 'ctx',
     apply: (value, at: number) => set(replaceLine(text, at, value)),
   });
   const lines = text.split('\n');

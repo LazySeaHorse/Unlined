@@ -41,7 +41,7 @@ export default function CodeNode({ id, data, selected }: NodeProps<NodeOf<'code'
   const update = useUpdateNodeData<'code'>(id);
   // `?` at the start of an empty line asks for code in words; it goes in that line's place.
   const ask = useInlineAsk(codeAsk, {
-    context: data.source,
+    context: () => data.source,
     apply: (code, at: number) => update({ source: replaceLine(data.source, at, code) }),
   });
   const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;

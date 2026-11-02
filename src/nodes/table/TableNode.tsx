@@ -28,6 +28,12 @@ interface Layout {
   xs: number[];
 }
 
+type CellAt = `${number}:${number}`;
+const cellAt = (at: CellAt) => {
+  const [row = 0, col = 0] = at.split(':').map(Number);
+  return { row, col };
+};
+
 /** Measures the gridlines in unscaled layout pixels, so the canvas zoom does not matter. */
 function measure(table: HTMLTableElement): Layout {
   const rows = Array.from(table.rows);
@@ -189,13 +195,12 @@ export default function TableNode({ id, data, selected }: NodeProps<NodeOf<'tabl
   const preview = (axis: 'row' | 'col', index: number) => (on: boolean) =>
     setDoomed(on ? { axis, index } : null);
   const [layout, setLayout] = useState<Layout | null>(null);
-  // The cell an ask is open in, as `row:col`, which the model is told along with the whole table.
-  const [asked, setAsked] = useState({ row: 0, col: 0 });
+  // An ask is for a cell, as `row:col`; the model is told which, along with the whole table.
   const ask = useInlineAsk(tableAsk, {
-    context: { cells, ...asked },
-    apply: (latex, at: `${number}:${number}`) => {
-      const [r, c] = at.split(':').map(Number);
-      edit((grid) => setCell(grid, r, c, latex));
+    context: (at: CellAt) => ({ cells, ...cellAt(at) }),
+    apply: (latex, at) => {
+      const { row, col } = cellAt(at);
+      edit((grid) => setCell(grid, row, col, latex));
     },
   });
   // Adding or removing a row or column moves the cells under an open ask.
@@ -255,8 +260,8 @@ export default function TableNode({ id, data, selected }: NodeProps<NodeOf<'tabl
                       <MathField
                         value={value}
                         onChange={(latex) => {
-                          if (ask.trigger(`${r}:${c}`, value, latex)) setAsked({ row: r, col: c });
-                          else edit((grid) => setCell(grid, r, c, latex));
+                          if (!ask.trigger(`${r}:${c}`, value, latex))
+                            edit((grid) => setCell(grid, r, c, latex));
                         }}
                         readOnly={readOnly}
                         modeToggle

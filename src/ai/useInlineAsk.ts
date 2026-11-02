@@ -21,8 +21,8 @@ export type AskState<Key, Value> =
   | { phase: 'ghost'; at: Key; words: string; value: Value };
 
 export interface InlineAskOptions<Context, Key, Value> {
-  /** The node's own data, read when the words are sent. */
-  context: Context;
+  /** The node's own data as the model is told it for an ask at `at`, read when the words are sent. */
+  context: (at: Key) => Context;
   /** Writes an accepted answer into the field at `at`, as one undo step. */
   apply: (value: Value, at: Key) => void;
 }
@@ -104,7 +104,7 @@ export function useInlineAsk<Context, Answer, Value, Key extends string | number
     const controller = new AbortController();
     request.current = controller;
     setState({ phase: 'running', at, words });
-    void askFor(spec, options.context, words.trim(), controller.signal).then((result) => {
+    void askFor(spec, options.context(at), words.trim(), controller.signal).then((result) => {
       // Superseded by newer words, Escape, closing or unmounting.
       if (controller.signal.aborted || result.status === 'aborted') return;
       request.current = undefined;

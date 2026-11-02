@@ -13,16 +13,19 @@ const field =
  */
 export function FormulaBar({
   label,
+  cell,
   value,
   readOnly,
   onCommit,
   ask,
 }: {
   label: string;
+  /** The active cell (`B5`), which an edit or an ask is for; empty when there is none. */
+  cell: string;
   value: string;
   readOnly: boolean;
   onCommit: (text: string) => void;
-  /** Typing `?` into the empty bar asks for a formula in words. */
+  /** Typing `?` into the empty bar asks for a formula in words, for the active cell. */
   ask: InlineAsk<string, SheetFormula>;
 }) {
   const [draft, setDraft] = useState<{ label: string; text: string } | null>(null);
@@ -36,12 +39,11 @@ export function FormulaBar({
   return (
     <div className="flex min-w-0 flex-1 items-center gap-1.5">
       <span className="w-14 shrink-0 truncate rounded border border-border bg-surface px-1.5 py-0.5 text-center text-xs font-medium text-muted">
-        {label || '–'}
+        {(ask.state.phase === 'closed' ? label : ask.state.at) || '–'}
       </span>
       <span className="shrink-0 text-xs font-semibold text-muted italic">fx</span>
       <AskSlot
         ask={ask}
-        at={ask.state.phase === 'closed' ? label : ask.state.at}
         className={cn(field, 'flex-1 font-mono')}
         renderGhost={({ formula, shown }) => (
           <span className="truncate px-2">
@@ -56,7 +58,7 @@ export function FormulaBar({
           readOnly={readOnly || !label}
           spellCheck={false}
           onChange={(e) => {
-            if (!ask.trigger(label, shown, e.target.value)) setDraft({ label, text: e.target.value });
+            if (!cell || !ask.trigger(cell, shown, e.target.value)) setDraft({ label, text: e.target.value });
           }}
           onBlur={commit}
           onKeyDown={(e) => {
