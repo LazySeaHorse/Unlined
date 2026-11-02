@@ -13,7 +13,7 @@ export function TabsList({ className, ...props }: ComponentProps<typeof RadixTab
   return (
     <RadixTabs.List
       className={cn(
-        'inline-flex h-9 w-fit items-center justify-center rounded-xl bg-surface-2 text-muted',
+        'flex h-9 items-center justify-center rounded-xl bg-surface-2 text-muted',
         LIST_INSET,
         className,
       )}
