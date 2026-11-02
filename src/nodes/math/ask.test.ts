@@ -29,16 +29,15 @@ describe('mathAsk', () => {
     expect(await mathAsk.check(answer, context)).toEqual({ ok: true, value: answer });
   });
 
-  it("shows the model the node's LaTeX, then the words", () => {
-    expect(mathAsk.input('', '  solve   it ')).toBe('Math: (empty)\nRequest: solve it');
-    expect(mathAsk.input('x^2', 'derivative')).toBe('Math: x^2\nRequest: derivative');
+  it('shows the model the words', () => {
+    expect(mathAsk.input(null, '  solve   it ')).toBe('Request: solve it');
   });
 
   it('keeps the last fenced block of a reasoned reply', async () => {
     fake = installFakeLanguageModel([
       'Integrate by parts twice: ```\\int e^x``` then solve for I.\n```latex\n\\frac{e^x(\\sin x-\\cos x)}{2}+C\n```',
     ]);
-    expect(await askFor(mathAsk, '', 'integrate e^x sin x')).toEqual({
+    expect(await askFor(mathAsk, null, 'integrate e^x sin x')).toEqual({
       status: 'ok',
       value: '\\frac{e^x(\\sin x-\\cos x)}{2}+C',
     });
@@ -46,7 +45,7 @@ describe('mathAsk', () => {
 
   it('retries once with the reason when the answer does not typeset', async () => {
     fake = installFakeLanguageModel(['```\n\\text{two}\n```', 'No fence at all']);
-    expect(await askFor(mathAsk, '', 'solve x-2=0')).toEqual({ status: 'invalid' });
+    expect(await askFor(mathAsk, null, 'solve x-2=0')).toEqual({ status: 'invalid' });
     expect(fake.prompts[1]).toContain('no \\text');
   });
 });

@@ -1,4 +1,5 @@
 import type { z } from 'zod';
+import { gridBody, oneLine } from '@/agent/format';
 import { type AskResult, ask, type Check, type ReplyFormat } from './languageModel';
 
 /**
@@ -41,3 +42,7 @@ export function askFor<Context, Answer, Value>(
     signal,
   });
 }
+
+/** Enough of a grid (a table, a sheet) for a small model: its top left corner, one line per cell. */
+export const gridView = (cells: string[][]): string =>
+  gridBody(cells.slice(0, 20).map((row) => row.slice(0, 10).map((text) => oneLine(text, 40))));

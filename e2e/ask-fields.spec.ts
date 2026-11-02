@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
       clone: async () => session(),
       destroy: () => {},
       prompt: async (input: string) =>
-        input.startsWith('Math:')
+        input.startsWith('Request:')
           ? 'By parts, twice.\n```\n\\frac{e^x(\\sin x-\\cos x)}{2}+C\n```'
           : '{"latex":"\\\\frac{1}{2}"}',
     });

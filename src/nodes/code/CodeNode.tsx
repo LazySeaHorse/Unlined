@@ -4,7 +4,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import type { NodeProps } from '@xyflow/react';
 import { Play } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { AskSlot } from '@/ai/AskSlot';
+import { AskSlot, PlainLines } from '@/ai/AskSlot';
 import { askedLine, replaceLine, useInlineAsk } from '@/ai/useInlineAsk';
 import { useReadOnly } from '@/canvas/readOnly';
 import { cn } from '@/lib/cn';
@@ -92,17 +92,17 @@ export default function CodeNode({ id, data, selected }: NodeProps<NodeOf<'code'
           asking === undefined
             ? undefined
             : {
-                above: <PlainLines lines={data.source.split('\n').slice(0, asking)} />,
-                below: <PlainLines lines={data.source.split('\n').slice(asking + 1)} />,
+                above: <ScriptLines lines={data.source.split('\n').slice(0, asking)} />,
+                below: <ScriptLines lines={data.source.split('\n').slice(asking + 1)} />,
               }
         }
-        renderGhost={(code) => <PlainLines lines={code.split('\n')} />}
+        renderGhost={(code) => <ScriptLines lines={code.split('\n')} />}
       >
         <CodeMirror
           value={data.source}
           onChange={(source, change) => {
             const line = askedLine(change.startState.doc.toString(), source);
-            if (!line || readOnly || !ask.open(line.index)) update({ source });
+            if (!line || !ask.open(line.index)) update({ source });
           }}
           extensions={extensions}
           theme={dark ? darkTheme : lightTheme}
@@ -136,11 +136,6 @@ export default function CodeNode({ id, data, selected }: NodeProps<NodeOf<'code'
 }
 
 /** Lines of the script as plain text, for while the editor gives way to an ask. */
-function PlainLines({ lines }: { lines: string[] }) {
-  return lines.map((line, index) => (
-    // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional.
-    <div key={index} className="min-h-[1lh] px-9 whitespace-pre">
-      {line}
-    </div>
-  ));
-}
+const ScriptLines = ({ lines }: { lines: string[] }) => (
+  <PlainLines lines={lines} className="px-9 whitespace-pre" />
+);

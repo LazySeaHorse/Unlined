@@ -3,6 +3,7 @@ import { oneLine } from '@/agent/format';
 import type { AskSpec } from '@/ai/inlineAsk';
 import { loadEngine } from '@/lib/math/engine';
 import type { GraphEquation } from '@/model/types';
+import { typesets } from '../math/ask';
 import { SYNTAX } from '../syntax';
 import { classifyRelation } from './relation';
 
@@ -38,7 +39,8 @@ The graph's other rows come first, for descriptions that refer to them.`,
     return `Rows: ${others.length > 0 ? others.join('; ') : '(none)'}\nDescription: ${oneLine(words, 300)}`;
   },
   check: async ({ latex }) => {
-    if (latex.includes('\\text')) return { ok: false, reason: 'Write only maths, no \\text.' };
+    const checked = typesets(latex);
+    if (!checked.ok) return checked;
     if (!classifyRelation(await loadEngine(), latex))
       return { ok: false, reason: 'That is not a row the graph can draw, in x and y only.' };
     return { ok: true, value: latex };

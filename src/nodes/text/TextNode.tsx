@@ -1,6 +1,6 @@
 import type { NodeProps } from '@xyflow/react';
 import { useState } from 'react';
-import { AskSlot } from '@/ai/AskSlot';
+import { AskSlot, PlainLines } from '@/ai/AskSlot';
 import { askedLine, replaceLine, useInlineAsk } from '@/ai/useInlineAsk';
 import { useReadOnly } from '@/canvas/readOnly';
 import { Markdown } from '@/lib/Markdown';
@@ -39,11 +39,11 @@ export function TextNode({ id, data, selected }: NodeProps<NodeOf<'text'>>) {
             asking === undefined
               ? undefined
               : {
-                  above: <PlainLines lines={shown.slice(0, asking)} />,
-                  below: <PlainLines lines={shown.slice(asking + 1)} />,
+                  above: <NoteLines lines={shown.slice(0, asking)} />,
+                  below: <NoteLines lines={shown.slice(asking + 1)} />,
                 }
           }
-          renderGhost={(text) => <PlainLines lines={text.split('\n')} />}
+          renderGhost={(text) => <NoteLines lines={text.split('\n')} />}
         >
           <textarea
             // biome-ignore lint/a11y/noAutofocus: entering edit mode is an explicit user action.
@@ -84,11 +84,6 @@ export function TextNode({ id, data, selected }: NodeProps<NodeOf<'text'>>) {
 }
 
 /** Lines of the note's source as the textarea shows them, for while it gives way to an ask. */
-function PlainLines({ lines }: { lines: string[] }) {
-  return lines.map((line, index) => (
-    // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional.
-    <div key={index} className="min-h-[1lh] break-words whitespace-pre-wrap">
-      {line}
-    </div>
-  ));
-}
+const NoteLines = ({ lines }: { lines: string[] }) => (
+  <PlainLines lines={lines} className="break-words whitespace-pre-wrap" />
+);

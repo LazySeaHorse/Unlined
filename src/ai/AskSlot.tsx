@@ -114,3 +114,13 @@ export function AskSlot<Key extends string | number, Value>({
     </div>
   );
 }
+
+/** Plain lines of a field's text, for the lines around an ask and its answer; `className` styles each like the field. */
+export function PlainLines({ lines, className }: { lines: string[]; className?: string }) {
+  return lines.map((line, index) => (
+    // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional.
+    <div key={index} className={cn('min-h-[1lh]', className)}>
+      {line}
+    </div>
+  ));
+}

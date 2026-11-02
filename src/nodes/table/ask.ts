@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { columnName, gridBody, oneLine } from '@/agent/format';
-import type { AskSpec } from '@/ai/inlineAsk';
+import { columnName, oneLine } from '@/agent/format';
+import { type AskSpec, gridView } from '@/ai/inlineAsk';
 import { typesets } from '../math/ask';
 
 /** The table's own cells, and the cell being asked for. */
@@ -9,12 +9,6 @@ export interface TableAskContext {
   row: number;
   col: number;
 }
-
-const MAX_ROWS = 20;
-const MAX_COLUMNS = 10;
-
-const view = (cells: string[][]) =>
-  gridBody(cells.slice(0, MAX_ROWS).map((row) => row.slice(0, MAX_COLUMNS).map((text) => oneLine(text, 40))));
 
 const identity: TableAskContext = {
   cells: [
@@ -71,7 +65,7 @@ in its row or column. Write only the cell's maths: brief, without $ signs and wi
   ],
   schema: z.object({ latex: z.string().min(1).max(200) }),
   input: ({ cells, row, col }, words) =>
-    `Table:\n${view(cells)}\nCell: ${columnName(col)}${row + 1}\nDescription: ${oneLine(words, 300)}`,
+    `Table:\n${gridView(cells)}\nCell: ${columnName(col)}${row + 1}\nDescription: ${oneLine(words, 300)}`,
   check: async ({ latex }) => {
     const checked = typesets(latex);
     return checked.ok ? { ok: true, value: latex } : checked;

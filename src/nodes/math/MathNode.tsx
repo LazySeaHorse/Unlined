@@ -14,7 +14,7 @@ export default function MathNode({ id, data, selected }: NodeProps<NodeOf<'math'
   const update = useUpdateNodeData<'math'>(id);
   const ask = useInlineAsk(mathAsk, {
     data,
-    context: () => data.latex,
+    context: () => null,
     apply: (latex, _at: 0) => update({ latex }),
   });
   return (
