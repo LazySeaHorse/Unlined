@@ -1,4 +1,5 @@
 import { nodeKinds, nodeSpecs } from '@/nodes/catalog';
+import { SYNTAX } from '@/nodes/syntax';
 
 /** Primer returned by get_guide. One plain-text document. */
 export function buildGuide(): string {
@@ -13,10 +14,9 @@ NODE KINDS
 ${kinds}
 
 FIELDS (create_nodes takes them flat next to "kind"; update_nodes "set" replaces them)
-- text: markdown. Markdown with $inline$ and $$display$$ LaTeX.
+- text: markdown. ${SYNTAX.text}
 - math: latex. Typeset only.
-- mathPlus: latex. Each line (separated by \\\\) is evaluated; "a := 2" defines a variable that later Math+
-  nodes can use. Math+ nodes are evaluated in reading order (top to bottom, then left to right), so position matters.
+- mathPlus: latex. ${SYNTAX.mathPlus} Math+ nodes are evaluated in reading order (top to bottom, then left to right), so position matters.
   read_nodes shows each line's result after ⟶.
   A link from one Math+ node to another hands the exact result of the source's last line to the target as a
   variable: named by the link's label when that is a single latin letter other than e and i ("k" or "$k$"), otherwise
@@ -27,10 +27,9 @@ FIELDS (create_nodes takes them flat next to "kind"; update_nodes "set" replaces
   assigns the name itself (k := 3) its own value wins from that line on. Links can form loops (allowed): the loop
   is broken at its node earliest in reading order, whose link from the loop is ignored ("loop: link ignored"). Links touching other kinds of node carry nothing.
 - graph: equations, a list of rows {latex, color}, each plotted on one grid in its colour (a section colour name; omit
-  to get a free one). A row is typed as on a graphing calculator: "y=x^2" or just "x^2", "x=3", "y>x+1",
-  "x^2+y^2=1".
+  to get a free one). ${SYNTAX.graph}
 - table: cells, rows of LaTeX math cells.
-- sheet: cells, rows of spreadsheet cells; formulas start with "=" and use A1 references (=SUM(A1:A3)).
+- sheet: cells, rows of spreadsheet cells; ${SYNTAX.sheet}
 - code: source, JavaScript. run_code runs it in a sandbox and returns console output and the last value.
 - video: url, a YouTube/Vimeo link or https embed URL.
 - web: url, the address of a live web page the user can browse in the node. It follows the user's navigation, so
