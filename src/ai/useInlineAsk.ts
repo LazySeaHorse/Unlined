@@ -57,6 +57,7 @@ const CLOSED = { phase: 'closed' } as const;
 
 const FAILED = {
   invalid: 'Could not turn that into something that fits here. Try other words.',
+  timeout: 'It took too long. Try again.',
   unavailable: 'Not available right now.',
 };
 

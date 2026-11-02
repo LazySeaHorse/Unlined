@@ -8,7 +8,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { type FakeModel, installFakeLanguageModel } from '@/test/fakeLanguageModel';
 import { AskSlot } from './AskSlot';
 import type { AskSpec } from './inlineAsk';
-import { releaseSessions } from './languageModel';
+import { releaseSessions, TURN_LIMIT_MS } from './languageModel';
 import { useAiAssist } from './store';
 import { askedLine, replaceLine, useInlineAsk } from './useInlineAsk';
 
@@ -149,6 +149,21 @@ describe('AskSlot', () => {
     expect((words() as HTMLInputElement).value).toBe('nonsense');
     await userEvent.type(words(), '!');
     expect(words().getAttribute('data-state')).toBe('typing');
+  });
+
+  it('says so when the model takes too long', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    try {
+      fake = installFakeLanguageModel(['{"text":"late"}'], 'available', 60_000);
+      render(<Harness />);
+      await userEvent.type(field(), '?');
+      await userEvent.type(words(), 'slow{Enter}');
+      await act(() => vi.advanceTimersByTimeAsync(TURN_LIMIT_MS + 1));
+      expect(words().getAttribute('data-state')).toBe('failed');
+      expect(words().getAttribute('title')).toBe('It took too long. Try again.');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('aborts the request when the words change and when the node goes', async () => {

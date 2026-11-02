@@ -50,7 +50,7 @@ describe('ask', () => {
 
   it('gives up after one retry', async () => {
     fake = installFakeLanguageModel(['{"word":"bad"}', '{"word":"bad"}', '{"word":"good"}']);
-    expect(await ask(base)).toEqual({ status: 'invalid', reason: 'Not good.' });
+    expect(await ask(base)).toEqual({ status: 'invalid' });
     expect(fake.prompts).toHaveLength(2);
   });
 
@@ -167,7 +167,7 @@ describe('ask, fenced and timed', () => {
       fake = installFakeLanguageModel(['{"word":"good"}'], 'available', 60_000);
       const result = ask(base);
       await vi.advanceTimersByTimeAsync(TURN_LIMIT_MS + 1);
-      expect(await result).toEqual({ status: 'invalid', reason: 'It took too long.' });
+      expect(await result).toEqual({ status: 'timeout' });
     } finally {
       vi.useRealTimers();
     }
@@ -180,7 +180,7 @@ describe('ask, fenced and timed', () => {
       fake.createMs = 60_000;
       const hung = ask(base);
       await vi.advanceTimersByTimeAsync(TURN_LIMIT_MS + 1);
-      expect(await hung).toEqual({ status: 'invalid', reason: 'It took too long.' });
+      expect(await hung).toEqual({ status: 'timeout' });
       fake.createMs = 0;
       const next = ask(base);
       await vi.advanceTimersByTimeAsync(10);

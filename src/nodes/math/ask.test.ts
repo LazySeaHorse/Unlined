@@ -46,10 +46,7 @@ describe('mathAsk', () => {
 
   it('retries once with the reason when the answer does not typeset', async () => {
     fake = installFakeLanguageModel(['```\n\\text{two}\n```', 'No fence at all']);
-    expect(await askFor(mathAsk, '', 'solve x-2=0')).toEqual({
-      status: 'invalid',
-      reason: expect.any(String),
-    });
+    expect(await askFor(mathAsk, '', 'solve x-2=0')).toEqual({ status: 'invalid' });
     expect(fake.prompts[1]).toContain('no \\text');
   });
 });

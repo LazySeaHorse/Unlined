@@ -134,7 +134,10 @@ export function lastFence(reply: string): string | undefined {
 
 export type AskResult<T> =
   | { status: 'ok'; value: T }
-  | { status: 'invalid'; reason: string }
+  /** The answers failed their check, even after the reason was sent back. */
+  | { status: 'invalid' }
+  /** A call ran past TURN_LIMIT_MS. */
+  | { status: 'timeout' }
   | { status: 'aborted' }
   | { status: 'unavailable' };
 
@@ -202,7 +205,6 @@ export function ask<T, U>(options: AskOptions<T, U>): Promise<AskResult<U>> {
       }
       const responseConstraint = format === 'json' ? z.toJSONSchema(schema) : undefined;
       let message = input;
-      let reason = 'no answer';
       for (let attempt = 0; attempt < 2; attempt++) {
         const raw = await session.prompt(message, { signal: orAborted(limited()), responseConstraint });
         clearTimeout(timer);
@@ -211,12 +213,11 @@ export function ask<T, U>(options: AskOptions<T, U>): Promise<AskResult<U>> {
           ? await check(parsed.data)
           : { ok: false as const, reason: 'The answer did not match the required shape.' };
         if (checked.ok) return { status: 'ok', value: checked.value };
-        reason = checked.reason;
         message = `${checked.reason} Answer again for: ${input}`;
       }
-      return { status: 'invalid', reason };
+      return { status: 'invalid' };
     } catch (e) {
-      if (timedOut) return { status: 'invalid', reason: 'It took too long.' };
+      if (timedOut) return { status: 'timeout' };
       if (isAbort(e, signal)) return { status: 'aborted' };
       return { status: 'unavailable' };
     } finally {
