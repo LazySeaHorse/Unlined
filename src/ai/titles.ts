@@ -1,10 +1,11 @@
+import { useEffect } from 'react';
 import { z } from 'zod';
 import { create } from 'zustand';
 import { nodeBody, oneLine } from '@/agent/format';
 import type { AppNode } from '@/model/types';
 import { asUndoStep, useCanvasStore } from '@/store/canvasStore';
 import { type AskResult, ask, type Check } from './languageModel';
-import { useAiAssist } from './store';
+import { aiAvailable, useAiAssist, useAiReady } from './store';
 
 /**
  * Suggest title: the model reads one node's own content and offers a very short title, shown faintly on the node
@@ -148,14 +149,32 @@ export function acceptTitles(only?: string): void {
   useTitleSuggestions.setState((s) => ({ ghosts: without(s.ghosts, ids) }));
 }
 
-export const hasTitleSuggestions = (): boolean => {
+/**
+ * A canvas key while suggestions are about: Enter takes the waiting ones, Escape drops them all and stops the
+ * requests still running. True when the key did that, so the canvas leaves it alone; false otherwise (Escape
+ * then deselects as usual).
+ */
+export function titleKey(key: string): boolean {
   const { pending, ghosts } = useTitleSuggestions.getState();
-  return Object.keys(pending).length + Object.keys(ghosts).length > 0;
-};
+  const waiting = Object.keys(ghosts).length > 0;
+  if (key === 'enter' && waiting) acceptTitles();
+  else if (key === 'escape' && (waiting || Object.keys(pending).length > 0)) discardTitles();
+  else return false;
+  return true;
+}
+
+/**
+ * Mounted with the canvas. Suggestions go when on-device AI stops being ready (switched off, the canvas
+ * read-only) and when the canvas does (another one opens): the cleanup runs on either.
+ */
+export function useTitleSuggestionsScope(): void {
+  const ready = useAiReady();
+  useEffect(() => (ready ? discardTitles : undefined), [ready]);
+}
 
 /** Starts suggesting titles for `ids`, replacing any suggestions still showing. */
 export function suggestTitles(ids: string[]): void {
-  if (!useAiAssist.getState().enabled) return;
+  if (!aiAvailable(useAiAssist.getState())) return;
   discardTitles();
   const { nodes, edges } = useCanvasStore.getState();
   const byId = new Map(nodes.map((n) => [n.id, n]));

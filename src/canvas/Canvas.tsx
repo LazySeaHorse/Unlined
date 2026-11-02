@@ -13,6 +13,7 @@ import {
 import { type DragEvent, type MouseEvent, useCallback, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { setAgentView } from '@/agent';
+import { useTitleSuggestionsScope } from '@/ai/titles';
 import { cn } from '@/lib/cn';
 import { closesMathPlusLoop, findLink } from '@/lib/links';
 import { cardFor, placedId } from '@/lib/stacks';
@@ -152,6 +153,7 @@ export function Canvas({ readOnly }: { readOnly: boolean }) {
     if (readOnly && linkingOn) useUiStore.getState().setLinking(false);
   }, [readOnly, linkingOn]);
   useShortcuts(readOnly);
+  useTitleSuggestionsScope();
   useClipboard(readOnly);
   const { menu, close: closeMenu } = useContextMenu(readOnly);
 

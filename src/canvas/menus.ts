@@ -36,7 +36,7 @@ import {
   Trash2,
   Ungroup,
 } from 'lucide-react';
-import { useAiAssist } from '@/ai/store';
+import { aiAvailable, useAiAssist } from '@/ai/store';
 import { suggestTitles } from '@/ai/titles';
 import { copyText } from '@/lib/clipboard';
 import { MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, resizeGrid } from '@/lib/grid';
@@ -211,12 +211,10 @@ const rename = (node: CardNode): MenuEntry => ({
 });
 
 /** Suggest title for `ids`, only while on-device AI is ready. */
-const suggestTitle = (ids: string[]): MenuEntry[] => {
-  const { enabled, availability } = useAiAssist.getState();
-  return enabled && availability === 'available'
+const suggestTitle = (ids: string[]): MenuEntry[] =>
+  aiAvailable(useAiAssist.getState())
     ? [{ label: 'Suggest title', icon: Heading, onSelect: () => suggestTitles(ids) }]
     : [];
-};
 
 /**
  * What right-clicking a sheet offers on its selection: a fill colour, and for a selected row or column

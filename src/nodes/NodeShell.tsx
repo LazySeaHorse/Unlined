@@ -1,6 +1,7 @@
 import { useNodeId } from '@xyflow/react';
 import { Popover } from 'radix-ui';
 import type { CSSProperties, FocusEvent, ReactNode } from 'react';
+import { useAiReady } from '@/ai/store';
 import { acceptTitles, useTitleSuggestions } from '@/ai/titles';
 import { isTextField } from '@/canvas/keyboard';
 import { useReadOnly } from '@/canvas/readOnly';
@@ -133,8 +134,11 @@ export function NodeTitle({
   const readOnly = useReadOnly();
   const editing = useUiStore((s) => s.renamingNode === id) && !readOnly;
 
-  const ghost = useTitleSuggestions((s) => s.ghosts[id]);
-  const pending = useTitleSuggestions((s) => id in s.pending);
+  // Suggestions show only while on-device AI is ready (which a read-only canvas is not).
+  const ready = useAiReady();
+  const suggested = useTitleSuggestions((s) => s.ghosts[id]);
+  const pending = useTitleSuggestions((s) => id in s.pending) && ready;
+  const ghost = ready ? suggested : undefined;
 
   const stopEditing = () => useUiStore.getState().stopRenamingNode(id);
   const commit = (name: string) => {

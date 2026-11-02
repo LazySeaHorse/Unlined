@@ -43,13 +43,17 @@ export const useAiAssist = create<AiAssistState>()(
   ),
 );
 
+/** The setting is on and the model is on this device. */
+export const aiAvailable = (s: Pick<AiAssistState, 'enabled' | 'availability'>): boolean =>
+  s.enabled && s.availability === 'available';
+
 /**
  * True when on-device AI can be used right now. Every AI control renders nothing otherwise, so nothing is reserved
  * for it. The read-only context covers the phone viewer and the moments an agent is editing.
  */
 export function useAiReady(): boolean {
   const readOnly = useReadOnly();
-  return useAiAssist((s) => s.enabled && s.availability === 'available') && !readOnly;
+  return useAiAssist(aiAvailable) && !readOnly;
 }
 
 /** Checks the model once at startup, but only for people who switched it on. */
