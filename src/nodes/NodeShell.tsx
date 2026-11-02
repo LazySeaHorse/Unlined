@@ -1,6 +1,7 @@
 import { useNodeId } from '@xyflow/react';
 import { Popover } from 'radix-ui';
 import type { CSSProperties, FocusEvent, ReactNode } from 'react';
+import { acceptTitles, useTitleSuggestions } from '@/ai/titles';
 import { isTextField } from '@/canvas/keyboard';
 import { useReadOnly } from '@/canvas/readOnly';
 import { cn } from '@/lib/cn';
@@ -132,6 +133,9 @@ export function NodeTitle({
   const readOnly = useReadOnly();
   const editing = useUiStore((s) => s.renamingNode === id) && !readOnly;
 
+  const ghost = useTitleSuggestions((s) => s.ghosts[id]);
+  const pending = useTitleSuggestions((s) => id in s.pending);
+
   const stopEditing = () => useUiStore.getState().stopRenamingNode(id);
   const commit = (name: string) => {
     useCanvasStore.getState().updateNodeData(id, { title: name.trim() || undefined });
@@ -174,11 +178,18 @@ export function NodeTitle({
     </Popover.Root>
   ) : (
     // biome-ignore lint/a11y/noStaticElementInteractions: double-click to rename mirrors desktop canvas apps.
+    // biome-ignore lint/a11y/useKeyWithClickEvents: a suggested title is also accepted with Enter, canvas-wide.
     <span
-      className={cn('min-w-0 truncate', !value && 'opacity-70')}
+      className={cn(
+        'min-w-0 truncate',
+        !value && !ghost && 'opacity-70',
+        ghost && 'title-ghost nodrag cursor-pointer',
+      )}
+      data-pending={pending || undefined}
+      onClick={ghost ? () => acceptTitles(id) : undefined}
       onDoubleClick={() => !readOnly && useUiStore.getState().renameNode(id)}
     >
-      {value || fallback}
+      {ghost || value || fallback}
     </span>
   );
 }

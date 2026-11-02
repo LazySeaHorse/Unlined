@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { acceptTitles, discardTitles, hasTitleSuggestions } from '@/ai/titles';
 import { kindForNumberKey } from '@/nodes/catalog';
 import { redo, undo, useCanvasStore } from '@/store/canvasStore';
 import {
@@ -79,6 +80,19 @@ export function useShortcuts(readOnly: boolean) {
         return;
       }
       if (isTyping(event.target)) return;
+
+      // Suggested titles waiting on the nodes: Enter takes them all, Escape drops them and stops the requests.
+      if (
+        !mod &&
+        (key === 'enter' || key === 'escape') &&
+        !isInOverlay(event.target) &&
+        hasTitleSuggestions()
+      ) {
+        event.preventDefault();
+        if (key === 'enter') acceptTitles();
+        else discardTitles();
+        return;
+      }
 
       if (!mod && !event.altKey && !event.shiftKey) {
         const kind = kindForNumberKey(event.key);

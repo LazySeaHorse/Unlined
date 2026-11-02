@@ -17,6 +17,7 @@ import {
   Copy,
   CopyPlus,
   Eraser,
+  Heading,
   Layers,
   Maximize,
   Minus,
@@ -35,6 +36,8 @@ import {
   Trash2,
   Ungroup,
 } from 'lucide-react';
+import { useAiAssist } from '@/ai/store';
+import { suggestTitles } from '@/ai/titles';
 import { copyText } from '@/lib/clipboard';
 import { MAX_TABLE_COLUMNS, MAX_TABLE_ROWS, resizeGrid } from '@/lib/grid';
 import { applyGridOp, applyToAll, columnLabel, GridOpError, gridOpLines } from '@/lib/gridOps';
@@ -207,6 +210,14 @@ const rename = (node: CardNode): MenuEntry => ({
   onSelect: () => void setTimeout(() => useUiStore.getState().renameNode(node.id), 0),
 });
 
+/** Suggest title for `ids`, only while on-device AI is ready. */
+const suggestTitle = (ids: string[]): MenuEntry[] => {
+  const { enabled, availability } = useAiAssist.getState();
+  return enabled && availability === 'available'
+    ? [{ label: 'Suggest title', icon: Heading, onSelect: () => suggestTitles(ids) }]
+    : [];
+};
+
 /**
  * What right-clicking a sheet offers on its selection: a fill colour, and for a selected row or column
  * a box for operations on it (`-= 3*R2`, `*= 1/2`, `<-> R4`), formulas included.
@@ -349,6 +360,7 @@ const kindExtras = (node: CardNode): MenuEntry[] => {
 export function stackMenu(stack: NodeOf<'stack'>, card: CardNode): MenuEntry[] {
   return [
     rename(card),
+    ...suggestTitle([card.id]),
     { separator: true },
     ...kindExtras(card),
     { label: 'Take out of stack', icon: SquareArrowOutUpRight, onSelect: () => takeOut(stack.id, card.id) },
@@ -395,6 +407,7 @@ export function stackMenu(stack: NodeOf<'stack'>, card: CardNode): MenuEntry[] {
 export function nodeMenu(node: CardNode): MenuEntry[] {
   return [
     rename(node),
+    ...suggestTitle([node.id]),
     { separator: true },
     ...kindExtras(node),
     copy,
@@ -510,6 +523,12 @@ export function selectionMenu(actions: MenuActions): MenuEntry[] {
         onSelect: () => alignSelected(edge),
       })),
     },
+    ...suggestTitle(
+      useCanvasStore
+        .getState()
+        .nodes.filter((n) => n.selected)
+        .map((n) => n.id),
+    ),
     { separator: true },
     copy,
     duplicate,
