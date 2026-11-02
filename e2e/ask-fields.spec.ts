@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
       clone: async () => session(),
       destroy: () => {},
       prompt: async (input: string) =>
-        input.startsWith('Request:')
+        input.includes('Request:')
           ? 'By parts, twice.\n```\n\\frac{e^x(\\sin x-\\cos x)}{2}+C\n```'
           : '{"latex":"\\\\frac{1}{2}"}',
     });
@@ -60,4 +60,25 @@ test('a table cell typed as ? and words takes the answer, and only that cell', a
   expect(await Promise.all([0, 1, 2, 3, 5, 6, 7, 8].map((i) => value(fields.nth(i))))).toEqual(
     Array(8).fill(''),
   );
+});
+
+test('a Math node asks from a new line under what is already there', async ({ page }) => {
+  await placeNode(page, 'Math');
+  const field = nodes(page).locator('math-field');
+  await field.click();
+  await expect(field).toBeFocused();
+  // MathLive reports edits a tick late, so keys go in one at a time.
+  await page.keyboard.type('x+1', { delay: 80 });
+  await page.keyboard.press('Shift+Enter');
+  await page.waitForTimeout(150);
+  await expect.poll(() => value(field)).toContain('displaylines');
+  await page.keyboard.press('Shift+Slash');
+  await expect(nodes(page).getByLabel('Describe it')).toBeFocused();
+  await page.keyboard.type('integrate e^x sin x');
+  await page.keyboard.press('Enter');
+  await expect(nodes(page).locator('.ask-ghost .katex')).toBeVisible();
+  await page.keyboard.press('Tab');
+  await expect(field).toBeFocused();
+  await expect.poll(() => value(field)).toContain('\\frac{e^x(\\sin x-\\cos x)}{2}+C');
+  expect(await value(field)).toContain('x+1');
 });

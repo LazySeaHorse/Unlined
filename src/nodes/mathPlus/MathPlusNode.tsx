@@ -1,7 +1,7 @@
 import type { NodeProps } from '@xyflow/react';
 import { Copy, TriangleAlert } from 'lucide-react';
 import { useMemo } from 'react';
-import { AskSlot } from '@/ai/AskSlot';
+import { AskSlot, TexLines } from '@/ai/AskSlot';
 import { askedLine, replaceLine, useInlineAsk } from '@/ai/useInlineAsk';
 import { useReadOnly } from '@/canvas/readOnly';
 import { copyText } from '@/lib/clipboard';
@@ -96,16 +96,6 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
       )}
     </NodeShell>
   );
-}
-
-/** Lines of the field as they look while it gives way to an ask. */
-function TexLines({ lines }: { lines: string[] }) {
-  return lines.map((line, index) => (
-    // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional.
-    <div key={index} className="min-h-6">
-      <Tex latex={line} />
-    </div>
-  ));
 }
 
 /** Offered lines, each with the result Math+ will give it once they are in, links and all. */
