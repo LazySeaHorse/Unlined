@@ -63,6 +63,32 @@ describe('ask', () => {
     expect(await ask(base)).toEqual({ status: 'unavailable' });
   });
 
+  it('never starts a download', async () => {
+    fake = installFakeLanguageModel(['{"word":"good"}'], 'downloadable');
+    expect(await ask(base)).toEqual({ status: 'unavailable' });
+    expect(fake.creates).toBe(0);
+  });
+
+  it('teaches the base session the system prompt and examples once', async () => {
+    fake = installFakeLanguageModel(['{"word":"good"}', '{"word":"good"}']);
+    await ask(base);
+    await ask(base);
+    expect(fake.creates).toBe(1);
+    expect(fake.initialPrompts).toEqual([
+      { role: 'system', content: 'Say a word.' },
+      { role: 'user', content: 'hi' },
+      { role: 'assistant', content: '{"word":"hello"}' },
+    ]);
+  });
+
+  it('makes the base afresh when it cannot be cloned', async () => {
+    fake = installFakeLanguageModel(['{"word":"good"}']);
+    fake.cloneFailures = 1;
+    expect(await ask(base)).toEqual({ status: 'unavailable' });
+    expect(await ask(base)).toEqual({ status: 'ok', value: 'good' });
+    expect(fake.creates).toBe(2);
+  });
+
   it('runs one request at a time', async () => {
     fake = installFakeLanguageModel(
       ['{"word":"good"}', '{"word":"good"}', '{"word":"good"}'],
@@ -124,10 +150,31 @@ describe('ask, fenced and timed', () => {
 
   it('ends a call that runs past the turn limit', async () => {
     vi.useFakeTimers();
-    fake = installFakeLanguageModel(['{"word":"good"}'], 'available', 60_000);
-    const result = ask(base);
-    await vi.advanceTimersByTimeAsync(TURN_LIMIT_MS + 1);
-    expect(await result).toEqual({ status: 'invalid', reason: 'It took too long.' });
-    vi.useRealTimers();
+    try {
+      fake = installFakeLanguageModel(['{"word":"good"}'], 'available', 60_000);
+      const result = ask(base);
+      await vi.advanceTimersByTimeAsync(TURN_LIMIT_MS + 1);
+      expect(await result).toEqual({ status: 'invalid', reason: 'It took too long.' });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ends a session that takes too long to make, and makes it afresh for the next request', async () => {
+    vi.useFakeTimers();
+    try {
+      fake = installFakeLanguageModel(['{"word":"good"}']);
+      fake.createMs = 60_000;
+      const hung = ask(base);
+      await vi.advanceTimersByTimeAsync(TURN_LIMIT_MS + 1);
+      expect(await hung).toEqual({ status: 'invalid', reason: 'It took too long.' });
+      fake.createMs = 0;
+      const next = ask(base);
+      await vi.advanceTimersByTimeAsync(10);
+      expect(await next).toEqual({ status: 'ok', value: 'good' });
+      expect(fake.creates).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

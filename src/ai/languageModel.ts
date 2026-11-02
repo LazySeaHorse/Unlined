@@ -70,15 +70,24 @@ export async function downloadModel(
 // examples are not re-sent and one request never leaks into the next.
 const bases = new Map<string, Promise<Session>>();
 
-function baseSession(feature: string, initialPrompts: Turn[]): Promise<Session> {
-  let base = bases.get(feature);
-  if (!base) {
-    const api = getApi();
-    if (!api) return Promise.reject(new Error('unsupported'));
-    base = api.create({ ...LANGUAGES, initialPrompts });
-    base.catch(() => bases.delete(feature));
-    bases.set(feature, base);
-  }
+/** Drops `base` from the cache, unless another has taken its place since. */
+const forget = (feature: string, base: Promise<Session>) => {
+  if (bases.get(feature) === base) bases.delete(feature);
+};
+
+function baseSession(feature: string, initialPrompts: Turn[], signal: AbortSignal): Promise<Session> {
+  const cached = bases.get(feature);
+  if (cached) return cached;
+  const api = getApi();
+  if (!api) return Promise.reject(new Error('unsupported'));
+  const base = (async () => {
+    // Creating a session for a model not on the device starts its download, which only a click in the
+    // On-device tab may do.
+    if ((await api.availability(LANGUAGES)) !== 'available') throw new Error('unavailable');
+    return api.create({ ...LANGUAGES, initialPrompts, signal });
+  })();
+  base.catch(() => forget(feature, base));
+  bases.set(feature, base);
   return base;
 }
 
@@ -99,7 +108,8 @@ const enqueue = <T>(job: () => Promise<T>): Promise<T> => {
   return run;
 };
 
-/** The longest one call to the model may take. A small model can loop; this ends it. */
+/** The longest one call to the model (getting a session, or one prompt) may take. A small model can loop, and
+ * setting one up can hang; this ends either. */
 export const TURN_LIMIT_MS = 30_000;
 
 /** How the model answers: constrained JSON (for syntax), or free text whose last fenced block is the answer. */
@@ -151,6 +161,17 @@ export function ask<T, U>(options: AskOptions<T, U>): Promise<AskResult<U>> {
     let session: Session | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
+    /** A signal for the next call, aborted once it has run TURN_LIMIT_MS. */
+    const limited = () => {
+      clearTimeout(timer);
+      const turn = new AbortController();
+      timer = setTimeout(() => {
+        timedOut = true;
+        turn.abort();
+      }, TURN_LIMIT_MS);
+      return turn.signal;
+    };
+    const orAborted = (limit: AbortSignal) => (signal ? AbortSignal.any([signal, limit]) : limit);
     try {
       const initialPrompts: Turn[] = [
         { role: 'system', content: system },
@@ -162,20 +183,21 @@ export function ask<T, U>(options: AskOptions<T, U>): Promise<AskResult<U>> {
           },
         ]),
       ];
-      session = await (await baseSession(feature, initialPrompts)).clone({ signal });
+      const setup = limited();
+      // The base is shared, so only the time limit may end its making, not this one request's abort.
+      const base = baseSession(feature, initialPrompts, setup);
+      try {
+        session = await (await base).clone({ signal: orAborted(setup) });
+      } catch (e) {
+        // A base that cannot be cloned, or took too long, is made afresh next time.
+        if (!signal?.aborted) forget(feature, base);
+        throw e;
+      }
       const responseConstraint = format === 'json' ? z.toJSONSchema(schema) : undefined;
       let message = input;
       let reason = 'no answer';
       for (let attempt = 0; attempt < 2; attempt++) {
-        const turn = new AbortController();
-        timer = setTimeout(() => {
-          timedOut = true;
-          turn.abort();
-        }, TURN_LIMIT_MS);
-        const raw = await session.prompt(message, {
-          signal: signal ? AbortSignal.any([signal, turn.signal]) : turn.signal,
-          responseConstraint,
-        });
+        const raw = await session.prompt(message, { signal: orAborted(limited()), responseConstraint });
         clearTimeout(timer);
         const parsed = schema.safeParse(format === 'fenced' ? lastFence(raw) : safeJson(raw));
         const checked = parsed.success
