@@ -9,14 +9,16 @@ import Spreadsheet, {
   type Point,
   type Selection,
 } from 'react-spreadsheet';
+import { useInlineAsk } from '@/ai/useInlineAsk';
 import { useReadOnly } from '@/canvas/readOnly';
 import { cn } from '@/lib/cn';
 import { addColumn, addRow, removeColumn, removeRow, setCell } from '@/lib/grid';
 import type { NodeOf } from '@/model/types';
 import { NodeShell, Stepper } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
+import { sheetAsk } from './ask';
 import { evaluateSheet } from './evaluate';
-import { cellKey, pruneFills, rangeLabel } from './fills';
+import { cellKey, parseCellKey, pruneFills, rangeLabel } from './fills';
 import { ColumnIndicator, CornerIndicator, RowIndicator } from './indicators';
 import { FormulaBar } from './SheetToolbar';
 import { publishSheetSelection } from './selection';
@@ -76,6 +78,14 @@ export default function SheetNode({ id, data, selected }: NodeProps<NodeOf<'shee
     if (event.button !== 2 || !selection || !cell || !(row instanceof HTMLTableRowElement)) return;
     if (selection.has(matrix, { row: row.rowIndex - 1, column: cell.cellIndex - 1 })) event.stopPropagation();
   };
+  const ask = useInlineAsk(sheetAsk, {
+    context: { cells, at: active ? cellKey(active) : '', fractions },
+    // The cell the ask began in, wherever the selection has gone since.
+    apply: ({ formula }, at: string) => {
+      const cell = parseCellKey(at);
+      if (cell) update({ cells: setCell(cells, cell.row, cell.column, formula) });
+    },
+  });
   const toggleFractions = () => update({ fractions: fractions ? undefined : true });
 
   return (
@@ -90,6 +100,7 @@ export default function SheetNode({ id, data, selected }: NodeProps<NodeOf<'shee
           label={label}
           value={active ? (cells[active.row]?.[active.column] ?? '') : ''}
           readOnly={readOnly}
+          ask={ask}
           onCommit={(text) => active && update({ cells: setCell(cells, active.row, active.column, text) })}
         />
       }

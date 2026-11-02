@@ -130,3 +130,21 @@ export function evaluateSheet(cells: string[][], fractions: boolean): (string | 
     row.map((text, c) => (isFormula(text) ? display(values[r][c], fractions) : undefined)),
   );
 }
+
+/**
+ * What `formula` would show in the cell `at` of the grid, or null when it is not a formula or shows an error
+ * (#NAME?, #REF!, …). The grid itself is left as it is.
+ */
+export function formulaResult(
+  cells: string[][],
+  at: { row: number; column: number },
+  formula: string,
+  fractions: boolean,
+): string | null {
+  if (!isFormula(formula) || cells[at.row]?.[at.column] === undefined) return null;
+  const next = cells.map((row, r) =>
+    r === at.row ? row.map((t, c) => (c === at.column ? formula : t)) : row,
+  );
+  const shown = evaluateSheet(next, fractions)[at.row]?.[at.column] ?? '';
+  return shown.startsWith('#') ? null : shown;
+}
