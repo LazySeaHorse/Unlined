@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import type { NodeKind } from '@/model/types';
 
 export type Theme = 'light' | 'dark';
-export type AiTab = 'connect' | 'activity';
+export type AiTab = 'connect' | 'activity' | 'device';
 
 interface UiState {
   /** Node kind created by double-clicking the canvas. */

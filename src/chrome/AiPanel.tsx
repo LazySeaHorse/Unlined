@@ -22,6 +22,7 @@ import { EmptyState } from '@/ui/EmptyState';
 import { Mascot } from '@/ui/Mascot';
 import { Switch } from '@/ui/Switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/ui/Tabs';
+import { OnDeviceTab } from './OnDeviceTab';
 import { Panel } from './Panel';
 
 const MCP_URL = 'http://127.0.0.1:47801/mcp';
@@ -253,12 +254,16 @@ export function AiPanel() {
         <TabsList className="mx-3 mt-3 shrink-0">
           <TabsTrigger value="connect">Connect</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="device">On-device</TabsTrigger>
         </TabsList>
         <TabsContent value="connect" className="min-h-0 flex-1 overflow-y-auto">
           <ConnectTab />
         </TabsContent>
         <TabsContent value="activity" className="flex min-h-0 flex-1 flex-col pt-2">
           <ActivityTab />
+        </TabsContent>
+        <TabsContent value="device" className="min-h-0 flex-1 overflow-y-auto">
+          <OnDeviceTab />
         </TabsContent>
       </Tabs>
     </Panel>
