@@ -46,6 +46,23 @@ export function splitBody(body: string): string[] {
 /** How the lines of a Math or Math+ body are told apart, for the helpers of an ask from a line (askedLine). */
 export const MATH_LINES = { separator: LINE_BREAK, split: splitBody };
 
+/** The line of `latex` (as MathLive writes it) that `offset` is in, and its index among the body's lines. */
+export function lineAt(latex: string, offset: number): { index: number; line: string } {
+  const body = linesBody(latex);
+  const lines = splitBody(body);
+  let end = body === latex ? 0 : latex.indexOf('{') + 1;
+  for (const [index, line] of lines.entries()) {
+    end += line.length;
+    if (offset <= end || index === lines.length - 1) return { index, line };
+    end += LINE_BREAK.length;
+  }
+  return { index: 0, line: '' };
+}
+
+/** The start of a field's LaTeX, up to its caret, as lines on '\n', for a model to read. */
+export const linesUpTo = (before: string): string =>
+  splitBody(before.replace(/^\s*\\displaylines\s*\{/, '')).join('\n');
+
 /** The lines that hold something, trimmed. */
 export function splitLines(latex: string): string[] {
   return splitBody(linesBody(latex))

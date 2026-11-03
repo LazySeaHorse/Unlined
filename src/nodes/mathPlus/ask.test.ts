@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { askFor } from '@/ai/inlineAsk';
 import { releaseSessions } from '@/ai/languageModel';
+import { itTeachesOnlyLinesThatFit } from '@/test/completeSpec';
 import { type FakeModel, installFakeLanguageModel } from '@/test/fakeLanguageModel';
-import { mathPlusAsk } from './ask';
+import { mathPlusAsk, mathPlusComplete } from './ask';
+import { lineAt } from './evaluate';
 
 let fake: FakeModel | undefined;
 afterEach(() => {
@@ -46,5 +48,33 @@ describe('mathPlusAsk', () => {
       value: ['s:=a+b'],
     });
     expect(fake.prompts[1]).toContain('does not evaluate');
+  });
+});
+
+describe('lineAt', () => {
+  it('finds the line an offset is in', () => {
+    const latex = '\\displaylines{a\\\\ bc\\\\ d}';
+    expect(lineAt(latex, 15)).toEqual({ index: 0, line: 'a' });
+    expect(lineAt(latex, 19)).toEqual({ index: 1, line: ' bc' });
+    expect(lineAt(latex, 22)).toEqual({ index: 2, line: ' d' });
+    expect(lineAt('x+1', 2)).toEqual({ index: 0, line: 'x+1' });
+  });
+});
+
+describe('mathPlusComplete', () => {
+  itTeachesOnlyLinesThatFit(mathPlusComplete);
+
+  it('shows the model the linked values, then the lines up to the caret', () => {
+    expect(
+      mathPlusComplete.input({ inputs: [{ name: 'k', value: '5' }] }, '\\displaylines{a:=2\\\\ a+'),
+    ).toBe('Values from links: k = 5\nMath+ up to the cursor:\na:=2\n a+');
+    expect(mathPlusComplete.input({ inputs: [] }, 'a+')).toBe('Math+ up to the cursor:\na+');
+  });
+
+  it('keeps a line Math+ evaluates, after the lines before it, and drops one it does not', async () => {
+    const check = (before: string, line: string, after: string) =>
+      mathPlusComplete.check(before + line + after, { inputs: [] }, { before, line, after });
+    expect(await check('\\displaylines{a:=2\\\\ \\\\ a', '+1', '}')).toBe(true);
+    expect(await check('\\displaylines{a:=2\\\\ a', '+', '}')).toBe(false);
   });
 });

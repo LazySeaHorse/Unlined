@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { askFor } from '@/ai/inlineAsk';
 import { releaseSessions } from '@/ai/languageModel';
+import { itTeachesOnlyLinesThatFit } from '@/test/completeSpec';
 import { type FakeModel, installFakeLanguageModel } from '@/test/fakeLanguageModel';
-import { mathAsk, typesets } from './ask';
+import { mathAsk, mathComplete, typesets } from './ask';
 
 let fake: FakeModel | undefined;
 afterEach(() => {
@@ -53,5 +54,23 @@ describe('mathAsk', () => {
     fake = installFakeLanguageModel(['```\n\\text{two}\n```', 'No fence at all']);
     expect(await askFor(mathAsk, [], 'solve x-2=0')).toEqual({ status: 'invalid' });
     expect(fake.prompts[1]).toContain('no \\text');
+  });
+});
+
+describe('mathComplete', () => {
+  itTeachesOnlyLinesThatFit(mathComplete);
+
+  it('shows the model the lines up to the caret, one to a line', () => {
+    expect(mathComplete.input(undefined, '\\displaylines{a=1\\\\ \\frac{b')).toBe(
+      'Math up to the cursor:\na=1\n \\frac{b',
+    );
+  });
+
+  it('checks only the line at the caret', () => {
+    const check = (before: string, line: string, after: string) =>
+      mathComplete.check(before + line + after, undefined, { before, line, after });
+    expect(check('\\displaylines{\\text{words}\\\\ x', '^2', '}')).toBe(true);
+    expect(check('\\displaylines{x\\\\ y^', '{', '}')).toBe(false);
+    expect(check('\\frac{1', '}{2}+', '}{3}')).toBe(false);
   });
 });

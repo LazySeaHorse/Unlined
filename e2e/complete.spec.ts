@@ -1,4 +1,4 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, type Locator, type Page, test } from '@playwright/test';
 import { nodes, openApp, placeNode } from './helpers';
 
 // On-device AI switched on, with a stand-in for Chrome's model that streams a continuation for each kind of field,
@@ -10,7 +10,7 @@ test.beforeEach(async ({ page }) => {
       Note: ' there\nnever read',
       Script: 'sort()\nnever read',
       Math: '+1',
-      'Math+': '+b',
+      'Math+': '+1',
       Row: '+1',
       Cell: '^2',
       Formula: 'B3)',
@@ -23,7 +23,8 @@ test.beforeEach(async ({ page }) => {
       prompt: async () => '{}',
       promptStreaming: (input: string) => {
         prompts.push(input);
-        const reply = lines[input.slice(0, input.indexOf(' up to the cursor'))] ?? '';
+        const name = Object.keys(lines).find((key) => `\n${input}`.includes(`\n${key} up to the cursor:`));
+        const reply = name ? lines[name] : '';
         let at = 0;
         return new ReadableStream<string>({
           pull: async (controller) => {
@@ -44,6 +45,16 @@ test.beforeEach(async ({ page }) => {
 
 const lastPrompt = (page: Page) =>
   page.evaluate(() => (window as unknown as { prompts: string[] }).prompts.at(-1));
+
+const mathValue = (field: Locator) => field.evaluate((f: HTMLElement & { value: string }) => f.value);
+
+/** Keys into a math field at a human pace: MathLive reports each edit a task later. */
+async function press(page: Page, keys: string[]) {
+  for (const key of keys) {
+    await page.keyboard.press(key);
+    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 30)));
+  }
+}
 
 test('Text: Tab offers the rest of the line at the caret, and Tab takes it as one undo step', async ({
   page,
@@ -100,4 +111,68 @@ test('Script: Tab offers the rest of the line at the caret, drawn in the editor'
   await expect(editor).toHaveText('console.log(nums.sort())');
   await page.keyboard.type(';');
   await expect(editor).toHaveText('console.log(nums.sort();)');
+});
+
+test('Math: Tab shows the line with the rest of it under the field, and Tab puts it in at the caret', async ({
+  page,
+}) => {
+  await placeNode(page, 'Math');
+  const node = nodes(page).first();
+  const field = node.locator('math-field');
+  await field.click();
+  await expect(field).toBeFocused();
+  await press(page, ['a', 'Shift+Enter', 'x']);
+  const before = await mathValue(field);
+  await page.keyboard.press('Tab');
+  await expect(field).toHaveAttribute('data-completing', '');
+  const ghost = node.locator('.complete-ghost');
+  await expect(ghost.locator('.katex')).toBeVisible();
+  await expect(ghost).toContainText('x+1');
+  await expect(field).not.toHaveAttribute('data-completing');
+  expect(await lastPrompt(page)).toBe('Math up to the cursor:\na\n x');
+  // Reading the field at its caret left it as it was.
+  expect(await mathValue(field)).toBe(before);
+  await expect(field).toBeFocused();
+
+  await page.keyboard.press('Tab');
+  await expect(ghost).toHaveCount(0);
+  await expect.poll(() => mathValue(field)).toBe('\\displaylines{a\\\\ x+1}');
+  await expect(field).toBeFocused();
+  // The caret is after what went in.
+  await press(page, ['2']);
+  await expect.poll(() => mathValue(field)).toBe('\\displaylines{a\\\\ x+12}');
+
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('ControlOrMeta+z');
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect.poll(() => mathValue(field)).toBe(before);
+});
+
+test('Math+: Tab offers the rest of a line, told the values links bring in', async ({ page }) => {
+  await placeNode(page, 'Math+');
+  const node = nodes(page).first();
+  const field = node.locator('math-field');
+  await field.click();
+  await expect(field).toBeFocused();
+  await press(page, ['a', ':', '=', '2', 'Shift+Enter', 'a']);
+  await page.keyboard.press('Tab');
+  await expect(node.locator('.complete-ghost .katex')).toBeVisible();
+  expect(await lastPrompt(page)).toContain('Math+ up to the cursor:\na\\coloneq2\n a');
+  await page.keyboard.press('Tab');
+  await expect.poll(() => mathValue(field)).toBe('\\displaylines{a\\coloneq2\\\\ a+1}');
+  await expect(node.getByText('3', { exact: true })).toBeVisible();
+});
+
+test('Math: Escape drops the line and leaves the caret in the field', async ({ page }) => {
+  await placeNode(page, 'Math');
+  const field = nodes(page).locator('math-field');
+  await field.click();
+  await expect(field).toBeFocused();
+  await press(page, ['x']);
+  await page.keyboard.press('Tab');
+  await expect(nodes(page).locator('.complete-ghost')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(nodes(page).locator('.complete-ghost')).toHaveCount(0);
+  await expect(field).toBeFocused();
+  expect(await mathValue(field)).toBe('x');
 });

@@ -2,7 +2,9 @@ import type { NodeProps } from '@xyflow/react';
 import { Copy, TriangleAlert } from 'lucide-react';
 import { useMemo } from 'react';
 import { AskSlot, TexLines } from '@/ai/AskSlot';
+import { CompleteSlot } from '@/ai/CompleteSlot';
 import { askedLine, replaceLine, useInlineAsk } from '@/ai/useInlineAsk';
+import { useInlineComplete } from '@/ai/useInlineComplete';
 import { useReadOnly } from '@/canvas/readOnly';
 import { copyText } from '@/lib/clipboard';
 import { cn } from '@/lib/cn';
@@ -13,12 +15,13 @@ import type { NodeOf, Titled } from '@/model/types';
 import { useCanvasStore } from '@/store/canvasStore';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
-import { mathPlusAsk } from './ask';
+import { mathPlusAsk, mathPlusComplete } from './ask';
 import {
   fromLinesBody,
   LINE_BREAK,
   type LineResult,
   type LinkInput,
+  lineAt,
   linesBody,
   MATH_LINES,
   splitBody,
@@ -36,14 +39,14 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
   const results = useMathPlusResults(id);
   const inputs = useMathPlusInputs(id);
   // `?` at the start of an empty line asks for lines in words; they go in that line's place.
+  const linked = () => inputs.flatMap(({ name, value }) => (value === null ? [] : [{ name, value }]));
   const ask = useInlineAsk(mathPlusAsk, {
     data,
-    context: () => ({
-      lines: splitLines(data.latex),
-      inputs: inputs.flatMap(({ name, value }) => (value === null ? [] : [{ name, value }])),
-    }),
+    context: () => ({ lines: splitLines(data.latex), inputs: linked() }),
     apply: (lines, at: number) => update({ latex: withLines(data.latex, at, lines) }),
   });
+  // Tab asks for the rest of the line at the caret, shown under the field.
+  const complete = useInlineComplete(mathPlusComplete, { data, context: () => ({ inputs: linked() }) });
   const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;
   const shown = splitBody(linesBody(data.latex));
 
@@ -57,32 +60,38 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
     >
       <InputChips id={id} />
       <div className="px-3 py-2">
-        <AskSlot
-          ask={ask}
-          lines={
-            asking === undefined
-              ? undefined
-              : {
-                  above: <TexLines lines={shown.slice(0, asking)} />,
-                  below: <TexLines lines={shown.slice(asking + 1)} />,
-                }
-          }
-          renderGhost={(lines) =>
-            asking !== undefined && <AnswerLines id={id} latex={data.latex} at={asking} lines={lines} />
-          }
+        <CompleteSlot
+          complete={complete}
+          at={0}
+          renderGhost={(latex, caret) => <Tex latex={lineAt(latex, caret).line} />}
         >
-          <MathField
-            value={data.latex}
-            onChange={(latex) => {
-              const line = askedLine(linesBody(data.latex), linesBody(latex), MATH_LINES);
-              if (!line || !ask.open(line.index)) update({ latex });
-            }}
-            menuNodeId={id}
-            readOnly={readOnly}
-            multiline
-            placeholder="a := 2"
-          />
-        </AskSlot>
+          <AskSlot
+            ask={ask}
+            lines={
+              asking === undefined
+                ? undefined
+                : {
+                    above: <TexLines lines={shown.slice(0, asking)} />,
+                    below: <TexLines lines={shown.slice(asking + 1)} />,
+                  }
+            }
+            renderGhost={(lines) =>
+              asking !== undefined && <AnswerLines id={id} latex={data.latex} at={asking} lines={lines} />
+            }
+          >
+            <MathField
+              value={data.latex}
+              onChange={(latex) => {
+                const line = askedLine(linesBody(data.latex), linesBody(latex), MATH_LINES);
+                if (!line || !ask.open(line.index)) update({ latex });
+              }}
+              menuNodeId={id}
+              readOnly={readOnly}
+              multiline
+              placeholder="a := 2"
+            />
+          </AskSlot>
+        </CompleteSlot>
       </div>
       {results === undefined ? (
         <p className="border-t border-border px-3 py-2 text-xs text-muted italic">Loading math engine…</p>

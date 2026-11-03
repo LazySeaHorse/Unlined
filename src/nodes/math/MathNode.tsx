@@ -1,14 +1,16 @@
 import type { NodeProps } from '@xyflow/react';
 import { AskSlot, TexLines } from '@/ai/AskSlot';
+import { CompleteSlot } from '@/ai/CompleteSlot';
 import { askedLine, replaceLine, useInlineAsk } from '@/ai/useInlineAsk';
+import { useInlineComplete } from '@/ai/useInlineComplete';
 import { useReadOnly } from '@/canvas/readOnly';
 import { MathField } from '@/lib/math/MathField';
 import { Tex } from '@/lib/math/Tex';
 import type { NodeOf } from '@/model/types';
-import { fromLinesBody, linesBody, MATH_LINES, splitBody, splitLines } from '../mathPlus/evaluate';
+import { fromLinesBody, lineAt, linesBody, MATH_LINES, splitBody, splitLines } from '../mathPlus/evaluate';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
-import { mathAsk } from './ask';
+import { mathAsk, mathComplete } from './ask';
 
 /** The node's LaTeX with its line at `at` replaced by `latex`. */
 const withLine = (source: string, at: number, latex: string) =>
@@ -23,6 +25,8 @@ export default function MathNode({ id, data, selected }: NodeProps<NodeOf<'math'
     context: () => splitLines(data.latex),
     apply: (latex, at: number) => update({ latex: withLine(data.latex, at, latex) }),
   });
+  // Tab asks for the rest of the line at the caret, shown under the field.
+  const complete = useInlineComplete(mathComplete, { data, context: () => undefined });
   const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;
   const shown = splitBody(linesBody(data.latex));
   return (
@@ -33,30 +37,36 @@ export default function MathNode({ id, data, selected }: NodeProps<NodeOf<'math'
       tint={data.color}
       className="min-w-24 px-3 py-2"
     >
-      <AskSlot
-        ask={ask}
-        lines={
-          asking === undefined
-            ? undefined
-            : {
-                above: <TexLines lines={shown.slice(0, asking)} />,
-                below: <TexLines lines={shown.slice(asking + 1)} />,
-              }
-        }
-        renderGhost={(latex) => <Tex latex={latex} className="text-[1.2rem]" />}
+      <CompleteSlot
+        complete={complete}
+        at={0}
+        renderGhost={(latex, caret) => <Tex latex={lineAt(latex, caret).line} className="text-[1.2rem]" />}
       >
-        <MathField
-          value={data.latex}
-          onChange={(latex) => {
-            const line = askedLine(linesBody(data.latex), linesBody(latex), MATH_LINES);
-            if (!line || !ask.open(line.index)) update({ latex });
-          }}
-          menuNodeId={id}
-          readOnly={readOnly}
-          multiline
-          placeholder="\text{math}"
-        />
-      </AskSlot>
+        <AskSlot
+          ask={ask}
+          lines={
+            asking === undefined
+              ? undefined
+              : {
+                  above: <TexLines lines={shown.slice(0, asking)} />,
+                  below: <TexLines lines={shown.slice(asking + 1)} />,
+                }
+          }
+          renderGhost={(latex) => <Tex latex={latex} className="text-[1.2rem]" />}
+        >
+          <MathField
+            value={data.latex}
+            onChange={(latex) => {
+              const line = askedLine(linesBody(data.latex), linesBody(latex), MATH_LINES);
+              if (!line || !ask.open(line.index)) update({ latex });
+            }}
+            menuNodeId={id}
+            readOnly={readOnly}
+            multiline
+            placeholder="\text{math}"
+          />
+        </AskSlot>
+      </CompleteSlot>
     </NodeShell>
   );
 }

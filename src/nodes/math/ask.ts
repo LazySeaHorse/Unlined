@@ -1,7 +1,8 @@
 import katex from 'katex';
 import { z } from 'zod';
 import { oneLine } from '@/agent/format';
-import type { AskSpec } from '@/ai/inlineAsk';
+import { type AskSpec, type CompleteSpec, continuing, upToCursor } from '@/ai/inlineAsk';
+import { lineAt, linesUpTo } from '../mathPlus/evaluate';
 
 /** Whether `latex` is maths that typesets: KaTeX renders it, and it is maths, not words in \text. */
 export function typesets(latex: string): { ok: true } | { ok: false; reason: string } {
@@ -53,4 +54,25 @@ without \\text. The note may already hold lines of maths; the request can refer 
     const checked = typesets(latex);
     return checked.ok ? { ok: true, value: latex } : checked;
   },
+};
+
+/** What every completion in a math field is told it writes. */
+export const LATEX_LINE = 'It is maths typed as LaTeX, without $ signs and without \\text.';
+
+/** The rest of a Math node's line at the caret, kept if that line still typesets. */
+export const mathComplete: CompleteSpec<void> = {
+  feature: 'math-complete',
+  system: continuing(`${LATEX_LINE} Its lines come one to a line.`),
+  examples: [
+    { context: undefined, before: 'x=\\frac{-b\\pm', after: '}{2a}', answer: '\\sqrt{b^2-4ac}' },
+    { context: undefined, before: '\\int_0^1x^2\\,dx', answer: '=\\frac{1}{3}' },
+    {
+      context: undefined,
+      before: '\\displaylines{a^2+b^2=c^2\\\\ c=',
+      after: '}',
+      answer: '\\sqrt{a^2+b^2}',
+    },
+  ],
+  input: (_, before) => upToCursor('Math', linesUpTo(before)),
+  check: (text, _, { before, line }) => typesets(lineAt(text, before.length + line.length).line).ok,
 };

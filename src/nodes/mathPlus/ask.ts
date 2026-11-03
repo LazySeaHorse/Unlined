@@ -1,15 +1,30 @@
 import { z } from 'zod';
 import { oneLine } from '@/agent/format';
-import type { AskSpec } from '@/ai/inlineAsk';
+import { type AskSpec, type CompleteSpec, continuing, upToCursor } from '@/ai/inlineAsk';
 import { loadEngine } from '@/lib/math/engine';
 import { SYNTAX } from '../syntax';
-import { evaluateDocuments, fromLinesBody, LINE_BREAK, splitLines } from './evaluate';
+import {
+  evaluateDocuments,
+  fromLinesBody,
+  LINE_BREAK,
+  lineAt,
+  linesBody,
+  linesUpTo,
+  splitBody,
+  splitLines,
+} from './evaluate';
 
 /** What the model sees of a Math+ node: its own lines, and the values its links bring in by name. */
 export interface MathPlusContext {
   lines: string[];
   inputs: { name: string; value: string }[];
 }
+
+/** The values a node's links bring in, for the model; empty when there are none. */
+const linkedValues = (inputs: MathPlusContext['inputs']) =>
+  inputs.length > 0
+    ? `Values from links: ${oneLine(inputs.map(({ name, value }) => `${name} = ${value}`).join('; '), 300)}`
+    : '';
 
 /**
  * Math+ lines from words, put in place of the line the `?` was typed on. The model writes expressions and
@@ -51,10 +66,10 @@ At most 6 lines. Do not explain anything, only write the lines.`,
   ],
   schema: z.object({ lines: z.array(z.string().max(160)).min(1).max(6) }),
   input: ({ lines, inputs }, words) => {
-    const linked = inputs.map(({ name, value }) => `${name} = ${value}`).join('; ');
+    const linked = linkedValues(inputs);
     return [
       `Lines:\n${lines.length > 0 ? lines.map((line) => oneLine(line, 200)).join('\n') : '(none)'}`,
-      ...(linked ? [`Values from links: ${oneLine(linked, 300)}`] : []),
+      ...(linked ? [linked] : []),
       `Description: ${oneLine(words, 300)}`,
     ].join('\n');
   },
@@ -68,5 +83,31 @@ At most 6 lines. Do not explain anything, only write the lines.`,
     if (failed)
       return { ok: false, reason: `A line does not evaluate (${failed.error}). Write Math+ LaTeX lines.` };
     return { ok: true, value: lines };
+  },
+};
+
+/** The rest of a Math+ line at the caret, kept if Math+ evaluates that line. The model sees the linked values too. */
+export const mathPlusComplete: CompleteSpec<Pick<MathPlusContext, 'inputs'>> = {
+  feature: 'mathplus-complete',
+  system: continuing(
+    `It is a line of Math+, a calculator that works out each line itself. ${oneLine(SYNTAX.mathPlus, Infinity)}
+A line is a LaTeX expression, or a definition with :=. Write the expression, never its result; use the names of
+the values links bring in. Never use \\text.`,
+  ),
+  examples: [
+    { context: { inputs: [] }, before: '\\displaylines{r:=3\\\\ A:=', after: '}', answer: '\\pi r^2' },
+    { context: { inputs: [{ name: 'k', value: '5' }] }, before: 'k^2', answer: '+1' },
+    { context: { inputs: [] }, before: 'f(x):=x^3', answer: '-x' },
+  ],
+  input: ({ inputs }, before) =>
+    [linkedValues(inputs), upToCursor('Math+', linesUpTo(before))].filter(Boolean).join('\n'),
+  check: async (text, _, { before, line }) => {
+    const { index } = lineAt(text, before.length + line.length);
+    // Results are for the lines that hold something.
+    const at = splitBody(linesBody(text))
+      .slice(0, index)
+      .filter((l) => l.trim()).length;
+    const results = evaluateDocuments((await loadEngine()).ce, [{ id: 'complete', latex: text }]).complete;
+    return results?.[at] !== undefined && !results[at].error;
   },
 };
