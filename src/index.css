@@ -1194,7 +1194,6 @@ math-field::part(virtual-keyboard-toggle) {
   z-index: 1;
   overflow: hidden;
   pointer-events: none;
-  color: transparent;
   border-style: solid;
   border-color: transparent;
 }

@@ -69,10 +69,12 @@ describe('useInlineComplete', () => {
     await userEvent.keyboard('{Tab}');
     await waitFor(() => expect(phase()).toBe('ghost'));
     expect(fake.prompts.at(-1)).toBe('ctx|Hi,');
-    expect(ghost()?.textContent).toBe('Hi, there');
+    expect(ghost()?.textContent).toBe('Hi, there said Sam');
+    expect(field().style.color).toBe('transparent');
     const steps = pastSteps();
     await userEvent.keyboard('{Tab}');
     expect(markdown()).toBe('Hi, there said Sam');
+    expect(field().style.color).toBe('');
     expect(document.activeElement).toBe(field());
     expect(field().selectionStart).toBe(9);
     expect(pastSteps()).toBe(steps + 1);

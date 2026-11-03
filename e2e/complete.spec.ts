@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
       'Math+': '+1',
       Row: '+1',
       Cell: '^2',
-      Formula: 'B3)',
+      Formula: 'A3)',
     };
     const prompts: string[] = [];
     Object.assign(window, { prompts });
@@ -66,7 +66,7 @@ test('Text: Tab offers the rest of the line at the caret, and Tab takes it as on
   await textarea.fill('# Notes\nHi, said Sam');
   await textarea.evaluate((t: HTMLTextAreaElement) => t.setSelectionRange(11, 11));
   await page.keyboard.press('Tab');
-  await expect(node.locator('.complete-copy')).toHaveText('# Notes\nHi, there');
+  await expect(node.locator('.complete-copy')).toHaveText('# Notes\nHi, there said Sam');
   expect(await lastPrompt(page)).toBe('Note up to the cursor:\n# Notes\nHi,');
   await expect(textarea).toBeFocused();
 

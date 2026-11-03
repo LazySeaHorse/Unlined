@@ -102,22 +102,30 @@ const LAYOUT = [
 ];
 
 /**
- * The waiting line over a textarea or input, at its caret: a copy of the field laid out the same, its text up to
- * the caret unseen and the line after it, faint, over the text it would push along.
+ * The waiting line over a textarea or input, at its caret: a copy of the field laid out the same, with the line in
+ * it, faint. The field's own text goes unseen meanwhile, its caret not, so the rest of the line moves along.
  */
-function CaretGhost({ field: { element, before }, text }: { field: CompleteField; text: string }) {
+function CaretGhost({ field: { element, before, after }, text }: { field: CompleteField; text: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const { color, caretColor } = element.style;
+    const shown = getComputedStyle(element).color;
+    if (ref.current) ref.current.style.color = shown;
+    element.style.caretColor = shown;
+    element.style.color = 'transparent';
+    return () => {
+      element.style.color = color;
+      element.style.caretColor = caretColor;
+    };
+  }, [element]);
   useLayoutEffect(() => {
     const copy = ref.current;
     const parent = copy?.offsetParent;
     if (!copy || !(parent instanceof HTMLElement)) return;
     const style = getComputedStyle(element);
     for (const name of LAYOUT) copy.style.setProperty(name, style.getPropertyValue(name));
-    copy.style.whiteSpace = element instanceof HTMLInputElement ? 'pre' : 'pre-wrap';
-    // Faint by its colour, not its opacity, so its background hides the text it lies over.
-    const line = copy.lastElementChild as HTMLElement;
-    line.style.color = `color-mix(in srgb, ${style.color} 50%, transparent)`;
-    line.style.backgroundColor = style.backgroundColor;
+    const input = element instanceof HTMLInputElement;
+    copy.style.whiteSpace = input ? 'pre' : 'pre-wrap';
     // Placed by its box on screen, scaled back by the canvas zoom.
     const box = element.getBoundingClientRect();
     const origin = parent.getBoundingClientRect();
@@ -125,14 +133,16 @@ function CaretGhost({ field: { element, before }, text }: { field: CompleteField
     copy.style.left = `${(box.left - origin.left) / scale - parent.clientLeft}px`;
     copy.style.top = `${(box.top - origin.top) / scale - parent.clientTop}px`;
     copy.style.width = `${element.offsetWidth}px`;
-    copy.style.height = `${element.offsetHeight}px`;
+    // A textarea's copy may run a line longer than the textarea; an input's scrolls with it.
+    copy.style[input ? 'height' : 'minHeight'] = `${element.offsetHeight}px`;
     copy.scrollTop = element.scrollTop;
     copy.scrollLeft = element.scrollLeft;
   });
   return (
     <div ref={ref} className="complete-copy" aria-hidden>
       {before}
-      <span>{text}</span>
+      <span className="complete-ghost">{text}</span>
+      {after}
     </div>
   );
 }
