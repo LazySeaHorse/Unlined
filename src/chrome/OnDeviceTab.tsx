@@ -15,6 +15,10 @@ const THINGS = [
   ['Sheet', 'In the formula bar, "? average of column B" becomes a formula.'],
   ['Code', 'In the editor, "? reverse a string" becomes a snippet.'],
   ['Titles', 'Right-click one or more nodes, Suggest title.'],
+  [
+    'Tab completion',
+    'Press Tab while typing in a field for the rest of the line, then Tab again to take it.',
+  ],
 ] as const;
 
 /** Settings for Chrome's built-in model. This is the only place the model is ever downloaded from. */

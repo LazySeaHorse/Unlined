@@ -30,7 +30,7 @@ Most digital study tools require a tablet and stylus. Computational notebooks hi
 - **Stacks**: put several nodes on one spot behind tabs, one shown at a time, e.g. a problem, its textbook page and your working. Each card keeps its scroll and state while hidden. Tap Space to fan the cards out and pick one. See [Controls](#controls).
 - **Links**: connect nodes with grid-snapped orthogonal pipes (arrow, dot or bar ends, colour, dashed, a label that may contain `$math$`). Turn on linking mode (toolbar button next to Organise, or `L`), drag from one node to another; click a link for its options, double-click it to name it, right-click for the menu. Between two Math+ nodes a link passes the source's result to the target as a variable: name it `k` (a single letter other than `e` or `i`) to use `k`, or leave it as `ans`. See [Links](#links).
 - **AI control**: let a coding agent (Claude Code, Codex, Gemini CLI, …) read and edit the open canvas through a small local bridge, or a browser agent through WebMCP. See [AI control](#ai-control).
-- **On-device writing help** (opt-in, desktop Chrome): start a line with `?` and say what you want, and Chrome's built-in model writes it in the node's own syntax. See [On-device writing help](#on-device-writing-help).
+- **On-device writing help** (opt-in, desktop Chrome): start a line with `?` and say what you want, and Chrome's built-in model writes it in the node's own syntax; or press Tab for the rest of a line. See [On-device writing help](#on-device-writing-help).
 - **Dark mode**, **offline PWA**.
 - **Mobile**: read-only viewer. Pan, zoom and switch canvases; editing is desktop-only.
 
@@ -114,6 +114,8 @@ Type `?` in an empty field (or at the start of an empty line), say what you want
 | Text | Markdown, with `$LaTeX$` |
 | Sheet formula bar | a formula and its value |
 | Script | JavaScript (never run until you run it) |
+
+Press Tab while typing in a field (text, script, math, Math+, a graph row, a table cell, the sheet's formula bar) for the rest of the line at the caret. It shows faintly (under the field for maths); Tab takes it as one undo step, and Esc or any other key drops it. The model sees only that field's text up to the caret (and, for Math+, the values its links pass in), and a line that would not render, draw, evaluate or parse is never shown. In an empty field, or with on-device help off, Tab does what it always did. A completion is cut off after 8 seconds.
 
 Right-click one or more nodes and choose Suggest title for a brief title each (it replaces an existing title). The model sees only the node it is working on (a Math+ node also sees the values its links pass in); for Suggest title, chosen nodes that are linked to each other are sent together in one request, up to four at a time. It is small: it writes the syntax and the app does the computing, but check what it gives you. A single model call is cut off after 30 seconds. The prompts share their syntax descriptions with the AI-control guide (`src/nodes/syntax.ts`).
 
