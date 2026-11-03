@@ -1156,6 +1156,10 @@ math-field::part(virtual-keyboard-toggle) {
 }
 .ask-lines .ask-input {
   flex: none;
+  /* The field's width, not the input's own (twenty characters) or its words', which would widen a node that is
+   * sized to its content. */
+  width: 0;
+  min-width: 100%;
 }
 .ask-lines .ask-input[data-state="ghost"] {
   color: inherit;

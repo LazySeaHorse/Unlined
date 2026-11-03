@@ -73,3 +73,39 @@ test('Text: ? on an empty line offers text under the lines above, accepted in it
   await expect(textarea).toBeFocused();
   await expect(textarea).toHaveValue('# Notes\nSo $x^2$ it is.');
 });
+
+for (const tool of ['Math', 'Math+']) {
+  test(`${tool}: asking from a line under a matrix keeps the matrix drawn and the node the size it was`, async ({
+    page,
+  }) => {
+    await placeNode(page, tool);
+    const node = nodes(page).first();
+    const field = node.locator('math-field');
+    // Set through the field, as typing a matrix takes a menu, saved as an edit, ending in an empty line with the caret on it.
+    await field.evaluate(
+      (f: HTMLElement & { setValue: (latex: string) => void; executeCommand: (command: string) => void }) => {
+        f.setValue('\\displaylines{\\begin{bmatrix}1&2\\\\3&4\\end{bmatrix}\\\\ }');
+        f.dispatchEvent(new Event('input'));
+        f.focus();
+        f.executeCommand('moveToMathfieldEnd');
+      },
+    );
+    await page.waitForTimeout(300);
+    const size = async () => {
+      const box = await node.boundingBox();
+      return [box?.width, box?.height].map((n) => Math.round(n ?? 0));
+    };
+    const before = await size();
+    await page.keyboard.press('Shift+Slash');
+    await expect(node.getByLabel('Describe it')).toBeFocused();
+    // The matrix is one typeset line, not rows split into pieces that show as raw LaTeX.
+    await expect(node.locator('.ask-slot .katex')).toHaveCount(1);
+    await expect(node).not.toContainText('\\begin');
+    // A pixel for MathLive and KaTeX setting the same matrix a little apart.
+    const asking = await size();
+    expect(Math.abs(asking[0] - before[0])).toBeLessThanOrEqual(2);
+    expect(Math.abs(asking[1] - before[1])).toBeLessThanOrEqual(2);
+    await page.keyboard.type('a very long request, longer than the node is wide, to see it keep its size');
+    expect(await size()).toEqual(asking);
+  });
+}
