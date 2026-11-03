@@ -1,22 +1,25 @@
 import { javascriptLanguage } from '@codemirror/lang-javascript';
 import { z } from 'zod';
 import { oneLine } from '@/agent/format';
-import type { AskSpec } from '@/ai/inlineAsk';
+import { type AskSpec, type CompleteSpec, continuing, upToCursor } from '@/ai/inlineAsk';
 
 /** The longest stretch of the script the model is shown. */
 const SOURCE_CHARS = 3000;
 
-/** Whether `code` parses as JavaScript, by the same grammar the editor highlights with. Never runs it. */
-export function parsesAsJavaScript(code: string): boolean {
-  let clean = true;
+/** How many places `code` does not parse as JavaScript, by the same grammar the editor highlights with. Never
+ * runs it. */
+export function parseErrors(code: string): number {
+  let errors = 0;
   javascriptLanguage.parser.parse(code).iterate({
     enter: (node) => {
-      if (node.type.isError) clean = false;
-      return clean;
+      if (node.type.isError) errors++;
     },
   });
-  return clean;
+  return errors;
 }
+
+/** Whether `code` parses as JavaScript. */
+export const parsesAsJavaScript = (code: string): boolean => parseErrors(code) === 0;
 
 /**
  * JavaScript from words, written in place of the line the `?` was typed on. Kept only if it parses. The script's
@@ -57,4 +60,24 @@ The script comes first, for requests that refer to it. End with the new code in 
     code.trim() && parsesAsJavaScript(code)
       ? { ok: true, value: code }
       : { ok: false, reason: 'That is not valid JavaScript. Write plain JavaScript.' },
+};
+
+/**
+ * The rest of a script's line at the caret. A script being typed seldom parses, so the line is kept if the script
+ * parses no worse with it than without.
+ */
+export const codeComplete: CompleteSpec<void> = {
+  feature: 'code-complete',
+  system: continuing('It is JavaScript run in a small sandbox, which shows what console.log prints.'),
+  examples: [
+    {
+      context: undefined,
+      before: 'const nums = [3, 1, 2];\nconsole.log(nums.',
+      answer: 'sort((a, b) => a - b));',
+    },
+    { context: undefined, before: 'for (let i = 0; i < 10; ', answer: 'i++) {' },
+    { context: undefined, before: "const greet = (name) => 'Hello, ' + ", answer: "name + '!';" },
+  ],
+  input: (_, before) => upToCursor('Script', before),
+  check: (text, _, { before, after }) => parseErrors(text) <= parseErrors(before + after),
 };

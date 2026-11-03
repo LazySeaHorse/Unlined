@@ -1,4 +1,4 @@
-import { expect, type Locator, type Page, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { nodes, openApp, placeNode } from './helpers';
 
 // On-device AI switched on, with a stand-in for Chrome's model that streams a continuation for each kind of field,
@@ -8,7 +8,7 @@ test.beforeEach(async ({ page }) => {
     localStorage.setItem('unlined-ai-assist', JSON.stringify({ state: { enabled: true }, version: 0 }));
     const lines: Record<string, string> = {
       Note: ' there\nnever read',
-      Script: 'sort((a, b) => a - b));\nnever read',
+      Script: 'sort()\nnever read',
       Math: '+1',
       'Math+': '+b',
       Row: '+1',
@@ -42,10 +42,12 @@ test.beforeEach(async ({ page }) => {
   await openApp(page);
 });
 
-const lastPrompt = (page: Page) => page.evaluate(() => (window as unknown as { prompts: string[] }).prompts.at(-1));
-const mathValue = (field: Locator) => field.evaluate((f: HTMLElement & { value: string }) => f.value);
+const lastPrompt = (page: Page) =>
+  page.evaluate(() => (window as unknown as { prompts: string[] }).prompts.at(-1));
 
-test('Text: Tab offers the rest of the line at the caret, and Tab takes it as one undo step', async ({ page }) => {
+test('Text: Tab offers the rest of the line at the caret, and Tab takes it as one undo step', async ({
+  page,
+}) => {
   await placeNode(page, 'Text');
   const node = nodes(page).first();
   await node.dblclick();
@@ -78,4 +80,24 @@ test('Text: any other key drops the line and types as usual', async ({ page }) =
   await page.keyboard.type('!');
   await expect(node.locator('.complete-copy')).toHaveCount(0);
   await expect(textarea).toHaveValue('Hi,!');
+});
+
+test('Script: Tab offers the rest of the line at the caret, drawn in the editor', async ({ page }) => {
+  await placeNode(page, 'Script');
+  const node = nodes(page).first();
+  const editor = node.locator('.cm-content');
+  await editor.click();
+  await page.keyboard.press('ControlOrMeta+a');
+  await page.keyboard.press('Delete');
+  // The editor closes the bracket itself, after the caret.
+  await page.keyboard.type('console.log(nums.');
+  await page.keyboard.press('Tab');
+  await expect(node.locator('.cm-content .complete-ghost')).toHaveText('sort()');
+  expect(await lastPrompt(page)).toBe('Script up to the cursor:\nconsole.log(nums.');
+
+  await page.keyboard.press('Tab');
+  await expect(node.locator('.complete-ghost')).toHaveCount(0);
+  await expect(editor).toHaveText('console.log(nums.sort())');
+  await page.keyboard.type(';');
+  await expect(editor).toHaveText('console.log(nums.sort();)');
 });

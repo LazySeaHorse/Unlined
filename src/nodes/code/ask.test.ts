@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { askFor } from '@/ai/inlineAsk';
 import { lastFence, releaseSessions } from '@/ai/languageModel';
+import { itTeachesOnlyLinesThatFit } from '@/test/completeSpec';
 import { type FakeModel, installFakeLanguageModel } from '@/test/fakeLanguageModel';
-import { codeAsk, parsesAsJavaScript } from './ask';
+import { codeAsk, codeComplete, parsesAsJavaScript } from './ask';
 
 let fake: FakeModel | undefined;
 afterEach(() => {
@@ -37,5 +38,24 @@ describe('codeAsk', () => {
     fake = installFakeLanguageModel([`Loop it.\n\`\`\`js\n\n${code}\n\n\`\`\``]);
     expect(lastFence(`\`\`\`js\n\n${code}\n\n\`\`\``)).toBe(code);
     expect(await askFor(codeAsk, '', 'loop')).toEqual({ status: 'ok', value: code });
+  });
+});
+
+describe('codeComplete', () => {
+  itTeachesOnlyLinesThatFit(codeComplete);
+
+  it('shows the model the script up to the caret', () => {
+    expect(codeComplete.input(undefined, 'let a = ')).toBe('Script up to the cursor:\nlet a = ');
+  });
+
+  it('keeps a line that leaves the script parsing no worse, and drops one that breaks it', () => {
+    const parts = (line: string) => ({ before: 'const a = ', line, after: '\nconsole.log(a);' });
+    const check = (line: string) => {
+      const { before, after } = parts(line);
+      return codeComplete.check(before + line + after, undefined, parts(line));
+    };
+    expect(check('[1, 2];')).toBe(true);
+    expect(check('[1, 2;')).toBe(false);
+    expect(check(') =>')).toBe(false);
   });
 });

@@ -5,7 +5,9 @@ import type { NodeProps } from '@xyflow/react';
 import { Play } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { AskSlot, PlainLines } from '@/ai/AskSlot';
+import { CompleteSlot } from '@/ai/CompleteSlot';
 import { askedLine, replaceLine, useInlineAsk } from '@/ai/useInlineAsk';
+import { useInlineComplete } from '@/ai/useInlineComplete';
 import { useReadOnly } from '@/canvas/readOnly';
 import { cn } from '@/lib/cn';
 import type { NodeOf } from '@/model/types';
@@ -13,10 +15,11 @@ import { useUiStore } from '@/store/uiStore';
 import { Button } from '@/ui/Button';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
-import { codeAsk } from './ask';
+import { codeAsk, codeComplete } from './ask';
+import { ghostText, readCodeEditor } from './ghost';
 import { type LogLevel, type LogLine, runScript } from './sandbox';
 
-const extensions = [javascript()];
+const extensions = [javascript(), ghostText];
 /** GitHub syntax colors on the node's own tile, so the editor matches the app theme. */
 const surface = {
   background: 'transparent',
@@ -45,6 +48,8 @@ export default function CodeNode({ id, data, selected }: NodeProps<NodeOf<'code'
     context: () => data.source,
     apply: (code, at: number) => update({ source: replaceLine(data.source, at, code) }),
   });
+  // Tab asks for the rest of the line at the caret.
+  const complete = useInlineComplete(codeComplete, { data, context: () => undefined });
   const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;
   const [output, setOutput] = useState<LogLine[]>([]);
   const stopRef = useRef<() => void>(undefined);
@@ -85,34 +90,36 @@ export default function CodeNode({ id, data, selected }: NodeProps<NodeOf<'code'
         </>
       }
     >
-      <AskSlot
-        ask={ask}
-        className="nodrag nowheel nokey flex min-h-0 flex-1 flex-col overflow-auto font-mono text-[13px] leading-[1.4]"
-        lines={
-          asking === undefined
-            ? undefined
-            : {
-                above: <ScriptLines lines={data.source.split('\n').slice(0, asking)} />,
-                below: <ScriptLines lines={data.source.split('\n').slice(asking + 1)} />,
-              }
-        }
-        renderGhost={(code) => <ScriptLines lines={code.split('\n')} />}
-      >
-        <CodeMirror
-          value={data.source}
-          onChange={(source, change) => {
-            const line = askedLine(change.startState.doc.toString(), source);
-            if (!line || !ask.open(line.index)) update({ source });
-          }}
-          extensions={extensions}
-          theme={dark ? darkTheme : lightTheme}
-          editable={!readOnly}
-          // Undo is the canvas's (canvas-history), so the code's edits interleave with the rest in one history.
-          basicSetup={{ foldGutter: false, history: false, historyKeymap: false }}
-          height="100%"
-          className="nodrag nowheel nokey canvas-history min-h-0 flex-1 overflow-hidden text-[13px]"
-        />
-      </AskSlot>
+      <CompleteSlot complete={complete} at={0} read={readCodeEditor}>
+        <AskSlot
+          ask={ask}
+          className="nodrag nowheel nokey flex min-h-0 flex-1 flex-col overflow-auto font-mono text-[13px] leading-[1.4]"
+          lines={
+            asking === undefined
+              ? undefined
+              : {
+                  above: <ScriptLines lines={data.source.split('\n').slice(0, asking)} />,
+                  below: <ScriptLines lines={data.source.split('\n').slice(asking + 1)} />,
+                }
+          }
+          renderGhost={(code) => <ScriptLines lines={code.split('\n')} />}
+        >
+          <CodeMirror
+            value={data.source}
+            onChange={(source, change) => {
+              const line = askedLine(change.startState.doc.toString(), source);
+              if (!line || !ask.open(line.index)) update({ source });
+            }}
+            extensions={extensions}
+            theme={dark ? darkTheme : lightTheme}
+            editable={!readOnly}
+            // Undo is the canvas's (canvas-history), so the code's edits interleave with the rest in one history.
+            basicSetup={{ foldGutter: false, history: false, historyKeymap: false }}
+            height="100%"
+            className="nodrag nowheel nokey canvas-history min-h-0 flex-1 overflow-hidden text-[13px]"
+          />
+        </AskSlot>
+      </CompleteSlot>
       <div
         ref={outputRef}
         className="nodrag nowheel h-28 shrink-0 overflow-y-auto border-t border-border bg-surface-2 font-mono text-xs select-text"

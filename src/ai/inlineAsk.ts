@@ -57,20 +57,29 @@ export interface CompleteSpec<Context> {
   examples: Array<{ context: Context; before: string; after?: string; answer: string }>;
   /** The message for one request: the text up to the caret (cut to its last COMPLETE_CHARS), and `context`. */
   input: (context: Context, before: string) => string;
-  /** Whether `text`, the field's text with the continuation in it, is still something the field can use. */
-  check: (text: string, context: Context, caret: number) => boolean | Promise<boolean>;
+  /** Whether `text`, the field's text with the continuation (`line`) in it, is still something the field can use. */
+  check: (text: string, context: Context, parts: CompleteParts) => boolean | Promise<boolean>;
   /** Lets the model reason before it answers (a fenced block, of which the first line is kept); off by default,
    * as a continuation is not a translation. */
   reasoning?: boolean;
 }
 
 /** A completion's system prompt: what is being typed (`what`), then the rules every completion keeps. */
-export const continuing = (what: string) => `You continue what someone is typing, from where their cursor is. ${what}
+export const continuing = (
+  what: string,
+) => `You continue what someone is typing, from where their cursor is. ${what}
 Reply with only what comes next at the cursor, on one short line: the rest of the line, a few words or symbols.
 Never repeat what is already there, and never explain.`;
 
 /** A completion's message: the text up to the cursor, under a line naming it. */
 export const upToCursor = (name: string, before: string) => `${name} up to the cursor:\n${before}`;
+
+/** A field's text either side of the caret, and the continuation that goes between. */
+export interface CompleteParts {
+  before: string;
+  line: string;
+  after: string;
+}
 
 /** The longest one completion may take. */
 export const COMPLETE_LIMIT_MS = 8_000;
@@ -102,7 +111,7 @@ export function completeFor<Context>(
       // A space typed already is not typed twice.
       if (/\s$/.test(before)) line = line.trimStart();
       const text = before + line + after;
-      return line.trim() && (await spec.check(text, context, before.length + line.length))
+      return line.trim() && (await spec.check(text, context, { before, line, after }))
         ? { ok: true, value: line }
         : { ok: false, reason: 'That does not fit here.' };
     },
