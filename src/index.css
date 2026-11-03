@@ -1166,6 +1166,39 @@ math-field::part(virtual-keyboard-toggle) {
   caret-color: auto;
 }
 
+/*
+ * Tab completion in a field (ai/CompleteSlot): the field shimmers as an ask does while the line is worked out,
+ * then the line waits faintly at the caret, or under a math field.
+ */
+[data-completing] {
+  background-image: linear-gradient(
+    90deg,
+    transparent 30%,
+    color-mix(in srgb, var(--accent) 14%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 300% 100%;
+}
+@media (prefers-reduced-motion: no-preference) {
+  [data-completing] {
+    animation: ask-shimmer 1.4s linear infinite;
+  }
+}
+.complete-ghost {
+  opacity: 0.5;
+  pointer-events: none;
+}
+/* A copy of a textarea or input over it, showing only the line at its caret. */
+.complete-copy {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  color: transparent;
+  border-style: solid;
+  border-color: transparent;
+}
+
 /* MathLive's popovers live outside the fields; flat in dark mode like the rest. */
 .dark {
   --environment-shadow: transparent;

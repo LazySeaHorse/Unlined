@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import { gridBody, oneLine } from '@/agent/format';
 import { type AskResult, ask, type Check, type ReplyFormat } from './languageModel';
 
@@ -39,6 +39,65 @@ export function askFor<Context, Answer, Value>(
     schema: spec.schema,
     format: spec.format,
     check: (answer) => spec.check(answer, context),
+    signal,
+  });
+}
+
+/**
+ * What one kind of field asks the model when Tab is pressed in it (see useInlineComplete): the rest of the line at
+ * the caret. The model sees only the field's text up to the caret (and `Context`, when a node has more of its own
+ * to tell, such as the values its links bring in). A continuation is kept only if the field's text with it put in
+ * still passes `check`, the same usability check the field's AskSpec makes; nothing is judged on what it says.
+ */
+export interface CompleteSpec<Context> {
+  /** Names the warm session; one per spec. */
+  feature: string;
+  system: string;
+  /** Worked examples: the text before and after the caret, and what goes at the caret. Each must pass `check`. */
+  examples: Array<{ context: Context; before: string; after?: string; answer: string }>;
+  /** The message for one request: the text up to the caret (cut to its last COMPLETE_CHARS), and `context`. */
+  input: (context: Context, before: string) => string;
+  /** Whether `text`, the field's text with the continuation in it, is still something the field can use. */
+  check: (text: string, context: Context, caret: number) => boolean | Promise<boolean>;
+  /** Lets the model reason before it answers (a fenced block, of which the first line is kept); off by default,
+   * as a continuation is not a translation. */
+  reasoning?: boolean;
+}
+
+/** The longest one completion may take. */
+export const COMPLETE_LIMIT_MS = 8_000;
+/** The most of a field's text, up to the caret, a completion is sent. */
+export const COMPLETE_CHARS = 2000;
+
+/** The text before a caret as the model is shown it: its end, at most COMPLETE_CHARS of it. */
+const shownBefore = (before: string) =>
+  before.length > COMPLETE_CHARS ? `…${before.slice(-COMPLETE_CHARS)}` : before;
+
+/** Asks the model what comes at the caret between `before` and `after`: one line, kept if the text with it passes. */
+export function completeFor<Context>(
+  spec: CompleteSpec<Context>,
+  context: Context,
+  before: string,
+  after: string,
+  signal?: AbortSignal,
+): Promise<AskResult<string>> {
+  return ask({
+    feature: spec.feature,
+    system: spec.system,
+    examples: spec.examples.map((e) => [spec.input(e.context, e.before), e.answer]),
+    input: spec.input(context, shownBefore(before)),
+    schema: z.string(),
+    format: spec.reasoning ? 'fenced' : 'line',
+    limitMs: COMPLETE_LIMIT_MS,
+    check: async (answer) => {
+      let line = answer.split('\n')[0].trimEnd();
+      // A space typed already is not typed twice.
+      if (/\s$/.test(before)) line = line.trimStart();
+      const text = before + line + after;
+      return line.trim() && (await spec.check(text, context, before.length + line.length))
+        ? { ok: true, value: line }
+        : { ok: false, reason: 'That does not fit here.' };
+    },
     signal,
   });
 }
