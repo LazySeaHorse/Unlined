@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { MATH_LINES } from '@/nodes/mathPlus/evaluate';
 import { askedLine, replaceLine } from './useInlineAsk';
 
 describe('askedLine', () => {
@@ -18,11 +19,21 @@ describe('askedLine', () => {
     expect(askedLine('?\n', '??\n')).toBeUndefined();
   });
 
-  it('takes a separator of several characters', () => {
-    expect(askedLine('a:=2\\\\', 'a:=2\\\\?', '\\\\')).toEqual({ index: 1, start: 6, end: 6 });
-    expect(askedLine('a\\\\\\\\b', 'a\\\\?\\\\b', '\\\\')).toEqual({ index: 1, start: 3, end: 3 });
+  it('takes the lines of maths', () => {
+    expect(askedLine('a:=2\\\\', 'a:=2\\\\?', MATH_LINES)).toEqual({ index: 1, start: 6, end: 6 });
+    expect(askedLine('a\\\\\\\\b', 'a\\\\?\\\\b', MATH_LINES)).toEqual({ index: 1, start: 3, end: 3 });
     // Inside a separator is not a line.
-    expect(askedLine('\\\\', '\\?\\', '\\\\')).toBeUndefined();
+    expect(askedLine('\\\\', '\\?\\', MATH_LINES)).toBeUndefined();
+    // A matrix's rows are not lines.
+    const matrix = '\\begin{bmatrix}1&2\\\\3&4\\end{bmatrix}';
+    expect(askedLine(`${matrix}\\\\`, `${matrix}\\\\?`, MATH_LINES)).toEqual({
+      index: 1,
+      start: matrix.length + 2,
+      end: matrix.length + 2,
+    });
+    expect(
+      askedLine(`${matrix}\\\\`, `\\begin{bmatrix}1&2\\\\3&4?\\end{bmatrix}\\\\`, MATH_LINES),
+    ).toBeUndefined();
   });
 });
 
@@ -30,6 +41,6 @@ describe('replaceLine', () => {
   it('puts lines in place of one', () => {
     expect(replaceLine('a\n\nb', 1, 'x\ny')).toBe('a\nx\ny\nb');
     expect(replaceLine('', 0, 'x')).toBe('x');
-    expect(replaceLine('a\\\\', 1, 'b\\\\c', '\\\\')).toBe('a\\\\b\\\\c');
+    expect(replaceLine('a\\\\', 1, 'b\\\\c', MATH_LINES)).toBe('a\\\\b\\\\c');
   });
 });

@@ -5,14 +5,14 @@ import { useReadOnly } from '@/canvas/readOnly';
 import { MathField } from '@/lib/math/MathField';
 import { Tex } from '@/lib/math/Tex';
 import type { NodeOf } from '@/model/types';
-import { fromLinesBody, LINE_BREAK, linesBody, splitLines } from '../mathPlus/evaluate';
+import { fromLinesBody, linesBody, MATH_LINES, splitBody, splitLines } from '../mathPlus/evaluate';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
 import { mathAsk } from './ask';
 
 /** The node's LaTeX with its line at `at` replaced by `latex`. */
 const withLine = (source: string, at: number, latex: string) =>
-  fromLinesBody(replaceLine(linesBody(source), at, latex, LINE_BREAK));
+  fromLinesBody(replaceLine(linesBody(source), at, latex, MATH_LINES));
 
 export default function MathNode({ id, data, selected }: NodeProps<NodeOf<'math'>>) {
   const readOnly = useReadOnly();
@@ -24,7 +24,7 @@ export default function MathNode({ id, data, selected }: NodeProps<NodeOf<'math'
     apply: (latex, at: number) => update({ latex: withLine(data.latex, at, latex) }),
   });
   const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;
-  const shown = linesBody(data.latex).split(LINE_BREAK);
+  const shown = splitBody(linesBody(data.latex));
   return (
     <NodeShell
       kind="math"
@@ -48,7 +48,7 @@ export default function MathNode({ id, data, selected }: NodeProps<NodeOf<'math'
         <MathField
           value={data.latex}
           onChange={(latex) => {
-            const line = askedLine(linesBody(data.latex), linesBody(latex), LINE_BREAK);
+            const line = askedLine(linesBody(data.latex), linesBody(latex), MATH_LINES);
             if (!line || !ask.open(line.index)) update({ latex });
           }}
           menuNodeId={id}

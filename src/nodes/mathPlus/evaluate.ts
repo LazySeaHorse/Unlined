@@ -22,10 +22,33 @@ export const linesBody = (latex: string): string =>
 export const fromLinesBody = (body: string): string =>
   body.includes(LINE_BREAK) ? `\\displaylines{${body}}` : body;
 
+/**
+ * The lines of a body (as linesBody gives it), blank ones included. A `\\` inside braces or an environment (the
+ * rows of a matrix, of `cases`) is not a line break.
+ */
+export function splitBody(body: string): string[] {
+  const lines: string[] = [];
+  let depth = 0;
+  let from = 0;
+  for (const [token, at] of Array.from(
+    body.matchAll(/\\\\|\\(?:begin|end)(?![a-zA-Z])|\\.|[{}]/g),
+    (m) => [m[0], m.index] as const,
+  )) {
+    if (token === LINE_BREAK && depth === 0) {
+      lines.push(body.slice(from, at));
+      from = at + token.length;
+    } else if (token === '{' || token === '\\begin') depth++;
+    else if (token === '}' || token === '\\end') depth = Math.max(0, depth - 1);
+  }
+  return [...lines, body.slice(from)];
+}
+
+/** How the lines of a Math or Math+ body are told apart, for the helpers of an ask from a line (askedLine). */
+export const MATH_LINES = { separator: LINE_BREAK, split: splitBody };
+
 /** The lines that hold something, trimmed. */
 export function splitLines(latex: string): string[] {
-  return linesBody(latex)
-    .split(/\\\\/)
+  return splitBody(linesBody(latex))
     .map((line) => line.trim())
     .filter(Boolean);
 }

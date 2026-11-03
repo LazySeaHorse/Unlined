@@ -20,13 +20,15 @@ import {
   type LineResult,
   type LinkInput,
   linesBody,
+  MATH_LINES,
+  splitBody,
   splitLines,
 } from './evaluate';
 import { resultsWith, useMathPlusInputs, useMathPlusResults } from './useMathPlusResults';
 
 /** The node's LaTeX with its line at `at` replaced by `lines`. */
 const withLines = (latex: string, at: number, lines: string[]) =>
-  fromLinesBody(replaceLine(linesBody(latex), at, lines.join(LINE_BREAK), LINE_BREAK));
+  fromLinesBody(replaceLine(linesBody(latex), at, lines.join(LINE_BREAK), MATH_LINES));
 
 export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'mathPlus'>>) {
   const readOnly = useReadOnly();
@@ -43,7 +45,7 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
     apply: (lines, at: number) => update({ latex: withLines(data.latex, at, lines) }),
   });
   const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;
-  const shown = linesBody(data.latex).split(LINE_BREAK);
+  const shown = splitBody(linesBody(data.latex));
 
   return (
     <NodeShell
@@ -72,7 +74,7 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
           <MathField
             value={data.latex}
             onChange={(latex) => {
-              const line = askedLine(linesBody(data.latex), linesBody(latex), LINE_BREAK);
+              const line = askedLine(linesBody(data.latex), linesBody(latex), MATH_LINES);
               if (!line || !ask.open(line.index)) update({ latex });
             }}
             menuNodeId={id}
@@ -106,8 +108,7 @@ function AnswerLines({ id, latex, at, lines }: { id: string; latex: string; at: 
     [engine, id, latex, at, lines],
   );
   // Results are for the lines that hold something.
-  const offset = linesBody(latex)
-    .split(LINE_BREAK)
+  const offset = splitBody(linesBody(latex))
     .slice(0, at)
     .filter((line) => line.trim()).length;
   return lines.map((line, index) => {

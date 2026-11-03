@@ -11,6 +11,15 @@ describe('splitLines', () => {
     expect(splitLines('1+1')).toEqual(['1+1']);
     expect(splitLines('  ')).toEqual([]);
   });
+
+  it('keeps the rows of an environment, and of braces, in their line', () => {
+    const matrix = '\\begin{bmatrix}1&2\\\\3&4\\end{bmatrix}';
+    expect(splitLines(`\\displaylines{${matrix}\\\\x}`)).toEqual([matrix, 'x']);
+    expect(splitLines('\\displaylines{\\frac{a\\\\b}{2}\\\\\\{c\\}}')).toEqual([
+      '\\frac{a\\\\b}{2}',
+      '\\{c\\}',
+    ]);
+  });
 });
 
 describe('evaluateDocuments', () => {

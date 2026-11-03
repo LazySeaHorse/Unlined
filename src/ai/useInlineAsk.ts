@@ -155,7 +155,7 @@ export function useInlineAsk<Context, Answer, Value, Key extends string | number
  * empty line. Its change handler hands the text before and after the edit to askedLine, and opens the ask at the
  * line's index (the hook's Key is then a number):
  *
- *   const line = askedLine(before, after);   // lines split on '\n'; Math+ passes '\\\\'
+ *   const line = askedLine(before, after);   // lines split on '\n'; maths passes its own (MATH_LINES)
  *   if (!line || !ask.open(line.index)) save(after);
  *
  * Like `trigger`, the `?` is dropped, not saved: the text keeps the empty line, which `apply` replaces with the
@@ -170,21 +170,33 @@ export interface AskedLine {
   end: number;
 }
 
+/** How a field's text divides into lines: by what separates them, and how to find them in a text. */
+export interface Lines {
+  separator: string;
+  split: (text: string) => string[];
+}
+
+/** Lines on '\n', as a note or code has them. */
+const NEWLINES: Lines = { separator: '\n', split: (text) => text.split('\n') };
+
 /** The line an edit asks from, when the edit was `?` typed into an empty (or blank) line. */
-export function askedLine(before: string, after: string, separator = '\n'): AskedLine | undefined {
+export function askedLine(before: string, after: string, lines = NEWLINES): AskedLine | undefined {
   if (after.length !== before.length + 1) return undefined;
   let at = 0;
   while (at < before.length && before[at] === after[at]) at++;
   if (after[at] !== '?' || after.slice(at + 1) !== before.slice(at)) return undefined;
-  const previous = at < separator.length ? -1 : before.lastIndexOf(separator, at - separator.length);
-  const start = previous < 0 ? 0 : previous + separator.length;
-  const next = before.indexOf(separator, at);
-  const end = next < 0 ? before.length : next;
-  if (before.slice(start, end).trim() !== '') return undefined;
-  return { index: before.slice(0, start).split(separator).length - 1, start, end };
+  let start = 0;
+  const all = lines.split(before);
+  for (const [index, line] of all.entries()) {
+    const end = start + line.length;
+    if (at < start) return undefined;
+    if (at <= end) return line.trim() === '' ? { index, start, end } : undefined;
+    start = end + lines.separator.length;
+  }
+  return undefined;
 }
 
 /** `text` with its line at `index` (see askedLine) replaced by `replacement`, which may hold several lines. */
-export function replaceLine(text: string, index: number, replacement: string, separator = '\n'): string {
-  return text.split(separator).toSpliced(index, 1, replacement).join(separator);
+export function replaceLine(text: string, index: number, replacement: string, lines = NEWLINES): string {
+  return lines.split(text).toSpliced(index, 1, replacement).join(lines.separator);
 }
