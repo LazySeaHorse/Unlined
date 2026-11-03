@@ -176,3 +176,38 @@ test('Math: Escape drops the line and leaves the caret in the field', async ({ p
   await expect(field).toBeFocused();
   expect(await mathValue(field)).toBe('x');
 });
+
+test('Graph: Tab shows the row with the rest of it under the row, and Tab puts it in', async ({ page }) => {
+  await placeNode(page, 'Graph');
+  await nodes(page).getByRole('button', { name: 'Add equation' }).click();
+  const row = nodes(page).locator('li').nth(1);
+  const field = row.locator('math-field');
+  await field.click();
+  await expect(field).toBeFocused();
+  await press(page, ['y', '=', 'x']);
+  const height = (await row.boundingBox())?.height ?? 0;
+  await page.keyboard.press('Tab');
+  const ghost = row.locator('.complete-ghost');
+  await expect(ghost).toContainText('y=x+1');
+  // Under the row, which grows by a line.
+  expect((await row.boundingBox())?.height).toBeGreaterThan(height);
+  expect(await lastPrompt(page)).toBe('Row up to the cursor:\ny=x');
+  await page.keyboard.press('Tab');
+  await expect.poll(() => mathValue(field)).toBe('y=x+1');
+  await expect(ghost).toHaveCount(0);
+});
+
+test('Table: Tab in a cell offers the rest of it, and only that cell takes it', async ({ page }) => {
+  await placeNode(page, 'Table');
+  const fields = nodes(page).locator('math-field');
+  await fields.nth(4).click();
+  await expect(fields.nth(4)).toBeFocused();
+  await press(page, ['x']);
+  await page.keyboard.press('Tab');
+  await expect(nodes(page).locator('.complete-ghost')).toContainText('x2');
+  await page.keyboard.press('Tab');
+  await expect.poll(() => mathValue(fields.nth(4))).toBe('x^2');
+  expect(await Promise.all([0, 1, 2, 3, 5, 6, 7, 8].map((i) => mathValue(fields.nth(i))))).toEqual(
+    Array(8).fill(''),
+  );
+});

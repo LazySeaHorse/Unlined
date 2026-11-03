@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { askFor } from '@/ai/inlineAsk';
 import { releaseSessions } from '@/ai/languageModel';
+import { itTeachesOnlyLinesThatFit } from '@/test/completeSpec';
 import { type FakeModel, installFakeLanguageModel } from '@/test/fakeLanguageModel';
-import { tableAsk } from './ask';
+import { tableAsk, tableComplete } from './ask';
 
 let fake: FakeModel | undefined;
 afterEach(() => {
@@ -47,5 +48,16 @@ describe('tableAsk', () => {
     fake = installFakeLanguageModel(['{"latex":"\\\\text{four}"}', '{"latex":"4"}']);
     expect(await askFor(tableAsk, table, 'next term')).toEqual({ status: 'ok', value: '4' });
     expect(fake.prompts[1]).toContain('no \\text');
+  });
+});
+
+describe('tableComplete', () => {
+  itTeachesOnlyLinesThatFit(tableComplete);
+
+  it('shows the model the cell up to the caret, and keeps only a cell that typesets', () => {
+    expect(tableComplete.input(undefined, 'a^')).toBe('Cell up to the cursor:\na^');
+    const parts = { before: 'a', line: '^', after: '' };
+    expect(tableComplete.check('a^', undefined, parts)).toBe(false);
+    expect(tableComplete.check('a^2', undefined, { ...parts, line: '^2' })).toBe(true);
   });
 });

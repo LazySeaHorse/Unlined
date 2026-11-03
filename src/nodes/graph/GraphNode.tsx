@@ -5,7 +5,9 @@ import 'mafs/core.css';
 import { Popover } from 'radix-ui';
 import { useMemo, useRef } from 'react';
 import { AskSlot } from '@/ai/AskSlot';
+import { CompleteSlot } from '@/ai/CompleteSlot';
 import { useInlineAsk } from '@/ai/useInlineAsk';
+import { useInlineComplete } from '@/ai/useInlineComplete';
 import { useReadOnly } from '@/canvas/readOnly';
 import { type Engine, useEngine } from '@/lib/math/engine';
 import { MathField } from '@/lib/math/MathField';
@@ -15,7 +17,7 @@ import type { GraphEquation, NodeOf, SectionColor } from '@/model/types';
 import { ColorSwatches, linkSwatch } from '../ColorSwatches';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
-import { graphAsk } from './ask';
+import { graphAsk, graphComplete } from './ask';
 import { newEquation } from './equations';
 import { implicitSegments, segmentsPath, shadedPath } from './implicit';
 import { classifyRelation, type PlotFn2, type Relation } from './relation';
@@ -37,6 +39,8 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
     // A row is something to tweak: the equation goes straight in, as typed text would.
     review: false,
   });
+  // Tab asks for the rest of a row at the caret, shown under it.
+  const complete = useInlineComplete(graphComplete, { data, context: () => undefined });
 
   return (
     <NodeShell
@@ -59,24 +63,31 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
       <ul className="shrink-0 divide-y divide-border border-b border-border">
         {equations.map(({ latex, color }, index) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: rows are edited in place by position.
-          <li key={index} className="flex items-center gap-2 px-3 py-1">
+          <li key={index} className="flex flex-wrap items-center gap-x-2 px-3 py-1">
             <ColorDot color={color} onChange={readOnly ? undefined : (c) => setRow(index, { color: c })} />
-            <AskSlot
-              ask={ask}
+            <CompleteSlot
+              complete={complete}
               at={index}
-              renderGhost={(answer) => <Tex latex={answer} className="text-base" />}
-              className="min-w-0 flex-1"
+              renderGhost={(row) => <Tex latex={row} className="text-base" />}
+              className="order-last basis-full pl-4.5"
             >
-              <MathField
-                value={latex}
-                onChange={(value) => {
-                  if (!ask.trigger(index, latex, value)) setRow(index, { latex: value });
-                }}
-                readOnly={readOnly}
-                placeholder="y=…"
-                className="min-w-0 flex-1 text-base"
-              />
-            </AskSlot>
+              <AskSlot
+                ask={ask}
+                at={index}
+                renderGhost={(answer) => <Tex latex={answer} className="text-base" />}
+                className="min-w-0 flex-1"
+              >
+                <MathField
+                  value={latex}
+                  onChange={(value) => {
+                    if (!ask.trigger(index, latex, value)) setRow(index, { latex: value });
+                  }}
+                  readOnly={readOnly}
+                  placeholder="y=…"
+                  className="min-w-0 flex-1 text-base"
+                />
+              </AskSlot>
+            </CompleteSlot>
             {!readOnly && equations.length > 1 && (
               <button
                 type="button"

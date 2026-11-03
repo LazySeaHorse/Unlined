@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { oneLine } from '@/agent/format';
-import type { AskSpec } from '@/ai/inlineAsk';
+import { type AskSpec, type CompleteSpec, continuing, upToCursor } from '@/ai/inlineAsk';
 import { loadEngine } from '@/lib/math/engine';
 import type { GraphEquation } from '@/model/types';
-import { typesets } from '../math/ask';
+import { LATEX_LINE, typesets } from '../math/ask';
 import { SYNTAX } from '../syntax';
 import { classifyRelation } from './relation';
 
@@ -45,4 +45,19 @@ The graph's other rows come first, for descriptions that refer to them.`,
       return { ok: false, reason: 'That is not a row the graph can draw, in x and y only.' };
     return { ok: true, value: latex };
   },
+};
+
+/** The rest of a graph row at the caret, kept if the graph can draw the row. */
+export const graphComplete: CompleteSpec<void> = {
+  feature: 'graph-complete',
+  system: continuing(
+    `It is one row of a graph. ${oneLine(SYNTAX.graph, Infinity)} Use only the variables x and y. ${LATEX_LINE}`,
+  ),
+  examples: [
+    { context: undefined, before: 'y=x^2', answer: '-2x+1' },
+    { context: undefined, before: 'x^2+y^2', answer: '=4' },
+    { context: undefined, before: 'y>', answer: '2x-1' },
+  ],
+  input: (_, before) => upToCursor('Row', before),
+  check: async (text) => typesets(text).ok && classifyRelation(await loadEngine(), text) !== null,
 };

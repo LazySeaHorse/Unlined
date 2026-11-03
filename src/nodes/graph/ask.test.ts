@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { askFor } from '@/ai/inlineAsk';
 import { releaseSessions } from '@/ai/languageModel';
+import { itTeachesOnlyLinesThatFit } from '@/test/completeSpec';
 import { type FakeModel, installFakeLanguageModel } from '@/test/fakeLanguageModel';
-import { graphAsk } from './ask';
+import { graphAsk, graphComplete } from './ask';
 
 let fake: FakeModel | undefined;
 afterEach(() => {
@@ -35,5 +36,20 @@ describe('graphAsk', () => {
     fake = installFakeLanguageModel(['{"latex":"y=x+z"}', '{"latex":"y=x+2"}']);
     expect(await askFor(graphAsk, [], 'a line')).toEqual({ status: 'ok', value: 'y=x+2' });
     expect(fake.prompts[1]).toContain('not a row the graph can draw');
+  });
+});
+
+describe('graphComplete', () => {
+  itTeachesOnlyLinesThatFit(graphComplete);
+
+  it('shows the model the row up to the caret', () => {
+    expect(graphComplete.input(undefined, 'y=')).toBe('Row up to the cursor:\ny=');
+  });
+
+  it('keeps a row the graph can draw, and drops one it cannot', async () => {
+    const parts = (before: string, line: string) => ({ before, line, after: '' });
+    expect(await graphComplete.check('y=x+1', undefined, parts('y=x', '+1'))).toBe(true);
+    expect(await graphComplete.check('y=x+z', undefined, parts('y=x', '+z'))).toBe(false);
+    expect(await graphComplete.check('y=x+', undefined, parts('y=x', '+'))).toBe(false);
   });
 });

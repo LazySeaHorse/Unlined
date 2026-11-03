@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { columnName, oneLine } from '@/agent/format';
-import { type AskSpec, gridView } from '@/ai/inlineAsk';
-import { typesets } from '../math/ask';
+import { type AskSpec, type CompleteSpec, continuing, gridView, upToCursor } from '@/ai/inlineAsk';
+import { LATEX_LINE, typesets } from '../math/ask';
 
 /** The table's own cells, and the cell being asked for. */
 export interface TableAskContext {
@@ -70,4 +70,17 @@ in its row or column. Write only the cell's maths: brief, without $ signs and wi
     const checked = typesets(latex);
     return checked.ok ? { ok: true, value: latex } : checked;
   },
+};
+
+/** The rest of a table cell at the caret, kept if the cell still typesets. */
+export const tableComplete: CompleteSpec<void> = {
+  feature: 'table-complete',
+  system: continuing(`It is one cell of a table of maths. ${LATEX_LINE}`),
+  examples: [
+    { context: undefined, before: '\\pi r', answer: '^2' },
+    { context: undefined, before: 'a^2+', answer: 'b^2' },
+    { context: undefined, before: '\\frac{1}{', after: '}', answer: '2' },
+  ],
+  input: (_, before) => upToCursor('Cell', before),
+  check: (text) => typesets(text).ok,
 };

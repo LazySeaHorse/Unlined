@@ -2,7 +2,9 @@ import type { NodeProps } from '@xyflow/react';
 import { Minus, Plus } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { AskSlot } from '@/ai/AskSlot';
+import { CompleteSlot } from '@/ai/CompleteSlot';
 import { useInlineAsk } from '@/ai/useInlineAsk';
+import { useInlineComplete } from '@/ai/useInlineComplete';
 import { useReadOnly } from '@/canvas/readOnly';
 import { cn } from '@/lib/cn';
 import { insertColumn, insertRow, removeColumnAt, removeRowAt, setCell } from '@/lib/grid';
@@ -13,7 +15,7 @@ import type { NodeOf } from '@/model/types';
 import { WithTooltip } from '@/ui/Button';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
-import { tableAsk } from './ask';
+import { tableAsk, tableComplete } from './ask';
 import { inBlock } from './blocks';
 import { useTableSelection } from './useTableSelection';
 
@@ -204,6 +206,8 @@ export default function TableNode({ id, data, selected }: NodeProps<NodeOf<'tabl
       edit((grid) => setCell(grid, row, col, latex));
     },
   });
+  // Tab asks for the rest of a cell at the caret, shown under it.
+  const complete = useInlineComplete(tableComplete, { data, context: () => undefined });
   const rowCount = cells.length;
   const colCount = cells[0]?.length ?? 0;
   const { block, selectRows, selectColumns, selectAll, cellHandlers } = useTableSelection({
@@ -247,23 +251,29 @@ export default function TableNode({ id, data, selected }: NodeProps<NodeOf<'tabl
                       (doomed?.axis === 'row' ? doomed.index === r : doomed?.index === c) && 'bg-danger/15',
                     )}
                   >
-                    <AskSlot
-                      ask={ask}
+                    <CompleteSlot
+                      complete={complete}
                       at={`${r}:${c}`}
                       renderGhost={(latex) => <Tex latex={latex} className="px-1.5 text-base" />}
-                      className="ask-fit"
                     >
-                      <MathField
-                        value={value}
-                        onChange={(latex) => {
-                          if (!ask.trigger(`${r}:${c}`, value, latex))
-                            edit((grid) => setCell(grid, r, c, latex));
-                        }}
-                        readOnly={readOnly}
-                        modeToggle
-                        className="min-h-8 px-1.5 py-1 text-base"
-                      />
-                    </AskSlot>
+                      <AskSlot
+                        ask={ask}
+                        at={`${r}:${c}`}
+                        renderGhost={(latex) => <Tex latex={latex} className="px-1.5 text-base" />}
+                        className="ask-fit"
+                      >
+                        <MathField
+                          value={value}
+                          onChange={(latex) => {
+                            if (!ask.trigger(`${r}:${c}`, value, latex))
+                              edit((grid) => setCell(grid, r, c, latex));
+                          }}
+                          readOnly={readOnly}
+                          modeToggle
+                          className="min-h-8 px-1.5 py-1 text-base"
+                        />
+                      </AskSlot>
+                    </CompleteSlot>
                   </td>
                 ))}
               </tr>
