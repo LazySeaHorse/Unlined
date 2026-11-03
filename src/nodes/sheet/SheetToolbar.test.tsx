@@ -5,9 +5,10 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { releaseSessions } from '@/ai/languageModel';
 import { useAiAssist } from '@/ai/store';
 import { useInlineAsk } from '@/ai/useInlineAsk';
+import { useInlineComplete } from '@/ai/useInlineComplete';
 import { setCell } from '@/lib/grid';
 import { type FakeModel, installFakeLanguageModel } from '@/test/fakeLanguageModel';
-import { sheetAsk } from './ask';
+import { sheetAsk, sheetComplete } from './ask';
 import { parseCellKey } from './fills';
 import { FormulaBar } from './SheetToolbar';
 
@@ -18,6 +19,7 @@ const start = [
   ['', ''],
 ];
 let written: string[][] = start;
+let committed: string | undefined;
 
 /** The formula bar wired to its ask the way SheetNode wires it. */
 function Bar({ label, cell }: { label: string; cell: string }) {
@@ -32,12 +34,29 @@ function Bar({ label, cell }: { label: string; cell: string }) {
       setCells(written);
     },
   });
-  return <FormulaBar label={label} cell={cell} value="" readOnly={false} ask={ask} onCommit={() => {}} />;
+  const complete = useInlineComplete(sheetComplete, {
+    data: cells,
+    context: (at: string) => ({ cells, at, fractions: false }),
+  });
+  return (
+    <FormulaBar
+      label={label}
+      cell={cell}
+      value=""
+      readOnly={false}
+      ask={ask}
+      complete={complete}
+      onCommit={(text) => {
+        committed = text;
+      }}
+    />
+  );
 }
 
 let fake: FakeModel | undefined;
 beforeEach(() => {
   written = start;
+  committed = undefined;
   useAiAssist.setState({ enabled: true, availability: 'available' });
 });
 afterEach(() => {
@@ -70,5 +89,30 @@ describe('FormulaBar ask', () => {
     await screen.findByText('→ 8', { exact: false });
     await userEvent.keyboard('{Enter}');
     expect(written[3]?.[1]).toBe('=B2+B3');
+  });
+});
+
+describe('FormulaBar completion', () => {
+  it('offers the rest of a formula that evaluates for the active cell, which Enter then commits', async () => {
+    fake = installFakeLanguageModel(['B3)']);
+    render(<Bar label="B4" cell="B4" />);
+    await userEvent.type(screen.getByLabelText('Formula bar'), '=SUM(B2:');
+    await userEvent.keyboard('{Tab}');
+    expect(await screen.findByText('B3)')).toBeTruthy();
+    expect(fake.prompts.at(-1)).toBe('Formula up to the cursor:\n=SUM(B2:');
+    await userEvent.keyboard('{Tab}');
+    expect(screen.getByLabelText('Formula bar')).toHaveProperty('value', '=SUM(B2:B3)');
+    await userEvent.keyboard('{Enter}');
+    expect(committed).toBe('=SUM(B2:B3)');
+  });
+
+  it('shows nothing for a formula that gives an error', async () => {
+    fake = installFakeLanguageModel(['C9']);
+    render(<Bar label="B4" cell="B4" />);
+    await userEvent.type(screen.getByLabelText('Formula bar'), '=NOPE(');
+    await userEvent.keyboard('{Tab}');
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(fake.prompts).toHaveLength(1);
+    expect(document.querySelector('.complete-copy')).toBeNull();
   });
 });

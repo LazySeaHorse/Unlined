@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { askFor } from '@/ai/inlineAsk';
 import { releaseSessions } from '@/ai/languageModel';
+import { itTeachesOnlyLinesThatFit } from '@/test/completeSpec';
 import { type FakeModel, installFakeLanguageModel } from '@/test/fakeLanguageModel';
-import { type SheetAskContext, sheetAsk } from './ask';
+import { type SheetAskContext, sheetAsk, sheetComplete } from './ask';
 import { formulaResult } from './evaluate';
 
 let fake: FakeModel | undefined;
@@ -64,5 +65,31 @@ describe('formulaResult', () => {
     expect(formulaResult(cells, { row: 0, column: 1 }, '=A1+1', false)).toBe('2');
     expect(cells).toEqual([['1', '2']]);
     expect(formulaResult(cells, { row: 3, column: 0 }, '=A1', false)).toBeNull();
+  });
+});
+
+describe('sheetComplete', () => {
+  itTeachesOnlyLinesThatFit(sheetComplete);
+
+  const grid: SheetAskContext = {
+    cells: [
+      ['1', ''],
+      ['2', ''],
+    ],
+    at: 'B1',
+    fractions: false,
+  };
+  const check = (before: string, line: string) =>
+    sheetComplete.check(before + line, grid, { before, line, after: '' });
+
+  it('shows the model only the bar up to the caret', () => {
+    expect(sheetComplete.input(grid, '=SUM(')).toBe('Formula up to the cursor:\n=SUM(');
+  });
+
+  it('keeps a formula that evaluates in the sheet, and any text that is not a formula', () => {
+    expect(check('=SUM(', 'A1:A2)')).toBe(true);
+    expect(check('=SUM(', 'A1:A2')).toBe(false);
+    expect(check('=NOPE(', 'A1)')).toBe(false);
+    expect(check('Total', ' so far')).toBe(true);
   });
 });

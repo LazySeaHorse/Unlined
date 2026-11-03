@@ -10,13 +10,14 @@ import Spreadsheet, {
   type Selection,
 } from 'react-spreadsheet';
 import { useInlineAsk } from '@/ai/useInlineAsk';
+import { useInlineComplete } from '@/ai/useInlineComplete';
 import { useReadOnly } from '@/canvas/readOnly';
 import { cn } from '@/lib/cn';
 import { addColumn, addRow, removeColumn, removeRow, setCell } from '@/lib/grid';
 import type { NodeOf } from '@/model/types';
 import { NodeShell, Stepper } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
-import { sheetAsk } from './ask';
+import { sheetAsk, sheetComplete } from './ask';
 import { evaluateSheet } from './evaluate';
 import { cellKey, parseCellKey, pruneFills, rangeLabel } from './fills';
 import { ColumnIndicator, CornerIndicator, RowIndicator } from './indicators';
@@ -87,6 +88,11 @@ export default function SheetNode({ id, data, selected }: NodeProps<NodeOf<'shee
       if (cell) update({ cells: setCell(cells, cell.row, cell.column, formula) });
     },
   });
+  // Tab in the formula bar asks for the rest of it at the caret, for the active cell.
+  const complete = useInlineComplete(sheetComplete, {
+    data,
+    context: (at: string) => ({ cells, at, fractions }),
+  });
   const toggleFractions = () => update({ fractions: fractions ? undefined : true });
 
   return (
@@ -103,6 +109,7 @@ export default function SheetNode({ id, data, selected }: NodeProps<NodeOf<'shee
           value={active ? (cells[active.row]?.[active.column] ?? '') : ''}
           readOnly={readOnly}
           ask={ask}
+          complete={complete}
           onCommit={(text) => active && update({ cells: setCell(cells, active.row, active.column, text) })}
         />
       }

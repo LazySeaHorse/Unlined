@@ -211,3 +211,19 @@ test('Table: Tab in a cell offers the rest of it, and only that cell takes it', 
     Array(8).fill(''),
   );
 });
+
+test('Sheet: Tab in the formula bar offers the rest of the formula at the caret', async ({ page }) => {
+  await placeNode(page, 'Sheet', 500, 300);
+  const sheet = nodes(page).first();
+  await sheet.locator('td.Spreadsheet__cell').nth(5).click({ force: true });
+  const bar = page.getByLabel('Formula bar');
+  await bar.click();
+  await page.keyboard.type('=SUM(A1:');
+  await page.keyboard.press('Tab');
+  await expect(sheet.locator('.complete-copy')).toHaveText('=SUM(A1:A3)');
+  await expect(bar).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(bar).toHaveValue('=SUM(A1:A3)');
+  await page.keyboard.press('Enter');
+  await expect(sheet.locator('td.Spreadsheet__cell').nth(5)).toHaveText('0');
+});

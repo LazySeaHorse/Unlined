@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { oneLine } from '@/agent/format';
-import { type AskSpec, gridView } from '@/ai/inlineAsk';
+import { type AskSpec, type CompleteSpec, continuing, gridView, upToCursor } from '@/ai/inlineAsk';
 import { SYNTAX } from '../syntax';
 import { formulaResult } from './evaluate';
 import { parseCellKey } from './fills';
@@ -58,5 +58,24 @@ compute the answer yourself, only write the formula, starting with =.`,
           }
         : { ok: true, value: { formula, shown } },
     );
+  },
+};
+
+/**
+ * The rest of what is typed in the formula bar, at the caret, for the active cell (`at`). A formula is kept if it
+ * gives no error in the sheet; other text always is. The model sees only the bar's text, not the grid.
+ */
+export const sheetComplete: CompleteSpec<SheetAskContext> = {
+  feature: 'sheet-complete',
+  system: continuing(`It is a spreadsheet cell; ${oneLine(SYNTAX.sheet, Infinity)}`),
+  examples: [
+    { context: items, before: '=SUM(B2:', answer: 'B4)' },
+    { context: items, before: '=AVERAGE(', answer: 'B2:B4)' },
+    { context: { ...items, at: 'C2' }, before: '=B2', answer: '*2' },
+  ],
+  input: (_, before) => upToCursor('Formula', before),
+  check: (text, { cells, at, fractions }) => {
+    const cell = parseCellKey(at);
+    return !text.startsWith('=') || (cell !== null && formulaResult(cells, cell, text, fractions) !== null);
   },
 };
