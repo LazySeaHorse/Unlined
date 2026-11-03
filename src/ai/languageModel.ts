@@ -4,14 +4,16 @@ import { z } from 'zod';
  * The only file that touches Chrome's built-in Prompt API (`LanguageModel`, Gemini Nano). Everything else asks
  * through `ask()` and gets a typed, validated answer or a reason it could not have one.
  *
- * The model only ever translates (words to LaTeX, to a formula, to a title). Whatever it returns is checked by the
- * app's own parsers before anyone sees it, via the `check` each caller passes.
+ * The model translates (words to LaTeX, to a formula, to a title) or continues a field's text by a line. Whatever it
+ * returns is checked by the app's own parsers before anyone sees it, via the `check` each caller passes.
  */
 
 export type Availability = 'unsupported' | 'unavailable' | 'downloadable' | 'downloading' | 'available';
 
 interface Session {
   prompt: (input: string, options?: { signal?: AbortSignal; responseConstraint?: object }) => Promise<string>;
+  /** The reply as it is written, in pieces (each one new text, as Chrome streams it). */
+  promptStreaming: (input: string, options?: { signal?: AbortSignal }) => ReadableStream<string>;
   clone: (options?: { signal?: AbortSignal }) => Promise<Session>;
   destroy: () => void;
 }
@@ -112,8 +114,37 @@ const enqueue = <T>(job: () => Promise<T>): Promise<T> => {
  * setting one up can hang; this ends either. */
 export const TURN_LIMIT_MS = 30_000;
 
-/** How the model answers: constrained JSON (for syntax), or free text whose last fenced block is the answer. */
-export type ReplyFormat = 'json' | 'fenced';
+/**
+ * How the model answers: constrained JSON (for syntax), free text whose last fenced block is the answer, or one
+ * line of text read as it streams (see firstLine).
+ */
+export type ReplyFormat = 'json' | 'fenced' | 'line';
+
+/** The most of a `line` reply that is kept. */
+export const LINE_CHARS = 120;
+
+/**
+ * A streamed reply up to its first line break, or its first LINE_CHARS: reading stops there and `stop` ends the
+ * reply, so the model does not go on writing what nobody will read. What arrived before is kept.
+ */
+export async function firstLine(stream: ReadableStream<string>, stop: () => void): Promise<string> {
+  const reader = stream.getReader();
+  let text = '';
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) return text;
+      text += value;
+      const end = text.indexOf('\n');
+      if (end >= 0 || text.length >= LINE_CHARS) {
+        stop();
+        return text.slice(0, end >= 0 ? Math.min(end, LINE_CHARS) : LINE_CHARS);
+      }
+    }
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+}
 
 /**
  * The text between the last two ``` of a free-text reply, without a language tag (a word alone on the opening
@@ -136,7 +167,7 @@ export type AskResult<T> =
   | { status: 'ok'; value: T }
   /** The answers failed their check, even after the reason was sent back. */
   | { status: 'invalid' }
-  /** A call ran past TURN_LIMIT_MS. */
+  /** A call ran past its limit (TURN_LIMIT_MS, or the caller's `limitMs`). */
   | { status: 'timeout' }
   | { status: 'aborted' }
   | { status: 'unavailable' };
@@ -154,8 +185,13 @@ export interface AskOptions<T, U> {
   schema: z.ZodType<T>;
   /** Validates the answer with the app's own engine. A failure is sent back to the model once. */
   check: Check<T, U>;
-  /** `json` (the default) constrains the reply to `schema`. `fenced` lets the model reason first and reads the last ``` block; `T` is then a string. */
+  /**
+   * `json` (the default) constrains the reply to `schema`. `fenced` lets the model reason first and reads the last
+   * ``` block; `line` takes the reply's first line as it streams, with no second try. `T` is then a string.
+   */
   format?: ReplyFormat;
+  /** The longest one call may take; TURN_LIMIT_MS unless said. */
+  limitMs?: number;
   signal?: AbortSignal;
 }
 
@@ -163,7 +199,8 @@ const isAbort = (e: unknown, signal?: AbortSignal) =>
   signal?.aborted || (e instanceof DOMException && e.name === 'AbortError');
 
 export function ask<T, U>(options: AskOptions<T, U>): Promise<AskResult<U>> {
-  const { feature, system, examples, input, schema, check, signal, format = 'json' } = options;
+  const { feature, system, examples, input, schema, check, signal } = options;
+  const { format = 'json', limitMs = TURN_LIMIT_MS } = options;
   if (signal?.aborted) return Promise.resolve({ status: 'aborted' });
   return enqueue(async (): Promise<AskResult<U>> => {
     if (signal?.aborted) return { status: 'aborted' };
@@ -171,14 +208,14 @@ export function ask<T, U>(options: AskOptions<T, U>): Promise<AskResult<U>> {
     let session: Session | undefined;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let timedOut = false;
-    /** A signal for the next call, aborted once it has run TURN_LIMIT_MS. */
+    /** A signal for the next call, aborted once it has run `limitMs`. */
     const limited = () => {
       clearTimeout(timer);
       const turn = new AbortController();
       timer = setTimeout(() => {
         timedOut = true;
         turn.abort();
-      }, TURN_LIMIT_MS);
+      }, limitMs);
       return turn.signal;
     };
     const orAborted = (limit: AbortSignal) => (signal ? AbortSignal.any([signal, limit]) : limit);
@@ -189,7 +226,12 @@ export function ask<T, U>(options: AskOptions<T, U>): Promise<AskResult<U>> {
           { role: 'user', content: user },
           {
             role: 'assistant',
-            content: format === 'fenced' ? `\`\`\`\n${out}\n\`\`\`` : JSON.stringify(out),
+            content:
+              format === 'fenced'
+                ? `\`\`\`\n${out}\n\`\`\``
+                : format === 'line'
+                  ? String(out)
+                  : JSON.stringify(out),
           },
         ]),
       ];
@@ -205,10 +247,13 @@ export function ask<T, U>(options: AskOptions<T, U>): Promise<AskResult<U>> {
       }
       const responseConstraint = format === 'json' ? z.toJSONSchema(schema) : undefined;
       let message = input;
-      for (let attempt = 0; attempt < 2; attempt++) {
-        const raw = await session.prompt(message, { signal: orAborted(limited()), responseConstraint });
+      // A line is a guess at what comes next: one that fails is not worth the wait for another.
+      for (let attempt = 0; attempt < (format === 'line' ? 1 : 2); attempt++) {
+        const raw = await reply(session, message, orAborted(limited()), format, responseConstraint);
         clearTimeout(timer);
-        const parsed = schema.safeParse(format === 'fenced' ? lastFence(raw) : safeJson(raw));
+        const parsed = schema.safeParse(
+          format === 'json' ? safeJson(raw) : format === 'fenced' ? lastFence(raw) : raw,
+        );
         const checked = parsed.success
           ? await check(parsed.data)
           : { ok: false as const, reason: 'The answer did not match the required shape.' };
@@ -225,6 +270,20 @@ export function ask<T, U>(options: AskOptions<T, U>): Promise<AskResult<U>> {
       session?.destroy();
     }
   });
+}
+
+/** One reply to `message`: whole, or for a `line` its first line, streamed. */
+function reply(
+  session: Session,
+  message: string,
+  signal: AbortSignal,
+  format: ReplyFormat,
+  responseConstraint?: object,
+): Promise<string> {
+  if (format !== 'line') return session.prompt(message, { signal, responseConstraint });
+  const cut = new AbortController();
+  const stream = session.promptStreaming(message, { signal: AbortSignal.any([signal, cut.signal]) });
+  return firstLine(stream, () => cut.abort());
 }
 
 function safeJson(raw: string): unknown {

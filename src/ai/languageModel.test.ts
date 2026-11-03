@@ -1,7 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { installFakeLanguageModel } from '@/test/fakeLanguageModel';
-import { ask, checkAvailability, lastFence, releaseSessions, TURN_LIMIT_MS } from './languageModel';
+import {
+  ask,
+  checkAvailability,
+  firstLine,
+  LINE_CHARS,
+  lastFence,
+  releaseSessions,
+  TURN_LIMIT_MS,
+} from './languageModel';
 
 const schema = z.object({ word: z.string() });
 const base = {
@@ -186,6 +194,80 @@ describe('ask, fenced and timed', () => {
       await vi.advanceTimersByTimeAsync(10);
       expect(await next).toEqual({ status: 'ok', value: 'good' });
       expect(fake.creates).toBe(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+describe('firstLine', () => {
+  const streamOf = (chunks: string[]) =>
+    new ReadableStream<string>({
+      start: (controller) => {
+        for (const chunk of chunks) controller.enqueue(chunk);
+        controller.close();
+      },
+    });
+
+  it('stops at the first line break, keeping what came before it', async () => {
+    const stop = vi.fn();
+    expect(await firstLine(streamOf(['  x+', '1\nand mo', 're']), stop)).toBe('  x+1');
+    expect(stop).toHaveBeenCalledOnce();
+  });
+
+  it('stops at the budget', async () => {
+    const stop = vi.fn();
+    const text = await firstLine(streamOf(Array(50).fill('word ')), stop);
+    expect(text).toHaveLength(LINE_CHARS);
+    expect(stop).toHaveBeenCalledOnce();
+  });
+
+  it('takes a reply that ends on its first line whole', async () => {
+    const stop = vi.fn();
+    expect(await firstLine(streamOf(['the ', 'end']), stop)).toBe('the end');
+    expect(stop).not.toHaveBeenCalled();
+  });
+});
+
+describe('ask, one line', () => {
+  const line = {
+    feature: 'line',
+    system: 'Continue the text.',
+    examples: [['Hello', ' world']] as Array<[string, string]>,
+    input: 'Once upon',
+    schema: z.string(),
+    format: 'line' as const,
+    check: async (v: string) =>
+      v.trim() ? { ok: true as const, value: v } : { ok: false as const, reason: 'Empty.' },
+  };
+
+  it('streams the reply, and stops the model at the end of the first line', async () => {
+    fake = installFakeLanguageModel([' a time\nthere was a\nlong story']);
+    expect(await ask(line)).toEqual({ status: 'ok', value: ' a time' });
+    expect(fake.stopped).toBe(1);
+    // Not read to the end.
+    expect(fake.streamed[0].length).toBeLessThan(' a time\nthere was a\nlong story'.length);
+  });
+
+  it('shows the examples as plain text, not JSON', async () => {
+    fake = installFakeLanguageModel([' a time']);
+    await ask(line);
+    expect(fake.initialPrompts.at(-1)).toEqual({ role: 'assistant', content: ' world' });
+  });
+
+  it('does not try again when the line fails its check', async () => {
+    fake = installFakeLanguageModel(['\nnext line', ' a time']);
+    expect(await ask(line)).toEqual({ status: 'invalid' });
+    expect(fake.prompts).toHaveLength(1);
+  });
+
+  it('ends at its own limit', async () => {
+    vi.useFakeTimers();
+    try {
+      fake = installFakeLanguageModel([' a time'], 'available', 60_000);
+      const result = ask({ ...line, limitMs: 8_000 });
+      await vi.advanceTimersByTimeAsync(8_001);
+      expect(await result).toEqual({ status: 'timeout' });
     } finally {
       vi.useRealTimers();
     }

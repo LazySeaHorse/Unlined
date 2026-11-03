@@ -15,6 +15,11 @@ export interface FakeModel {
   /** How long create() takes, and how many clone() calls fail before they work again. */
   createMs: number;
   cloneFailures: number;
+  /** How many characters promptStreaming() sends at a time, and how much of its replies were read before it was stopped. */
+  chunkChars: number;
+  streamed: string[];
+  /** Streamed replies stopped (cancelled or aborted) before their end. */
+  stopped: number;
   uninstall: () => void;
 }
 
@@ -46,6 +51,9 @@ export function installFakeLanguageModel(
     peak: 0,
     createMs: 0,
     cloneFailures: 0,
+    chunkChars: 4,
+    streamed: [],
+    stopped: 0,
     uninstall: () => {},
   };
   const session = (): object => {
@@ -72,6 +80,38 @@ export function installFakeLanguageModel(
         } finally {
           model.running--;
         }
+      },
+      // The answer in pieces of chunkChars, `delayMs` before the first.
+      promptStreaming: (input: string, options?: { signal?: AbortSignal }) => {
+        model.prompts.push(input);
+        const answer = model.answers.shift() ?? '';
+        const index = model.streamed.push('') - 1;
+        let at = 0;
+        let ended = false;
+        const stop = () => {
+          if (!ended) model.stopped++;
+          ended = true;
+        };
+        options?.signal?.addEventListener('abort', stop);
+        return new ReadableStream<string>({
+          pull: async (controller) => {
+            try {
+              await wait(at === 0 ? delayMs : 0, options?.signal);
+            } catch (e) {
+              return controller.error(e);
+            }
+            if (ended) return;
+            if (at >= answer.length) {
+              ended = true;
+              return controller.close();
+            }
+            const chunk = answer.slice(at, at + model.chunkChars);
+            at += chunk.length;
+            model.streamed[index] += chunk;
+            controller.enqueue(chunk);
+          },
+          cancel: stop,
+        });
       },
     };
   };
