@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { askFor } from '@/ai/inlineAsk';
+import { askFor, completeFor } from '@/ai/inlineAsk';
 import { releaseSessions } from '@/ai/languageModel';
+import { itTeachesOnlyLinesThatFit } from '@/test/completeSpec';
 import { type FakeModel, installFakeLanguageModel } from '@/test/fakeLanguageModel';
-import { mathSpans, textAsk } from './ask';
+import { mathSpans, textAsk, textComplete } from './ask';
 
 let fake: FakeModel | undefined;
 afterEach(() => {
@@ -38,5 +39,23 @@ describe('textAsk', () => {
   it('keeps the last fenced block of a reply that thinks first', async () => {
     fake = installFakeLanguageModel(['They want a list.\n```\n- eggs\n```']);
     expect(await askFor(textAsk, '', 'eggs')).toEqual({ status: 'ok', value: '- eggs' });
+  });
+});
+
+describe('textComplete', () => {
+  itTeachesOnlyLinesThatFit(textComplete);
+
+  it('shows the model the note up to the caret', () => {
+    expect(textComplete.input(undefined, '# Notes\nSo ')).toBe('Note up to the cursor:\n# Notes\nSo ');
+  });
+
+  it('keeps a line whose maths renders with the rest of the note, and drops one that breaks it', async () => {
+    fake = installFakeLanguageModel(['x^2$ and more\nnext', '\\frac{1}{$']);
+    expect(await completeFor(textComplete, undefined, 'So $', ' it is.')).toEqual({
+      status: 'ok',
+      value: 'x^2$ and more',
+    });
+    expect(fake.prompts.at(-1)).toBe('Note up to the cursor:\nSo $');
+    expect((await completeFor(textComplete, undefined, 'So $', '')).status).toBe('invalid');
   });
 });

@@ -64,6 +64,14 @@ export interface CompleteSpec<Context> {
   reasoning?: boolean;
 }
 
+/** A completion's system prompt: what is being typed (`what`), then the rules every completion keeps. */
+export const continuing = (what: string) => `You continue what someone is typing, from where their cursor is. ${what}
+Reply with only what comes next at the cursor, on one short line: the rest of the line, a few words or symbols.
+Never repeat what is already there, and never explain.`;
+
+/** A completion's message: the text up to the cursor, under a line naming it. */
+export const upToCursor = (name: string, before: string) => `${name} up to the cursor:\n${before}`;
+
 /** The longest one completion may take. */
 export const COMPLETE_LIMIT_MS = 8_000;
 /** The most of a field's text, up to the caret, a completion is sent. */

@@ -42,9 +42,12 @@ function textControl(field: HTMLTextAreaElement | HTMLInputElement): CompleteFie
       const at = field.selectionStart ?? field.value.length;
       // Set past React's own setter, so that the input event below reaches the field's onChange.
       const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(field), 'value')?.set;
-      setter?.call(field, field.value.slice(0, at) + text + field.value.slice(at));
+      const next = field.value.slice(0, at) + text + field.value.slice(at);
+      setter?.call(field, next);
       field.dispatchEvent(new Event('input', { bubbles: true }));
-      field.setSelectionRange(at + text.length, at + text.length);
+      // Once React has rendered the edit, which puts the caret at the end.
+      const caret = at + text.length;
+      queueMicrotask(() => field.value === next && field.setSelectionRange(caret, caret));
     },
   };
 }

@@ -3,7 +3,7 @@ import remarkParse from 'remark-parse';
 import { unified } from 'unified';
 import { z } from 'zod';
 import { oneLine } from '@/agent/format';
-import type { AskSpec } from '@/ai/inlineAsk';
+import { type AskSpec, type CompleteSpec, continuing, upToCursor } from '@/ai/inlineAsk';
 import remarkObsidianMath from '@/lib/remarkObsidianMath';
 import { SYNTAX } from '../syntax';
 
@@ -26,6 +26,18 @@ export function mathSpans(markdown: string): { latex: string; display: boolean }
   };
   walk(parser.parse(markdown) as MdNode);
   return spans;
+}
+
+/** The first `$…$` or `$$…$$` span in `markdown` that KaTeX cannot render, as the note would show it. */
+export function brokenMath(markdown: string): string | undefined {
+  for (const { latex, display } of mathSpans(markdown)) {
+    try {
+      katex.renderToString(latex, { throwOnError: true, displayMode: display });
+    } catch {
+      return latex;
+    }
+  }
+  return undefined;
 }
 
 /** The longest stretch of the note the model is shown. */
@@ -69,13 +81,26 @@ requests that refer to it. End with the new text in a \`\`\` fenced block.`,
   check: async (markdown) => {
     const text = markdown.trim();
     if (!text) return { ok: false, reason: 'Write some text.' };
-    for (const { latex, display } of mathSpans(text)) {
-      try {
-        katex.renderToString(latex, { throwOnError: true, displayMode: display });
-      } catch {
-        return { ok: false, reason: `$${latex}$ does not render. Write plain LaTeX between the $ signs.` };
-      }
-    }
+    const broken = brokenMath(text);
+    if (broken !== undefined)
+      return { ok: false, reason: `$${broken}$ does not render. Write plain LaTeX between the $ signs.` };
     return { ok: true, value: text };
   },
+};
+
+/** The rest of a note's line at the caret, kept if the note's maths still renders with it. */
+export const textComplete: CompleteSpec<void> = {
+  feature: 'text-complete',
+  system: continuing(`It is a note: ${oneLine(SYNTAX.text, Infinity)}`),
+  examples: [
+    { context: undefined, before: 'Met Sam about the launch. We moved it', answer: ' to May.' },
+    { context: undefined, before: '# Shopping\n- milk\n- ', answer: 'eggs' },
+    {
+      context: undefined,
+      before: 'The roots of $ax^2+bx+c=0$ are $x=',
+      answer: '\\frac{-b\\pm\\sqrt{b^2-4ac}}{2a}$',
+    },
+  ],
+  input: (_, before) => upToCursor('Note', before),
+  check: (text) => brokenMath(text) === undefined,
 };
