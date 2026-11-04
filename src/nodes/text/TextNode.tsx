@@ -1,6 +1,6 @@
 import type { NodeProps } from '@xyflow/react';
-import { useState } from 'react';
-import { AskSlot, PlainLines } from '@/ai/AskSlot';
+import { useEffect, useRef, useState } from 'react';
+import { AskSlot } from '@/ai/AskSlot';
 import { CompleteSlot } from '@/ai/CompleteSlot';
 import { askedLine, replaceLine, useInlineAsk } from '@/ai/useInlineAsk';
 import { useInlineComplete } from '@/ai/useInlineComplete';
@@ -16,6 +16,7 @@ export function TextNode({ id, data, selected }: NodeProps<NodeOf<'text'>>) {
   const readOnly = useReadOnly();
   const update = useUpdateNodeData<'text'>(id);
   const [editing, setEditing] = useState(false);
+  const field = useRef<HTMLTextAreaElement>(null);
   // `?` at the start of an empty line asks for text in words; it goes in that line's place.
   const ask = useInlineAsk(textAsk, {
     data,
@@ -25,7 +26,11 @@ export function TextNode({ id, data, selected }: NodeProps<NodeOf<'text'>>) {
   // Tab asks for the rest of the line at the caret.
   const complete = useInlineComplete(textComplete, { data, context: () => undefined });
   const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;
-  const shown = data.markdown.split('\n');
+  // An ask that ends anywhere but back in the note (a click elsewhere) ends the editing it was holding open.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the ask ends.
+  useEffect(() => {
+    if (asking === undefined && document.activeElement !== field.current) setEditing(false);
+  }, [asking]);
 
   return (
     <NodeShell
@@ -39,16 +44,8 @@ export function TextNode({ id, data, selected }: NodeProps<NodeOf<'text'>>) {
         <CompleteSlot complete={complete} at={0}>
           <AskSlot
             ask={ask}
-            className="nodrag w-[32rem] max-w-full bg-surface p-4 font-mono text-sm leading-relaxed text-fg"
-            lines={
-              asking === undefined
-                ? undefined
-                : {
-                    above: <NoteLines lines={shown.slice(0, asking)} />,
-                    below: <NoteLines lines={shown.slice(asking + 1)} />,
-                  }
-            }
-            renderGhost={(text) => <NoteLines lines={text.split('\n')} />}
+            placeholder="Describe the text"
+            renderGhost={(text) => <pre className="ask-code">{text}</pre>}
           >
             <textarea
               // biome-ignore lint/a11y/noAutofocus: entering edit mode is an explicit user action.
@@ -58,7 +55,9 @@ export function TextNode({ id, data, selected }: NodeProps<NodeOf<'text'>>) {
                 const line = askedLine(data.markdown, e.target.value);
                 if (!line || !ask.open(line.index)) update({ markdown: e.target.value });
               }}
-              onBlur={() => setEditing(false)}
+              ref={field}
+              // The words go in the ask's bubble, which takes focus; the note stays open for them.
+              onBlur={() => asking === undefined && setEditing(false)}
               onKeyDown={(e) => {
                 if (e.key !== 'Escape') return;
                 // Hand focus to the node so its shortcuts (Ctrl+D, Ctrl+C...) work again.
@@ -88,8 +87,3 @@ export function TextNode({ id, data, selected }: NodeProps<NodeOf<'text'>>) {
     </NodeShell>
   );
 }
-
-/** Lines of the note's source as the textarea shows them, for while it gives way to an ask. */
-const NoteLines = ({ lines }: { lines: string[] }) => (
-  <PlainLines lines={lines} className="break-words whitespace-pre-wrap" />
-);

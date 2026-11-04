@@ -1,5 +1,6 @@
+import { Sparkles } from 'lucide-react';
 import { type ReactNode, useLayoutEffect, useRef } from 'react';
-import { cn } from '@/lib/cn';
+import { Bubble } from './Bubble';
 import { type CompleteField, type FieldReader, readField } from './completeField';
 import type { InlineComplete } from './useInlineComplete';
 
@@ -10,12 +11,10 @@ interface CompleteSlotProps<Key extends string | number> {
   /** Reads the field; textareas, inputs and math fields by default. A code editor brings its own. */
   read?: FieldReader;
   /**
-   * For a math field, which shows the waiting line under itself: what to draw, given the field's LaTeX with the
+   * For a math field, which shows the waiting line in a bubble under itself: what to draw, given the field's LaTeX with the
    * continuation in it and the caret's offset after it (see lineAt for a field of several lines).
    */
   renderGhost?: (text: string, caret: number) => ReactNode;
-  /** Classes for that line under the field. */
-  className?: string;
   /** The field, and an AskSlot around it when the node has one. */
   children: ReactNode;
 }
@@ -29,7 +28,6 @@ export function CompleteSlot<Key extends string | number>({
   at,
   read = readField,
   renderGhost,
-  className,
   children,
 }: CompleteSlotProps<Key>) {
   const { state } = complete;
@@ -65,12 +63,16 @@ export function CompleteSlot<Key extends string | number>({
       {children}
       {ghost?.field.ghost === 'caret' && <CaretGhost field={ghost.field} text={ghost.text} />}
       {below && (
-        <div className={cn('complete-ghost', className)} aria-hidden>
-          {below(
-            ghost.field.before + ghost.text + ghost.field.after,
-            ghost.field.before.length + ghost.text.length,
-          )}
-        </div>
+        <Bubble passive anchor={() => ghost.field.element}>
+          <Sparkles aria-hidden className="size-3.5 shrink-0 text-accent" />
+          <div className="complete-ghost">
+            {below(
+              ghost.field.before + ghost.text + ghost.field.after,
+              ghost.field.before.length + ghost.text.length,
+            )}
+          </div>
+          <kbd>Tab</kbd>
+        </Bubble>
       )}
     </div>
   );

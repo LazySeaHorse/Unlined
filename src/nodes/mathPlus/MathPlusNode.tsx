@@ -1,7 +1,7 @@
 import type { NodeProps } from '@xyflow/react';
 import { Copy, TriangleAlert } from 'lucide-react';
 import { useMemo } from 'react';
-import { AskSlot, TexLines } from '@/ai/AskSlot';
+import { AskSlot } from '@/ai/AskSlot';
 import { CompleteSlot } from '@/ai/CompleteSlot';
 import { askedLine, replaceLine, useInlineAsk } from '@/ai/useInlineAsk';
 import { useInlineComplete } from '@/ai/useInlineComplete';
@@ -48,7 +48,6 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
   // Tab asks for the rest of the line at the caret, shown under the field.
   const complete = useInlineComplete(mathPlusComplete, { data, context: () => ({ inputs: linked() }) });
   const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;
-  const shown = splitBody(linesBody(data.latex));
 
   return (
     <NodeShell
@@ -67,14 +66,7 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
         >
           <AskSlot
             ask={ask}
-            lines={
-              asking === undefined
-                ? undefined
-                : {
-                    above: <TexLines lines={shown.slice(0, asking)} />,
-                    below: <TexLines lines={shown.slice(asking + 1)} />,
-                  }
-            }
+            placeholder="Describe the lines"
             renderGhost={(lines) =>
               asking !== undefined && <AnswerLines id={id} latex={data.latex} at={asking} lines={lines} />
             }

@@ -29,10 +29,10 @@ test('a Math node typed as ? and words takes the worked answer as one undo step'
   await field.click();
   await expect(field).toBeFocused();
   await page.keyboard.press('Shift+Slash');
-  await expect(nodes(page).getByLabel('Describe it')).toBeFocused();
+  await expect(page.getByLabel('Describe it')).toBeFocused();
   await page.keyboard.type('integrate e^x sin x');
   await page.keyboard.press('Enter');
-  await expect(nodes(page).locator('.ask-ghost .katex')).toBeVisible();
+  await expect(page.locator('.ask-ghost .katex')).toBeVisible();
 
   await page.keyboard.press('Tab');
   await expect(field).toBeFocused();
@@ -49,10 +49,10 @@ test('a table cell typed as ? and words takes the answer, and only that cell', a
   await fields.nth(4).click();
   await expect(fields.nth(4)).toBeFocused();
   await page.keyboard.press('Shift+Slash');
-  await expect(nodes(page).getByLabel('Describe it')).toBeFocused();
+  await expect(page.getByLabel('Describe it')).toBeFocused();
   await page.keyboard.type('a half');
   await page.keyboard.press('Enter');
-  await expect(nodes(page).locator('.ask-ghost .katex')).toBeVisible();
+  await expect(page.locator('.ask-ghost .katex')).toBeVisible();
   await page.keyboard.press('Enter');
 
   await expect(fields.nth(4)).toBeFocused();
@@ -73,10 +73,10 @@ test('a Math node asks from a new line under what is already there', async ({ pa
   await page.waitForTimeout(150);
   await expect.poll(() => value(field)).toContain('displaylines');
   await page.keyboard.press('Shift+Slash');
-  await expect(nodes(page).getByLabel('Describe it')).toBeFocused();
+  await expect(page.getByLabel('Describe it')).toBeFocused();
   await page.keyboard.type('integrate e^x sin x');
   await page.keyboard.press('Enter');
-  await expect(nodes(page).locator('.ask-ghost .katex')).toBeVisible();
+  await expect(page.locator('.ask-ghost .katex')).toBeVisible();
   await page.keyboard.press('Tab');
   await expect(field).toBeFocused();
   await expect.poll(() => value(field)).toContain('\\frac{e^x(\\sin x-\\cos x)}{2}+C');

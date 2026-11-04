@@ -9,7 +9,11 @@ test.beforeEach(async ({ page }) => {
       clone: async () => session(),
       destroy: () => {},
       prompt: async (input: string) =>
-        input.startsWith('Lines:') ? '{"lines":["s:=a+b"]}' : '```\nSo $x^2$ it is.\n```',
+        input.startsWith('Lines:')
+          ? '{"lines":["s:=a+b"]}'
+          : input.startsWith('Script:')
+            ? "```\nconsole.log('Hello');\n```"
+            : '```\nSo $x^2$ it is.\n```',
     });
     Object.assign(window, {
       LanguageModel: { availability: async () => 'available', create: async () => session() },
@@ -33,11 +37,11 @@ test('Math+: ? on an empty line offers lines with their results, accepted in its
     await page.keyboard.press(key);
     await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 30)));
   }
-  const words = nodes(page).getByLabel('Describe it');
+  const words = page.getByLabel('Describe it');
   await expect(words).toBeFocused();
   await page.keyboard.type('add them');
   await page.keyboard.press('Enter');
-  const ghost = nodes(page).locator('.ask-ghost');
+  const ghost = page.locator('.ask-ghost');
   await expect(ghost.locator('.katex')).toHaveCount(2);
   await expect(ghost).toContainText('5');
 
@@ -62,13 +66,13 @@ test('Text: ? on an empty line offers text under the lines above, accepted in it
   await page.keyboard.press('ControlOrMeta+End');
   const top = (await node.boundingBox())?.y;
   await page.keyboard.press('Shift+Slash');
-  const words = node.getByLabel('Describe it');
+  const words = page.getByLabel('Describe it');
   await expect(words).toBeFocused();
-  await expect(node).toContainText('# Notes');
+  await expect(textarea).toHaveValue('# Notes\n');
   expect((await node.boundingBox())?.y).toBe(top);
   await page.keyboard.type('a square');
   await page.keyboard.press('Enter');
-  await expect(node.locator('.ask-ghost')).toHaveText('So $x^2$ it is.');
+  await expect(page.locator('.ask-ghost')).toHaveText('So $x^2$ it is.');
   await page.keyboard.press('Enter');
   await expect(textarea).toBeFocused();
   await expect(textarea).toHaveValue('# Notes\nSo $x^2$ it is.');
@@ -96,16 +100,61 @@ for (const tool of ['Math', 'Math+']) {
       return [box?.width, box?.height].map((n) => Math.round(n ?? 0));
     };
     const before = await size();
+    const latex = await value(page);
     await page.keyboard.press('Shift+Slash');
-    await expect(node.getByLabel('Describe it')).toBeFocused();
-    // The matrix is one typeset line, not rows split into pieces that show as raw LaTeX.
-    await expect(node.locator('.ask-slot .katex')).toHaveCount(1);
-    await expect(node).not.toContainText('\\begin');
-    // A pixel for MathLive and KaTeX setting the same matrix a little apart.
-    const asking = await size();
-    expect(Math.abs(asking[0] - before[0])).toBeLessThanOrEqual(2);
-    expect(Math.abs(asking[1] - before[1])).toBeLessThanOrEqual(2);
+    await expect(page.getByLabel('Describe it')).toBeFocused();
+    // The field is the one on the canvas, not a copy: the matrix is still drawn by it, untouched, and the node
+    // is exactly the size it was.
+    await expect(page.locator('.ask-bubble .katex')).toHaveCount(0);
+    expect(await value(page)).toBe(latex);
+    expect(await size()).toEqual(before);
     await page.keyboard.type('a very long request, longer than the node is wide, to see it keep its size');
-    expect(await size()).toEqual(asking);
+    expect(await size()).toEqual(before);
   });
 }
+
+test('Script: asking from a line keeps the line numbers and the node as they were, and the code is only added on Tab', async ({
+  page,
+}) => {
+  await placeNode(page, 'Script');
+  const node = nodes(page).first();
+  await node.locator('.cm-content').click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.press('Enter');
+  await page.waitForTimeout(100);
+  const box = await node.boundingBox();
+  const lines = await node.locator('.cm-lineNumbers .cm-gutterElement').count();
+  const source = () => node.locator('.cm-content').innerText();
+  const text = await source();
+  await page.keyboard.press('Shift+Slash');
+  await expect(page.getByLabel('Describe it')).toBeFocused();
+  await expect(page.getByPlaceholder('Describe the code')).toBeVisible();
+  await expect(node.locator('.cm-gutters')).toBeVisible();
+  expect(await node.locator('.cm-lineNumbers .cm-gutterElement').count()).toBe(lines);
+  // The editor is the same one, without the `?`.
+  expect(await source()).toBe(text);
+  expect(await node.boundingBox()).toEqual(box);
+  await page.keyboard.type('say hi');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('.ask-bubble .ask-ghost')).toContainText('Hello');
+  expect(await node.boundingBox()).toEqual(box);
+  await page.keyboard.press('Tab');
+  await expect(node.locator('.cm-content')).toContainText('Hello');
+  await expect(node.locator('.cm-content')).toBeFocused();
+  expect(await node.locator('.cm-lineNumbers .cm-gutterElement').count()).toBeGreaterThanOrEqual(lines);
+});
+
+test('Text: Escape from the words puts the caret back on the line it was on', async ({ page }) => {
+  await placeNode(page, 'Text');
+  const node = nodes(page).first();
+  await node.dblclick();
+  const textarea = node.locator('textarea');
+  await textarea.fill('top\n\nend');
+  await textarea.evaluate((t: HTMLTextAreaElement) => t.setSelectionRange(4, 4));
+  await page.keyboard.press('Shift+Slash');
+  await expect(page.getByLabel('Describe it')).toBeFocused();
+  await expect(textarea).toHaveValue('top\n\nend');
+  await page.keyboard.press('Escape');
+  await expect(textarea).toBeFocused();
+  expect(await textarea.evaluate((t: HTMLTextAreaElement) => t.selectionStart)).toBe(4);
+});

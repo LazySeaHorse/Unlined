@@ -49,7 +49,7 @@ export function FormulaBar({
       <CompleteSlot complete={complete} at={cell}>
         <AskSlot
           ask={ask}
-          className={cn(field, 'focus-within:border-accent')}
+          placeholder="Describe the formula"
           renderGhost={({ formula, shown }) => (
             <span className="truncate px-2">
               {formula}

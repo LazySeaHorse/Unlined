@@ -109,7 +109,7 @@ Off by default and per device. Turn it on in the AI panel's On-device tab and pi
 
 Either way it runs on your computer, so nothing leaves the device (unless you point the address at another machine, which the tab warns about).
 
-Type `?` in an empty field (or at the start of an empty line), say what you want and press Enter. The answer shows faintly; Tab or Enter accepts it (one undo step), Esc dismisses it. (A graph row takes its answer straight away, as a normal row you can edit; Ctrl+Z takes it back.)
+Type `?` in an empty field (or at the start of an empty line) and an **Ask AI** bubble opens under it, with a sparkle, a hint for what to write ("Describe the equation") and the keys: say what you want and press Enter. The bubble floats over the canvas, so the node never changes size or layout (a script keeps its line numbers); the field stays as it is, and Esc closes the bubble with the caret back where it was. While the model works the bubble says "Thinking…", and if it cannot give a usable answer it says why and keeps your words for another try. The answer shows in the bubble as it will look; Tab or Enter puts it in (one undo step), Esc goes back to your words. (A graph row takes its answer straight away, as a normal row you can edit; Ctrl+Z takes it back.) Clicking elsewhere closes the bubble.
 
 | Where | What `?` gives you |
 | --- | --- |
@@ -120,7 +120,7 @@ Type `?` in an empty field (or at the start of an empty line), say what you want
 | Sheet formula bar | a formula and its value |
 | Script | JavaScript (never run until you run it) |
 
-Press Tab while typing in a field (text, script, math, Math+, a graph row, a table cell, the sheet's formula bar) for the rest of the line at the caret. It shows faintly (under the field for maths); Tab takes it as one undo step, and Esc or any other key drops it. The model sees only that field's text up to the caret (and, for Math+, the values its links pass in), and a line that would not render, draw, evaluate or parse is never shown. In an empty field, or with on-device help off, Tab does what it always did. A completion is cut off after 8 seconds.
+Press Tab while typing in a field (text, script, math, Math+, a graph row, a table cell, the sheet's formula bar) for the rest of the line at the caret. It shows faintly at the caret (a small bubble with a Tab key under a math field); Tab takes it as one undo step, and Esc or any other key drops it. The model sees only that field's text up to the caret (and, for Math+, the values its links pass in), and a line that would not render, draw, evaluate or parse is never shown. In an empty field, or with on-device help off, Tab does what it always did. A completion is cut off after 8 seconds.
 
 Right-click one or more nodes and choose Suggest title for a brief title each (it replaces an existing title). The model sees only the node it is working on (a Math+ node also sees the values its links pass in); for Suggest title, chosen nodes that are linked to each other are sent together in one request, up to four at a time. It is small: it writes the syntax and the app does the computing, but check what it gives you. A single model call is cut off after 30 seconds. The prompts share their syntax descriptions with the AI-control guide (`src/nodes/syntax.ts`).
 

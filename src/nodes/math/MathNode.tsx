@@ -1,5 +1,5 @@
 import type { NodeProps } from '@xyflow/react';
-import { AskSlot, TexLines } from '@/ai/AskSlot';
+import { AskSlot } from '@/ai/AskSlot';
 import { CompleteSlot } from '@/ai/CompleteSlot';
 import { askedLine, replaceLine, useInlineAsk } from '@/ai/useInlineAsk';
 import { useInlineComplete } from '@/ai/useInlineComplete';
@@ -7,7 +7,7 @@ import { useReadOnly } from '@/canvas/readOnly';
 import { MathField } from '@/lib/math/MathField';
 import { Tex } from '@/lib/math/Tex';
 import type { NodeOf } from '@/model/types';
-import { fromLinesBody, lineAt, linesBody, MATH_LINES, splitBody, splitLines } from '../mathPlus/evaluate';
+import { fromLinesBody, lineAt, linesBody, MATH_LINES, splitLines } from '../mathPlus/evaluate';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
 import { mathAsk, mathComplete } from './ask';
@@ -27,8 +27,6 @@ export default function MathNode({ id, data, selected }: NodeProps<NodeOf<'math'
   });
   // Tab asks for the rest of the line at the caret, shown under the field.
   const complete = useInlineComplete(mathComplete, { data, context: () => undefined });
-  const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;
-  const shown = splitBody(linesBody(data.latex));
   return (
     <NodeShell
       kind="math"
@@ -44,14 +42,7 @@ export default function MathNode({ id, data, selected }: NodeProps<NodeOf<'math'
       >
         <AskSlot
           ask={ask}
-          lines={
-            asking === undefined
-              ? undefined
-              : {
-                  above: <TexLines lines={shown.slice(0, asking)} />,
-                  below: <TexLines lines={shown.slice(asking + 1)} />,
-                }
-          }
+          placeholder="Describe the equation"
           renderGhost={(latex) => <Tex latex={latex} className="text-[1.2rem]" />}
         >
           <MathField

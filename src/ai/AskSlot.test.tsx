@@ -41,7 +41,7 @@ function Harness() {
     <AskSlot
       ask={ask}
       at={0}
-      className="slot-box"
+      placeholder="Describe the shout"
       renderGhost={(value) => <span data-testid="ghost">{value}</span>}
     >
       <input
@@ -82,7 +82,7 @@ describe('AskSlot', () => {
   it('leaves the field laid out as without it, and unmeasured, while on-device AI is not ready', () => {
     useAiAssist.setState({ availability: 'downloadable' });
     render(<Harness />);
-    expect(field().closest('.slot-box')).toBeNull();
+    expect(screen.queryByRole('dialog')).toBeNull();
     const style = vi.spyOn(window, 'getComputedStyle');
     try {
       fireEvent.keyDown(field(), { key: 'a' });
@@ -92,10 +92,37 @@ describe('AskSlot', () => {
     }
   });
 
-  it("takes the field's place in the layout while open", async () => {
+  it('asks in a labelled bubble beside the field, leaving the field itself in place', async () => {
+    render(<Harness />);
+    const before = field();
+    await userEvent.type(field(), '?');
+    const bubble = screen.getByRole('dialog', { name: 'Ask AI' });
+    expect(bubble.contains(words())).toBe(true);
+    expect(bubble.contains(field())).toBe(false);
+    expect(field()).toBe(before);
+    expect((words() as HTMLInputElement).placeholder).toBe('Describe the shout');
+    expect(bubble.textContent).toContain('Enter');
+    expect(bubble.textContent).toContain('Esc');
+  });
+
+  it('shows a wait while the answer is worked out, and the keys for taking or leaving it', async () => {
+    fake = installFakeLanguageModel(['{"text":"hello"}'], 'available', 200);
     render(<Harness />);
     await userEvent.type(field(), '?');
-    expect(words().closest('.slot-box')).not.toBeNull();
+    await userEvent.type(words(), 'say hello{Enter}');
+    expect(screen.getByRole('status').textContent).toContain('Thinking');
+    const bubble = screen.getByRole('dialog', { name: 'Ask AI' });
+    await screen.findByTestId('ghost');
+    expect(bubble.textContent).toContain('Tab');
+    expect(bubble.textContent).toContain('insert');
+  });
+
+  it('shows the reason for a failure in words, not only on the input', async () => {
+    fake = installFakeLanguageModel(['{"text":"bad"}', '{"text":"bad"}']);
+    render(<Harness />);
+    await userEvent.type(field(), '?');
+    await userEvent.type(words(), 'nonsense{Enter}');
+    await waitFor(() => expect(screen.getByRole('status').textContent).toContain('Could not turn that'));
   });
 
   it('opens on ? in an empty field only, without saving the ?', async () => {
@@ -215,16 +242,10 @@ function LinesHarness() {
     context: () => 'ctx',
     apply: (value, at: number) => set(replaceLine(text, at, value)),
   });
-  const lines = text.split('\n');
-  const at = ask.state.phase === 'closed' ? undefined : ask.state.at;
   return (
     <AskSlot
       ask={ask}
-      lines={
-        at === undefined
-          ? undefined
-          : { above: lines.slice(0, at).join('|'), below: lines.slice(at + 1).join('|') }
-      }
+      placeholder="Describe the line"
       renderGhost={(value) => <span data-testid="ghost">{value}</span>}
     >
       <textarea
@@ -251,7 +272,8 @@ describe('AskSlot with lines', () => {
     (field() as HTMLTextAreaElement).setSelectionRange(4, 4);
     await userEvent.keyboard('?');
     expect(markdown()).toBe('top\n\nend');
-    expect(words().parentElement?.textContent).toBe('topend');
+    // The field is left as it is: its caret is where it was.
+    expect((field() as HTMLTextAreaElement).value).toBe('top\n\nend');
     await userEvent.type(words(), 'middle{Enter}');
     expect((await screen.findByTestId('ghost')).textContent).toBe('MID');
     expect(words().getAttribute('data-state')).toBe('ghost');

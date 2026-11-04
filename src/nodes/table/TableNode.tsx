@@ -254,13 +254,13 @@ export default function TableNode({ id, data, selected }: NodeProps<NodeOf<'tabl
                     <CompleteSlot
                       complete={complete}
                       at={`${r}:${c}`}
-                      renderGhost={(latex) => <Tex latex={latex} className="px-1.5 text-base" />}
+                      renderGhost={(latex) => <Tex latex={latex} className="text-base" />}
                     >
                       <AskSlot
                         ask={ask}
                         at={`${r}:${c}`}
-                        renderGhost={(latex) => <Tex latex={latex} className="px-1.5 text-base" />}
-                        className="ask-fit"
+                        renderGhost={(latex) => <Tex latex={latex} className="text-base" />}
+                        placeholder="Describe the cell"
                       >
                         <MathField
                           value={value}

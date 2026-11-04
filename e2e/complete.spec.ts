@@ -107,13 +107,13 @@ test('Script: Tab offers the rest of the line at the caret, drawn in the editor'
   expect(await lastPrompt(page)).toBe('Script up to the cursor:\nconsole.log(nums.');
 
   await page.keyboard.press('Tab');
-  await expect(node.locator('.complete-ghost')).toHaveCount(0);
+  await expect(page.locator('.complete-ghost')).toHaveCount(0);
   await expect(editor).toHaveText('console.log(nums.sort())');
   await page.keyboard.type(';');
   await expect(editor).toHaveText('console.log(nums.sort();)');
 });
 
-test('Math: Tab shows the line with the rest of it under the field, and Tab puts it in at the caret', async ({
+test('Math: Tab shows the line with the rest of it in a bubble, and Tab puts it in at the caret', async ({
   page,
 }) => {
   await placeNode(page, 'Math');
@@ -123,12 +123,14 @@ test('Math: Tab shows the line with the rest of it under the field, and Tab puts
   await expect(field).toBeFocused();
   await press(page, ['a', 'Shift+Enter', 'x']);
   const before = await mathValue(field);
+  const size = await node.boundingBox();
   await page.keyboard.press('Tab');
   await expect(field).toHaveAttribute('data-completing', '');
-  const ghost = node.locator('.complete-ghost');
+  const ghost = page.locator('.complete-ghost');
   await expect(ghost.locator('.katex')).toBeVisible();
   await expect(ghost).toContainText('x+1');
   await expect(field).not.toHaveAttribute('data-completing');
+  expect(await node.boundingBox()).toEqual(size);
   expect(await lastPrompt(page)).toBe('Math up to the cursor:\na\n x');
   // Reading the field at its caret left it as it was.
   expect(await mathValue(field)).toBe(before);
@@ -156,7 +158,7 @@ test('Math+: Tab offers the rest of a line, told the values links bring in', asy
   await expect(field).toBeFocused();
   await press(page, ['a', ':', '=', '2', 'Shift+Enter', 'a']);
   await page.keyboard.press('Tab');
-  await expect(node.locator('.complete-ghost .katex')).toBeVisible();
+  await expect(page.locator('.complete-ghost .katex')).toBeVisible();
   expect(await lastPrompt(page)).toContain('Math+ up to the cursor:\na\\coloneq2\n a');
   await page.keyboard.press('Tab');
   await expect.poll(() => mathValue(field)).toBe('\\displaylines{a\\coloneq2\\\\ a+1}');
@@ -170,14 +172,14 @@ test('Math: Escape drops the line and leaves the caret in the field', async ({ p
   await expect(field).toBeFocused();
   await press(page, ['x']);
   await page.keyboard.press('Tab');
-  await expect(nodes(page).locator('.complete-ghost')).toBeVisible();
+  await expect(page.locator('.complete-ghost')).toBeVisible();
   await page.keyboard.press('Escape');
-  await expect(nodes(page).locator('.complete-ghost')).toHaveCount(0);
+  await expect(page.locator('.complete-ghost')).toHaveCount(0);
   await expect(field).toBeFocused();
   expect(await mathValue(field)).toBe('x');
 });
 
-test('Graph: Tab shows the row with the rest of it under the row, and Tab puts it in', async ({ page }) => {
+test('Graph: Tab shows the row with the rest of it in a bubble, and Tab puts it in', async ({ page }) => {
   await placeNode(page, 'Graph');
   await nodes(page).getByRole('button', { name: 'Add equation' }).click();
   const row = nodes(page).locator('li').nth(1);
@@ -187,10 +189,10 @@ test('Graph: Tab shows the row with the rest of it under the row, and Tab puts i
   await press(page, ['y', '=', 'x']);
   const height = (await row.boundingBox())?.height ?? 0;
   await page.keyboard.press('Tab');
-  const ghost = row.locator('.complete-ghost');
+  const ghost = page.locator('.complete-ghost');
   await expect(ghost).toContainText('y=x+1');
-  // Under the row, which grows by a line.
-  expect((await row.boundingBox())?.height).toBeGreaterThan(height);
+  // In a bubble over the canvas: the row does not grow to make room.
+  expect((await row.boundingBox())?.height).toBe(height);
   expect(await lastPrompt(page)).toBe('Row up to the cursor:\ny=x');
   await page.keyboard.press('Tab');
   await expect.poll(() => mathValue(field)).toBe('y=x+1');
@@ -204,7 +206,7 @@ test('Table: Tab in a cell offers the rest of it, and only that cell takes it', 
   await expect(fields.nth(4)).toBeFocused();
   await press(page, ['x']);
   await page.keyboard.press('Tab');
-  await expect(nodes(page).locator('.complete-ghost')).toContainText('x2');
+  await expect(page.locator('.complete-ghost')).toContainText('x2');
   await page.keyboard.press('Tab');
   await expect.poll(() => mathValue(fields.nth(4))).toBe('x^2');
   expect(await Promise.all([0, 1, 2, 3, 5, 6, 7, 8].map((i) => mathValue(fields.nth(i))))).toEqual(

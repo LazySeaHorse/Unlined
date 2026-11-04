@@ -4,7 +4,7 @@ import CodeMirror from '@uiw/react-codemirror';
 import type { NodeProps } from '@xyflow/react';
 import { Play } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { AskSlot, PlainLines } from '@/ai/AskSlot';
+import { AskSlot } from '@/ai/AskSlot';
 import { CompleteSlot } from '@/ai/CompleteSlot';
 import { askedLine, replaceLine, useInlineAsk } from '@/ai/useInlineAsk';
 import { useInlineComplete } from '@/ai/useInlineComplete';
@@ -50,7 +50,6 @@ export default function CodeNode({ id, data, selected }: NodeProps<NodeOf<'code'
   });
   // Tab asks for the rest of the line at the caret.
   const complete = useInlineComplete(codeComplete, { data, context: () => undefined });
-  const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;
   const [output, setOutput] = useState<LogLine[]>([]);
   const stopRef = useRef<() => void>(undefined);
   const outputRef = useRef<HTMLDivElement>(null);
@@ -93,21 +92,14 @@ export default function CodeNode({ id, data, selected }: NodeProps<NodeOf<'code'
       <CompleteSlot complete={complete} at={0} read={readCodeEditor}>
         <AskSlot
           ask={ask}
-          className="nodrag nowheel nokey flex min-h-0 flex-1 flex-col overflow-auto font-mono text-[13px] leading-[1.4]"
-          lines={
-            asking === undefined
-              ? undefined
-              : {
-                  above: <ScriptLines lines={data.source.split('\n').slice(0, asking)} />,
-                  below: <ScriptLines lines={data.source.split('\n').slice(asking + 1)} />,
-                }
-          }
-          renderGhost={(code) => <ScriptLines lines={code.split('\n')} />}
+          placeholder="Describe the code"
+          renderGhost={(code) => <pre className="ask-code">{code}</pre>}
         >
           <CodeMirror
             value={data.source}
             onChange={(source, change) => {
               const line = askedLine(change.startState.doc.toString(), source);
+              // (The `?` an ask takes back out of the editor is reported as an edit too: the node's own text.)
               if (!line || !ask.open(line.index)) update({ source });
             }}
             extensions={extensions}
@@ -141,8 +133,3 @@ export default function CodeNode({ id, data, selected }: NodeProps<NodeOf<'code'
     </NodeShell>
   );
 }
-
-/** Lines of the script as plain text, for while the editor gives way to an ask. */
-const ScriptLines = ({ lines }: { lines: string[] }) => (
-  <PlainLines lines={lines} className="px-9 whitespace-pre" />
-);

@@ -1,9 +1,10 @@
-import { type KeyboardEvent, type ReactNode, useLayoutEffect, useRef } from 'react';
-import { cn } from '@/lib/cn';
-import { Tex } from '@/lib/math/Tex';
-import type { InlineAsk } from './useInlineAsk';
+import { Loader2, Sparkles, TriangleAlert } from 'lucide-react';
+import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef } from 'react';
+import { type FieldSnapshot, snapshotField } from './askField';
+import { Bubble } from './Bubble';
+import type { AskState, InlineAsk } from './useInlineAsk';
 
-/** What the slot focuses when it hands back to its field. */
+/** What the slot focuses when it hands back to its field and has no record of where `?` was typed. */
 const FIELD = 'math-field, input, textarea, [contenteditable="true"]';
 
 interface AskSlotProps<Key extends string | number, Value> {
@@ -11,80 +12,91 @@ interface AskSlotProps<Key extends string | number, Value> {
   /** Which of the node's fields this is. Left out when the slot is the only place the node asks from (a field of
    * several lines, where the key is a line; a sheet's formula bar, where it is a cell). */
   at?: Key;
-  /** The answer as it would look in the field, drawn faintly until it is accepted. */
+  /** What the request is for, as a hint in the empty box: "Describe the equation". */
+  placeholder: string;
+  /** The answer as it would look in the field, shown in the bubble until it is accepted. */
   renderGhost: (value: Value) => ReactNode;
-  /**
-   * The slot's classes while an ask is open, when it takes the field's place in the layout (flex-1, padding, …).
-   * Otherwise the slot has no box of its own, so the field lays out exactly as without it.
-   */
-  className?: string;
-  /**
-   * For a field of several lines (see askedLine): the field's lines above and below the one asked from, drawn
-   * in its place while it gives way. The input then takes just that line and the answer shows under it.
-   */
-  lines?: { above: ReactNode; below: ReactNode };
-  /** The field. It is unmounted while an ask is open here, and focused again when the ask ends by key. */
+  /** The field. It stays exactly as it is while an ask is open, and is focused again when the ask ends by key. */
   children: ReactNode;
 }
 
 /**
- * Where a field and its ask (useInlineAsk) take turns. While the ask is open the field gives way to a plain input
- * of the same height, which shimmers while the answer is worked out, shows the answer faintly over itself, and
- * underlines in red, with the reason on hover, when there is none.
+ * Where a field and its ask (useInlineAsk) meet. The field is never swapped or resized: an open ask is a bubble
+ * (Bubble) that hangs below it, with a box for the words, what the keys do, a "thinking" state while the answer is
+ * worked out, the answer for Tab or Enter to take, and the reason when there is none.
  */
 export function AskSlot<Key extends string | number, Value>({
   ask,
   at,
+  placeholder,
   renderGhost,
-  className,
-  lines,
   children,
 }: AskSlotProps<Key, Value>) {
   const slot = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
-  // The field's height, so the input takes exactly its room. Computed style, as it is exact (offsetHeight rounds)
-  // and unscaled by the canvas zoom.
-  const fieldHeight = useRef<number>(undefined);
-  const measure = () => {
-    const element = slot.current?.firstElementChild;
-    if (element) fieldHeight.current = Number.parseFloat(getComputedStyle(element).height) || undefined;
-  };
-  const refocus = useRef(false);
   const { state } = ask;
+  const open = state.phase !== 'closed' && (at === undefined || state.at === at);
+  // The field as it was before the `?`, and whether the ask ending should hand focus back to it.
+  const snapshot = useRef<FieldSnapshot>(undefined);
+  const refocus = useRef(false);
+  // The caret goes back where it was after Escape, not after an answer, which changed the text.
+  const caret = useRef(false);
   // An answer that went straight into the field (see `review`) ends the wait with the field to carry on in.
   const waiting = useRef(false);
-  const open = state.phase !== 'closed' && (at === undefined || state.at === at);
+  const wasOpen = useRef(false);
+
+  // Takes a snapshot as `?` goes in: by key, and by input for a keyboard that sends no key (a phone's).
+  useEffect(() => {
+    const element = slot.current;
+    if (!element || !ask.ready) return;
+    const note = (event: Event) => {
+      const asks =
+        event instanceof KeyboardEvent
+          ? event.key === '?' || event.key === 'Unidentified'
+          : event instanceof InputEvent && event.data === '?';
+      // (A keyboard with no keys, a phone's, sends 'Unidentified' and then the input.)
+      // Any other key makes an earlier snapshot stale.
+      snapshot.current = asks ? snapshotField(event.target) : undefined;
+    };
+    element.addEventListener('keydown', note, true);
+    element.addEventListener('beforeinput', note, true);
+    return () => {
+      element.removeEventListener('keydown', note, true);
+      element.removeEventListener('beforeinput', note, true);
+    };
+  }, [ask.ready]);
 
   useLayoutEffect(() => {
     if (open) {
-      input.current?.focus();
-    } else if (refocus.current || waiting.current) {
+      snapshot.current?.revert();
+    } else if (wasOpen.current) {
+      if (refocus.current || waiting.current) {
+        const restore = snapshot.current;
+        if (restore && caret.current) restore.restore();
+        else slot.current?.querySelector<HTMLElement>(FIELD)?.focus();
+      }
       refocus.current = false;
-      slot.current?.querySelector<HTMLElement>(FIELD)?.focus();
+      caret.current = false;
+      snapshot.current = undefined;
     }
+    wasOpen.current = open;
   }, [open]);
   useLayoutEffect(() => {
     waiting.current = state.phase === 'running';
   });
 
-  if (!open) {
-    return (
-      // Measured as a key goes down, before it changes the field (a math field shrinks once its placeholder goes).
-      <div ref={slot} className="contents" onKeyDownCapture={ask.ready ? measure : undefined}>
-        {children}
-      </div>
-    );
-  }
-
   const onKeyDown = (event: KeyboardEvent) => {
     const ghost = state.phase === 'ghost';
     if (event.key === 'Escape') {
       refocus.current = state.phase === 'typing';
+      caret.current = refocus.current;
       ask.back();
     } else if (event.key === 'Enter' || (event.key === 'Tab' && ghost)) {
       refocus.current = ghost;
       if (ghost) ask.accept();
       else ask.submit();
+    } else if (event.key === 'Tab' && !event.shiftKey) {
+      // Focus stays in the bubble: it ends with Escape, or an answer.
     } else {
       return;
     }
@@ -92,53 +104,103 @@ export function AskSlot<Key extends string | number, Value>({
     event.stopPropagation();
   };
 
-  const error = state.phase === 'typing' ? state.error : undefined;
   return (
-    <div
-      ref={slot}
-      className={cn('ask-slot', lines && 'ask-lines', className)}
-      style={{ minHeight: fieldHeight.current }}
-    >
-      {lines?.above}
+    // data-asking: the node is still being typed in, though focus is in the bubble (see .node-tile in index.css).
+    <div ref={slot} className="contents" data-asking={open || undefined}>
+      {children}
+      {state.phase !== 'closed' && open && (
+        <Bubble
+          anchor={() => snapshot.current?.anchor?.() ?? slot.current?.firstElementChild}
+          label="Ask AI"
+          onOutside={ask.close}
+        >
+          <AskPanel
+            state={state}
+            placeholder={placeholder}
+            input={input}
+            onWords={ask.setWords}
+            onKeyDown={onKeyDown}
+            ghost={state.phase === 'ghost' ? renderGhost(state.value) : undefined}
+          />
+        </Bubble>
+      )}
+    </div>
+  );
+}
+
+type OpenState<Key, Value> = Exclude<AskState<Key, Value>, { phase: 'closed' }>;
+
+function AskPanel<Key, Value>({
+  state,
+  placeholder,
+  input,
+  onWords,
+  onKeyDown,
+  ghost,
+}: {
+  state: OpenState<Key, Value>;
+  placeholder: string;
+  input: React.RefObject<HTMLInputElement | null>;
+  onWords: (words: string) => void;
+  onKeyDown: (event: KeyboardEvent) => void;
+  ghost: ReactNode;
+}) {
+  // The bubble mounts in a portal after the slot, so the box takes focus as it appears.
+  useLayoutEffect(() => input.current?.focus(), [input]);
+  const error = state.phase === 'typing' ? state.error : undefined;
+  const hints =
+    state.phase === 'ghost'
+      ? [
+          ['Tab', 'insert'],
+          ['Esc', 'edit'],
+        ]
+      : state.phase === 'running'
+        ? [['Esc', 'cancel']]
+        : [
+            ['Enter', error ? 'retry' : 'ask'],
+            ['Esc', 'cancel'],
+          ];
+  return (
+    <div className="ask-bubble" data-state={error ? 'failed' : state.phase}>
+      <div className="ask-head">
+        <Sparkles aria-hidden className="size-3.5" />
+        <span>Ask AI</span>
+      </div>
       <input
         ref={input}
         aria-label="Describe it"
+        placeholder={placeholder}
         className="ask-input nodrag nopan nokey"
         data-state={error ? 'failed' : state.phase}
         aria-invalid={error ? true : undefined}
         title={error}
         value={state.words}
-        onChange={(event) => ask.setWords(event.target.value)}
+        onChange={(event) => onWords(event.target.value)}
         onKeyDown={onKeyDown}
-        onBlur={() => state.phase === 'typing' && !state.words && ask.close()}
         spellCheck={false}
         autoComplete="off"
       />
-      {/* There while the ask is open, so a screen reader reads the answer out when it comes. */}
-      <div className={cn('ask-ghost', !lines && 'ask-ghost-over')} aria-live="polite">
-        {state.phase === 'ghost' && renderGhost(state.value)}
+      {/* There while the ask is open, so a screen reader reads each change once: the wait, the reason, the answer. */}
+      <div role="status" aria-live="polite" className="ask-status">
+        {state.phase === 'running' && (
+          <p className="ask-note">
+            <Loader2 aria-hidden className="ask-spin size-3.5" /> Thinking…
+          </p>
+        )}
+        {error && (
+          <p className="ask-note ask-error">
+            <TriangleAlert aria-hidden className="size-3.5 shrink-0" /> {error}
+          </p>
+        )}
+        {state.phase === 'ghost' && <div className="ask-ghost">{ghost}</div>}
       </div>
-      {lines?.below}
+      <p className="ask-hints">
+        {hints.map(([key, what]) => (
+          <span key={key}>
+            <kbd>{key}</kbd> {what}
+          </span>
+        ))}
+      </p>
     </div>
   );
-}
-
-/** Plain lines of a field's text, for the lines around an ask and its answer; `className` styles each like the field. */
-export function PlainLines({ lines, className }: { lines: string[]; className?: string }) {
-  return lines.map((line, index) => (
-    // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional.
-    <div key={index} className={cn('min-h-[1lh]', className)}>
-      {line}
-    </div>
-  ));
-}
-
-/** Typeset lines of a math field, for the lines around an ask while the field gives way to it. */
-export function TexLines({ lines }: { lines: string[] }) {
-  return lines.map((line, index) => (
-    // biome-ignore lint/suspicious/noArrayIndexKey: lines are positional.
-    <div key={index} className="min-h-6">
-      <Tex latex={line} />
-    </div>
-  ));
 }

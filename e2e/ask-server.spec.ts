@@ -38,10 +38,10 @@ test('a ? in a graph row is answered by the local server', async ({ page }) => {
   await field.click();
   await expect(field).toBeFocused();
   await page.keyboard.press('Shift+Slash');
-  await expect(row.getByLabel('Describe it')).toBeFocused();
+  await expect(page.getByLabel('Describe it')).toBeFocused();
   await page.keyboard.type('downward parabola');
   await page.keyboard.press('Enter');
-  await expect(row.getByLabel('Describe it')).toHaveCount(0);
+  await expect(page.getByLabel('Describe it')).toHaveCount(0);
   const value = () => field.evaluate((f: HTMLElement & { value: string }) => f.value);
   await expect.poll(value).toBe('y=-2x^2');
 });
