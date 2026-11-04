@@ -191,6 +191,7 @@ describe('the server as a model', () => {
     setServer(config);
     const result = await ask({
       ...base,
+      examples: [['hi', 'hello']] as Array<[string, string]>,
       schema: z.string(),
       format: 'line',
       check: async (v: string) => ({ ok: true as const, value: v }),

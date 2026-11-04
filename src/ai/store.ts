@@ -33,6 +33,8 @@ interface AiAssistState {
   download: (signal?: AbortSignal) => Promise<void>;
 }
 
+let pause: ReturnType<typeof setTimeout> | undefined;
+
 export const useAiAssist = create<AiAssistState>()(
   persist(
     (set, get) => ({
@@ -50,7 +52,10 @@ export const useAiAssist = create<AiAssistState>()(
       setServerConfig: (config) => {
         const urlChanged = config.url !== undefined && config.url !== get().server.url;
         set((s) => ({ server: { ...s.server, ...config }, ...(urlChanged && { models: [] }) }));
-        if (get().enabled && get().provider === 'server') void get().refresh();
+        if (!get().enabled || get().provider !== 'server') return;
+        // Typing an address changes it with every key: ask the server once the typing pauses.
+        clearTimeout(pause);
+        pause = setTimeout(() => void get().refresh(), urlChanged ? 400 : 0);
       },
       setEnabled: (enabled) => {
         if (!enabled) releaseSessions();
@@ -71,7 +76,11 @@ export const useAiAssist = create<AiAssistState>()(
           // Nothing chosen yet: the first model, as the server has it loaded or at hand.
           if (!server.model && models[0])
             set((s) => ({ server: { ...s.server, model: models[0] as string } }));
-          set({ models, serverError: undefined, availability: models.length ? 'available' : 'unavailable' });
+          set({
+            models,
+            availability: models.length ? 'available' : 'unavailable',
+            serverError: models.length ? undefined : 'The server has no chat models.',
+          });
         } catch (e) {
           if (get().provider !== 'server' || get().server.url !== server.url) return;
           set({
