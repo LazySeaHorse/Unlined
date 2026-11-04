@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_BOX, fitBox, niceStep } from './fit';
+import { DEFAULT_BOX, fitBox, niceStep, sane } from './fit';
 import type { Relation } from './relation';
 
 const y = (fn: (x: number) => number): Relation => ({ kind: 'y', fn });
@@ -72,6 +72,59 @@ describe('fitBox', () => {
   });
 });
 
+describe('fitBox with fast and steep functions', () => {
+  const fit = (fn: (t: number) => number) => fitBox([y(fn)]) as NonNullable<ReturnType<typeof fitBox>>;
+  const reasonable = (b: ReturnType<typeof fit>) => {
+    expect([...b.x, ...b.y].every(Number.isFinite)).toBe(true);
+    expect(b.y[1] - b.y[0]).toBeLessThan(1e7);
+    expect(b.x[1] - b.x[0]).toBeLessThan(1e3);
+  };
+  it('shows e^x around the origin, not a window of hundreds', () => {
+    const b = fit(Math.exp);
+    reasonable(b);
+    expect(b.x[0]).toBeLessThanOrEqual(-5);
+    expect(b.x[1]).toBeGreaterThanOrEqual(5);
+    expect(b.y[1]).toBeGreaterThanOrEqual(Math.exp(5));
+  });
+  it('shows 2^x and 10^x', () => {
+    for (const base of [2, 10]) {
+      const b = fit((t) => base ** t);
+      reasonable(b);
+      expect(b.x[0]).toBeLessThanOrEqual(-5);
+      expect(b.x[1]).toBeGreaterThanOrEqual(5);
+      expect(b.y[1]).toBeGreaterThanOrEqual(base ** 3);
+    }
+  });
+  it('shows e^-x as e^x mirrored', () => {
+    const b = fit((t) => Math.exp(-t));
+    reasonable(b);
+    expect(b.x[0]).toBeLessThanOrEqual(-5);
+    expect(b.x[1]).toBeGreaterThanOrEqual(5);
+    expect(b.y[1]).toBeGreaterThanOrEqual(Math.exp(5));
+  });
+  it('shows x^10 with a bounded height, and the bell e^-x^2 whole and centred', () => {
+    const steep = fit((t) => t ** 10);
+    reasonable(steep);
+    expect(steep.x[1]).toBeLessThan(10);
+    const bell = fit((t) => Math.exp(-t * t));
+    reasonable(bell);
+    expect(bell.x[0]).toBeGreaterThan(-10);
+    expect(bell.x[1]).toBeLessThan(10);
+    expect(bell.x[0] + bell.x[1]).toBeCloseTo(0, 5);
+    expect(bell.y[1]).toBeGreaterThanOrEqual(1);
+    expect(bell.y[1]).toBeLessThan(3);
+  });
+  it('gives tan and 1/x a window that is symmetric and small', () => {
+    for (const fn of [Math.tan, (t: number) => 1 / t]) {
+      const b = fit(fn);
+      reasonable(b);
+      expect(b.y[1] - b.y[0]).toBeLessThan(100);
+      expect(Math.abs(b.y[0] + b.y[1])).toBeLessThan(0.3 * (b.y[1] - b.y[0]));
+      expect(b.y[1]).toBeGreaterThanOrEqual(2);
+    }
+  });
+});
+
 describe('fitBox with restrictions', () => {
   it('shows a restricted segment, from its ends', () => {
     const relation: Relation = { kind: 'y', fn: (t) => 100 * t, where: (px) => px > 20 && px < 50 };
@@ -117,5 +170,14 @@ describe('niceStep', () => {
     expect(niceStep(1300)).toBe(2000);
     expect(niceStep(0.013)).toBe(0.02);
     expect(niceStep(5)).toBe(5);
+  });
+});
+
+describe('sane', () => {
+  it('refuses windows that are not finite, empty or absurdly wide', () => {
+    expect(sane(DEFAULT_BOX)).toBe(true);
+    expect(sane({ x: [0, 1e12], y: [0, 1] })).toBe(false);
+    expect(sane({ x: [0, 1], y: [Number.NaN, 1] })).toBe(false);
+    expect(sane({ x: [1, 1], y: [0, 1] })).toBe(false);
   });
 });

@@ -64,14 +64,25 @@ function interesting(fn: PlotFn, scale: number): Point[] {
       if (Math.abs(edge.v) <= 10 * typical + 1e-12) points.push(edge);
     }
     if (!finite(a) || !finite(b)) continue;
-    if (a === 0) points.push({ t: ts[i], v: 0 });
-    else if (a * b < 0) {
+    // An exact 0 is a root only when the curve is clearly off it nearby: exp(-1000) underflows to 0 along with
+    // everything near it, which is a curve hugging the axis and not a hundred crossings.
+    if (a === 0) {
+      const near = Math.max(Math.abs(b), i > 0 && finite(vs[i - 1]) ? Math.abs(vs[i - 1]) : 0);
+      if (near > 1e-6 * biggest) points.push({ t: ts[i], v: 0 });
+    } else if (a * b < 0) {
       const crossing = root(fn, ts[i], ts[i + 1]);
       if (crossing) points.push(crossing);
     }
     if (i > 0 && finite(vs[i - 1])) {
       const [before, after] = [a - vs[i - 1], b - a];
-      if (before * after < 0 && Math.abs(before) > noise && Math.abs(after) > noise)
+      // Not across a pole, where the sign flips: that is a jump, not a peak.
+      if (
+        before * after < 0 &&
+        a * b >= 0 &&
+        a * vs[i - 1] >= 0 &&
+        Math.abs(before) > noise &&
+        Math.abs(after) > noise
+      )
         points.push({ t: ts[i], v: a });
     }
   }
@@ -92,6 +103,19 @@ function frame([lo, hi]: [number, number]): [number, number] {
   return [lo, hi];
 }
 
+/** The most a window may span in value, as a multiple of what it spans in `t`, and in itself. */
+const MAX_RATIO = 1e5;
+const MAX_SPAN = 1e9;
+
+/** `[lo, hi]` cut down to a span a graph can show (exp, x^10): the part nearest zero, which is where it starts. */
+function limit([lo, hi]: [number, number], tSpan: number): [number, number] {
+  const most = Math.min(MAX_RATIO * tSpan, MAX_SPAN);
+  if (hi - lo <= most) return [lo, hi];
+  if (lo >= 0) return [lo, lo + most];
+  if (hi <= 0) return [hi - most, hi];
+  return [Math.max(lo, -most / 2), Math.min(hi, most / 2)];
+}
+
 /** At least `MIN_SPAN` wide, around the middle of `[lo, hi]`. */
 function atLeast([lo, hi]: [number, number], span: number): [number, number] {
   if (hi - lo >= span) return [lo, hi];
@@ -99,10 +123,28 @@ function atLeast([lo, hi]: [number, number], span: number): [number, number] {
   return [mid - span / 2, mid + span / 2];
 }
 
-/** The 1st to 99th percentile of the finite `values`, so a function that shoots off does not squash the rest. */
-function percentiles(values: number[]): [number, number] | undefined {
-  const sorted = values.filter(finite).sort((a, b) => a - b);
+/** Whether `values` jump across a pole: neighbours of opposite sign, both far bigger than is typical. */
+function hasPoles(values: number[], typical: number): boolean {
+  for (let i = 0; i < values.length - 1; i++) {
+    const [a, b] = [values[i], values[i + 1]];
+    if (finite(a) && finite(b) && a * b < 0 && Math.min(Math.abs(a), Math.abs(b)) > 3 * typical) return true;
+  }
+  return false;
+}
+
+/**
+ * The 1st to 99th percentile of the finite `values`, so a function that shoots off does not squash the rest. Where
+ * the values run through poles (tan, 1/x) what is far bigger than the median is the pole itself, and is left out.
+ */
+function percentiles(all: number[]): [number, number] | undefined {
+  let sorted = all.filter(finite).sort((a, b) => a - b);
   if (sorted.length === 0) return undefined;
+  const sizes = sorted.map(Math.abs).sort((a, b) => a - b);
+  const typical = sizes[Math.floor(sizes.length / 2)];
+  if (typical > 0 && hasPoles(all, typical)) {
+    const kept = sorted.filter((v) => Math.abs(v) <= 10 * typical);
+    if (kept.length > 0) sorted = kept;
+  }
   return [sorted[Math.floor(0.01 * (sorted.length - 1))], sorted[Math.ceil(0.99 * (sorted.length - 1))]];
 }
 
@@ -129,7 +171,7 @@ function view(fn: PlotFn): { t: [number, number]; v: [number, number] } | undefi
     Array.from({ length: SAMPLES }, (_, i) => fn(from + ((to - from) * i) / (SAMPLES - 1))),
   );
   if (!seen) return undefined;
-  const v = frame([Math.min(seen[0], ...vs), Math.max(seen[1], ...vs)]);
+  const v = limit(frame([Math.min(seen[0], ...vs), Math.max(seen[1], ...vs)]), t[1] - t[0]);
   return { t, v };
 }
 
@@ -187,7 +229,7 @@ export function fitBox(relations: ReadonlyArray<Relation | null>): Box | undefin
     return tidy([lo - room, hi + room]);
   };
   const box = { x: pad([Math.min(...x), Math.max(...x)]), y: pad([Math.min(...y), Math.max(...y)]) };
-  return [...box.x, ...box.y].every(finite) && box.x[1] > box.x[0] && box.y[1] > box.y[0] ? box : undefined;
+  return sane(box) ? box : undefined;
 }
 
 /** The grid step (1, 2 or 5 times a power of ten) that is at least `least` units wide. */
@@ -195,4 +237,9 @@ export function niceStep(least: number): number {
   if (!(least > 0) || !Number.isFinite(least)) return 1;
   const power = 10 ** Math.floor(Math.log10(least));
   return [1, 2, 5, 10].map((m) => m * power).find((step) => step >= least * (1 - 1e-9)) as number;
+}
+
+/** Whether a window can be drawn: finite, and neither a speck nor wider than a graph can label. */
+export function sane(box: Box): boolean {
+  return [box.x, box.y].every(([lo, hi]) => finite(lo) && finite(hi) && hi - lo > 1e-9 && hi - lo < MAX_SPAN);
 }
