@@ -93,7 +93,9 @@ export async function listModels(
 
 /** `<think>…</think>` blocks that reasoning models write into their content, off; a block still open goes too. */
 export function stripThinking(text: string): string {
-  // Some chat templates open the block in the prompt, so only its end shows in the reply.
+  // Some chat templates open the block in the prompt, so only its end shows in the reply. The tradeoff: a stray
+  // `</think>` in a reply that never had a block takes everything before it with it. That is rare, and showing a
+  // reasoning model's whole thinking is worse.
   return text
     .replace(/^(?:(?!<think>)[\s\S])*?<\/think>/, '')
     .replace(/<think>[\s\S]*?<\/think>/g, '')
@@ -253,11 +255,14 @@ export function localApi(read: () => LocalServerConfig): LocalApi {
               const { done, value } = await inner.read();
               if (done) controller.close();
               else controller.enqueue(value);
+              if (done) live.delete(stop);
             } catch (e) {
+              live.delete(stop);
               controller.error(e);
             }
           },
           cancel() {
+            live.delete(stop);
             stop.abort();
           },
         });

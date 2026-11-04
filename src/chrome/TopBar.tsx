@@ -129,7 +129,7 @@ export function TopBar() {
         <IconButton round icon={Redo2} label="Redo" hint="Ctrl+Shift+Z" disabled={!canRedo} onClick={redo} />
       </Capsule>
 
-      <Capsule className="min-w-0 overflow-x-auto [scrollbar-width:none]">
+      <Capsule className="min-w-0 overflow-x-auto px-2.5 [scrollbar-width:none]">
         <ToolGroup tool={tool}>
           {toolbarKinds().map((kind) => {
             const spec = nodeSpecs[kind];
