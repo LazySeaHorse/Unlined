@@ -66,6 +66,17 @@ export function AskSlot<Key extends string | number, Value>({
     };
   }, [ask.ready]);
 
+  // A press anywhere but in the bubble puts it away. Heard on the way down, before the canvas can take the press.
+  const close = ask.close;
+  useEffect(() => {
+    if (!open) return;
+    const away = (event: PointerEvent) => {
+      if (!(event.target instanceof Element && event.target.closest('.ask-bubble'))) close();
+    };
+    document.addEventListener('pointerdown', away, true);
+    return () => document.removeEventListener('pointerdown', away, true);
+  }, [open, close]);
+
   useLayoutEffect(() => {
     if (open) {
       snapshot.current?.revert();
