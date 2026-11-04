@@ -1,6 +1,6 @@
 import type { NodeProps } from '@xyflow/react';
 import { Plus, X } from 'lucide-react';
-import { Coordinates, Mafs, Plot, usePaneContext } from 'mafs';
+import { Coordinates, Mafs, Plot, usePaneContext, useTransformContext, vec } from 'mafs';
 import 'mafs/core.css';
 import { Popover } from 'radix-ui';
 import { useMemo, useRef } from 'react';
@@ -19,8 +19,10 @@ import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
 import { graphAsk, graphComplete } from './ask';
 import { newEquation } from './equations';
+import { DEFAULT_BOX, fitBox, niceStep } from './fit';
 import { implicitSegments, segmentsPath, shadedPath } from './implicit';
 import { classifyRelation, type PlotFn2, type Relation } from './relation';
+import { useGraphView } from './view';
 
 export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'graph'>>) {
   const readOnly = useReadOnly();
@@ -101,30 +103,72 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
           </li>
         ))}
       </ul>
-      <div ref={plotRef} className="nodrag nopan nowheel min-h-0 flex-1">
-        {engine && height > 0 && <Plot2D engine={engine} equations={equations} height={height} />}
+      <div
+        ref={plotRef}
+        role="application"
+        aria-label="Graph"
+        className="nodrag nopan nowheel min-h-0 flex-1"
+        // Dragging, wheeling or keying the plot is the user taking the window: edits stop refitting it.
+        onPointerMove={(e) => e.buttons === 1 && useGraphView.getState().markMoved(id)}
+        onWheel={() => useGraphView.getState().markMoved(id)}
+        onKeyDown={(e) => /^(Arrow|[+\-=_])/.test(e.key) && useGraphView.getState().markMoved(id)}
+      >
+        {engine && height > 0 && (
+          <Plot2D
+            id={id}
+            engine={engine}
+            equations={equations}
+            height={height}
+            equalAxes={data.equalAxes === true}
+          />
+        )}
       </div>
     </NodeShell>
   );
 }
 
-/** Plots every row. */
+/**
+ * Plots every row, in the window that fits them. It is fitted again as the equations change, until the user pans or
+ * zooms; then it stays where they put it until Fit (right-click) or the axes setting asks for a fresh one. A new
+ * window is a new Mafs, which starts again from its viewBox.
+ */
 function Plot2D({
+  id,
   engine,
   equations,
   height,
+  equalAxes,
 }: {
+  id: string;
   engine: Engine;
   equations: GraphEquation[];
   height: number;
+  equalAxes: boolean;
 }) {
   const compiled = useMemo(
     () => equations.map(({ latex }) => classifyRelation(engine, latex)),
     [engine, equations],
   );
+  const moved = useGraphView((s) => s.moved[id] === true);
+  const fits = useGraphView((s) => s.fits[id] ?? 0);
+  const fitted = useMemo(() => fitBox(compiled), [compiled]);
+  // While the rows do not parse the last window stays, rather than jumping back to the default and again.
+  const shown = useRef<{ box: typeof DEFAULT_BOX; key: string }>({ box: DEFAULT_BOX, key: 'start' });
+  if (!moved) {
+    const box = fitted ?? (shown.current.key === 'start' ? DEFAULT_BOX : shown.current.box);
+    shown.current = { box, key: `${box.x}/${box.y}/${fits}/${equalAxes}` };
+  }
+  const { box, key } = shown.current;
   return (
-    <Mafs height={height} pan zoom viewBox={{ x: [-5, 5], y: [-5, 5] }} preserveAspectRatio={false}>
-      <Coordinates.Cartesian />
+    <Mafs
+      key={key}
+      height={height}
+      pan
+      zoom={{ min: 0.0001, max: 10000 }}
+      viewBox={{ x: box.x, y: box.y, padding: 0 }}
+      preserveAspectRatio={equalAxes ? 'contain' : false}
+    >
+      <Axes />
       {compiled.map((relation, index) =>
         relation ? (
           // biome-ignore lint/suspicious/noArrayIndexKey: one plot per row.
@@ -226,4 +270,23 @@ function ImplicitCurve({ fn, color }: { fn: PlotFn2; color: string }) {
       }}
     />
   );
+}
+
+/** The least room, in pixels, between grid lines on each axis (x labels are wider than y labels are tall). */
+const GRID_PX = { x: 70, y: 36 };
+
+/**
+ * The axes with a grid step that suits the window: Mafs steps by 1 unless told otherwise, which is a thousand
+ * crowded labels once the window spans thousands, and none at all once it spans hundredths. Follows pan and zoom.
+ */
+function Axes() {
+  const { viewTransform } = useTransformContext();
+  const [origin, unitX, unitY] = [
+    vec.transform([0, 0], viewTransform),
+    vec.transform([1, 0], viewTransform),
+    vec.transform([0, 1], viewTransform),
+  ];
+  const xStep = niceStep(GRID_PX.x / Math.abs(unitX[0] - origin[0]));
+  const yStep = niceStep(GRID_PX.y / Math.abs(unitY[1] - origin[1]));
+  return <Coordinates.Cartesian xAxis={{ lines: xStep }} yAxis={{ lines: yStep }} />;
 }

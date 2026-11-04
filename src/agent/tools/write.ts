@@ -65,6 +65,10 @@ const content = {
       .min(1)
       .max(20)
       .transform(withColors),
+    equalAxes: z
+      .boolean()
+      .optional()
+      .describe('Keep a unit the same length on both axes. Omit to scale each axis to fit the curves.'),
     title,
     color: tint,
   },

@@ -28,6 +28,7 @@ import {
   Pin,
   Play,
   Plus,
+  Scaling,
   Shapes,
   Sigma,
   SquareArrowOutUpRight,
@@ -56,6 +57,7 @@ import {
 import { animateGridLines } from '@/motion/gridLines';
 import { afterRender } from '@/motion/motion';
 import { nodeSpecs } from '@/nodes/catalog';
+import { useGraphView } from '@/nodes/graph/view';
 import { mathPlusResultsText } from '@/nodes/mathPlus/useMathPlusResults';
 import { withFill } from '@/nodes/sheet/fills';
 import { sheetSelection } from '@/nodes/sheet/selection';
@@ -152,6 +154,20 @@ const copyLatex = (latex: string): MenuEntry => ({
 /** Extra items for particular kinds of node, shown above the common ones. */
 const kindItems: { [K in NodeKind]?: (node: NodeOf<K>) => MenuEntry[] } = {
   math: (node) => [...mathMenu(node), { separator: true }, copyLatex(node.data.latex)],
+  graph: (node) => [
+    {
+      label: 'Fit to equations',
+      icon: Maximize,
+      onSelect: () => useGraphView.getState().fit(node.id),
+    },
+    {
+      label: 'Keep axes 1:1',
+      icon: Scaling,
+      checked: node.data.equalAxes === true,
+      onSelect: () =>
+        useCanvasStore.getState().updateNodeData<'graph'>(node.id, { equalAxes: !node.data.equalAxes }),
+    },
+  ],
   table: (node) => [tableSize(node)],
   web: (node) => [loadAutomatically(node), unloadOffscreen(node)],
   mathPlus: (node) => [

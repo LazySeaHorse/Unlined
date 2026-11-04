@@ -22,7 +22,8 @@ export type NodeDataMap = {
   };
   math: Titled & { latex: string };
   mathPlus: Titled & { latex: string };
-  graph: Titled & { equations: GraphEquation[] };
+  /** `equalAxes` keeps a unit the same length on both axes; otherwise each is scaled to fit what is drawn. */
+  graph: Titled & { equations: GraphEquation[]; equalAxes?: boolean };
   table: Titled & { cells: string[][] };
   sheet: Titled & {
     cells: string[][];
