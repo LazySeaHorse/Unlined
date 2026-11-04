@@ -26,15 +26,8 @@ const TEMPLATES: (MenuEntry | { label: string; latex: string })[] = [
   { label: 'Conjugate', latex: '\\overline{#?}' },
 ];
 
-const MATRIX_SIZES = [
-  [2, 2],
-  [3, 3],
-  [4, 4],
-  [2, 3],
-  [3, 2],
-  [1, 3],
-  [3, 1],
-] as const;
+/** The most rows or columns a matrix is inserted with. */
+const MATRIX_MAX = 12;
 
 /** MathLive's named text colours, with the swatches its own menu shows. The neutrals follow the theme (lib/math/ink.ts). */
 const TEXT_COLORS = {
@@ -99,10 +92,15 @@ export function mathMenu(node: NodeOf<'math' | 'mathPlus'>): MenuEntry[] {
     {
       label: 'Insert matrix',
       icon: Grid3x3,
-      items: MATRIX_SIZES.map(([rows, cols]) => ({
-        label: `${rows} × ${cols}`,
-        onSelect: edit((f) => f.insert(matrix(rows, cols), { selectionMode: 'item', focus: true })),
-      })),
+      items: [
+        {
+          size: {
+            max: { rows: MATRIX_MAX, columns: MATRIX_MAX },
+            onPick: (rows, cols) =>
+              edit((f) => f.insert(matrix(rows, cols), { selectionMode: 'item', focus: true }))(),
+          },
+        },
+      ],
     },
     {
       label: 'Text colour',

@@ -62,7 +62,7 @@ test('math menu inserts a matrix and a template at the caret', async ({ page }) 
   await page.keyboard.press('ArrowLeft');
   await field.click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Insert matrix' }).click();
-  await page.getByRole('menuitem', { name: '2 × 2' }).click();
+  await page.getByRole('button', { name: '2 × 2' }).click();
   await expect.poll(() => latex(page)).toContain('\\begin{pmatrix}');
   expect(await latex(page)).toMatch(/^x=\\begin\{pmatrix\}.*\\end\{pmatrix\}1$/);
 
@@ -71,6 +71,20 @@ test('math menu inserts a matrix and a template at the caret', async ({ page }) 
   await page.getByRole('menuitem', { name: 'Integral' }).click();
   await expect.poll(() => latex(page)).toContain('\\int');
   await expect(field).toBeFocused();
+});
+
+test('math menu inserts a matrix of a typed size', async ({ page }) => {
+  await placeNode(page, 'Math');
+  const field = nodes(page).locator('math-field');
+  await field.click();
+  await expect(field).toBeFocused();
+  await field.click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'Insert matrix' }).click();
+  await page.getByLabel('Rows', { exact: true }).fill('2');
+  await page.getByLabel('Columns', { exact: true }).fill('3');
+  await page.keyboard.press('Enter');
+  await expect.poll(() => latex(page)).toContain('\\begin{pmatrix}');
+  expect((await latex(page)).match(/&/g)).toHaveLength(4);
 });
 
 test('math menu colours the selected math', async ({ page }) => {
