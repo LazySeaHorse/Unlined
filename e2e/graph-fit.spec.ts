@@ -46,3 +46,27 @@ test('a row restricted with braces is drawn only where the restriction holds', a
   await expect(curve).toHaveCount(1);
   await page.screenshot({ path: test.info().outputPath('restricted.png') });
 });
+
+test('points are drawn, and rulers hold the edges once the axes are panned away', async ({ page }) => {
+  await openApp(page);
+  await placeNode(page, 'Graph');
+  const field = nodes(page).locator('li').first().locator('math-field');
+  await field.click();
+  await field.evaluate((f: HTMLElement & { value: string }) => {
+    f.value = '(1,2),(3,-1)';
+    f.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(nodes(page).locator('svg circle')).toHaveCount(2);
+  const labels = async () => (await nodes(page).locator('svg text').allTextContents()).join(' ');
+  expect(await labels()).toContain('-0.5');
+
+  // Drag the plot until both axes are out of view: their labels go with them, and the rulers take over.
+  const plot = nodes(page).getByRole('application', { name: 'Graph' });
+  const at = (await plot.boundingBox()) as { x: number; y: number; width: number; height: number };
+  await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(at.x + at.width / 2 - 400, at.y + at.height / 2 - 300, { steps: 10 });
+  await page.mouse.up();
+  await expect.poll(async () => (await labels()).includes('-2.5')).toBe(true);
+  await expect.poll(async () => /\b5\b/.test(await labels())).toBe(true);
+});

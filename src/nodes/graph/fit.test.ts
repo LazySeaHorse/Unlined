@@ -87,6 +87,27 @@ describe('fitBox with restrictions', () => {
   });
 });
 
+describe('fitBox with points', () => {
+  it('shows a point with the axes when they are near, and a far one whole', () => {
+    const near = fitBox([{ kind: 'points', points: [[1, 2]] }]) as NonNullable<ReturnType<typeof fitBox>>;
+    expect(near.x[0]).toBeLessThanOrEqual(0);
+    expect(near.x[1]).toBeGreaterThanOrEqual(2);
+    expect(near.y[1]).toBeGreaterThanOrEqual(4);
+    const far = fitBox([
+      {
+        kind: 'points',
+        points: [
+          [1000, 2000],
+          [1200, 2500],
+        ],
+      },
+    ]) as NonNullable<ReturnType<typeof fitBox>>;
+    expect(far.x[0]).toBeLessThanOrEqual(1000);
+    expect(far.x[1]).toBeGreaterThanOrEqual(1200);
+    expect(far.y[1]).toBeGreaterThanOrEqual(2500);
+  });
+});
+
 describe('niceStep', () => {
   it('rounds up to 1, 2 or 5 times a power of ten', () => {
     expect(niceStep(0.8)).toBe(1);

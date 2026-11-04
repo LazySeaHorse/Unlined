@@ -1,9 +1,9 @@
 import type { NodeProps } from '@xyflow/react';
 import { Plus, X } from 'lucide-react';
-import { Coordinates, Mafs, Plot, usePaneContext, useTransformContext, vec } from 'mafs';
+import { Coordinates, Mafs, Plot, Point, usePaneContext, useTransformContext, vec } from 'mafs';
 import 'mafs/core.css';
 import { Popover } from 'radix-ui';
-import { useMemo, useRef } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AskSlot } from '@/ai/AskSlot';
 import { CompleteSlot } from '@/ai/CompleteSlot';
 import { useInlineAsk } from '@/ai/useInlineAsk';
@@ -221,6 +221,14 @@ function Curve({ relation, color }: { relation: Relation; color: string }) {
       ) : (
         <Plot.OfY x={relation.fn} color={color} />
       );
+    case 'points':
+      return (
+        <>
+          {relation.points.map(([x, y]) => (
+            <Point key={`${x},${y}`} x={x} y={y} color={color} />
+          ))}
+        </>
+      );
     case 'implicit':
       return <ImplicitCurve fn={relation.fn} color={color} />;
     case 'shade':
@@ -333,5 +341,74 @@ function Axes() {
   ];
   const xStep = niceStep(GRID_PX.x / Math.abs(unitX[0] - origin[0]));
   const yStep = niceStep(GRID_PX.y / Math.abs(unitY[1] - origin[1]));
-  return <Coordinates.Cartesian xAxis={{ lines: xStep }} yAxis={{ lines: yStep }} />;
+  return (
+    <>
+      <Coordinates.Cartesian xAxis={{ lines: xStep }} yAxis={{ lines: yStep }} />
+      <Rulers xStep={xStep} yStep={yStep} />
+    </>
+  );
+}
+
+/** A number as a grid label, without the dust of floating point (0.30000000000000004). */
+const tickLabel = (n: number) => String(Number(n.toPrecision(10)));
+
+/** The multiples of `step` from `lo` to `hi`. */
+function multiples(lo: number, hi: number, step: number): number[] {
+  const first = Math.ceil(lo / step - 1e-9);
+  const last = Math.floor(hi / step + 1e-9);
+  return Array.from({ length: Math.max(0, Math.min(last - first + 1, 200)) }, (_, i) => (first + i) * step);
+}
+
+/**
+ * Rulers along the bottom and left edges, for when an axis has scrolled out of the window: its labels would be
+ * out of sight with it, and nothing would say where you are. They stand in for the axis labels only while the
+ * axis is off screen.
+ */
+function Rulers({ xStep, yStep }: { xStep: number; yStep: number }) {
+  const { viewTransform } = useTransformContext();
+  const anchor = useRef<SVGGElement>(null);
+  // The visible part of Mafs' drawing space, read from the svg it is drawn in.
+  const [view, setView] = useState<{ x: number; y: number; w: number; h: number }>();
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the svg's viewBox follows the transform.
+  useLayoutEffect(() => {
+    const box = anchor.current?.ownerSVGElement?.viewBox.baseVal;
+    if (!box) return;
+    setView((old) =>
+      old && old.x === box.x && old.y === box.y && old.w === box.width && old.h === box.height
+        ? old
+        : { x: box.x, y: box.y, w: box.width, h: box.height },
+    );
+  }, [viewTransform]);
+
+  const origin = vec.transform([0, 0], viewTransform);
+  const scaleX = vec.transform([1, 0], viewTransform)[0] - origin[0];
+  const scaleY = vec.transform([0, 1], viewTransform)[1] - origin[1];
+  const style = { fill: 'var(--mafs-origin-color)', paintOrder: 'stroke' } as const;
+  const labels = [];
+  if (view && scaleX !== 0 && scaleY !== 0) {
+    const [x0, x1] = [view.x / scaleX, (view.x + view.w) / scaleX];
+    const [y0, y1] = [(view.y + view.h) / scaleY, view.y / scaleY];
+    if (y0 > 0 || y1 < 0)
+      for (const x of multiples(x0, x1, xStep))
+        labels.push(
+          <text key={`x${x}`} x={x * scaleX} y={view.y + view.h - 6} textAnchor="middle" style={style}>
+            {tickLabel(x)}
+          </text>,
+        );
+    if (x0 > 0 || x1 < 0)
+      for (const y of multiples(y0, y1, yStep)) {
+        // Not on top of the bottom ruler's labels.
+        if (y * scaleY > view.y + view.h - 22) continue;
+        labels.push(
+          <text key={`y${y}`} x={view.x + 6} y={y * scaleY} dominantBaseline="central" style={style}>
+            {tickLabel(y)}
+          </text>,
+        );
+      }
+  }
+  return (
+    <g ref={anchor} className="mafs-axis">
+      {labels}
+    </g>
+  );
 }

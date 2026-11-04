@@ -12,7 +12,7 @@ const must = (latex: string): Relation => {
 /** A row that plots one variable against the other, so its function takes one number. */
 const curve = (latex: string) => {
   const relation = must(latex);
-  if (relation.kind === 'implicit' || relation.kind === 'shade')
+  if (relation.kind === 'implicit' || relation.kind === 'shade' || relation.kind === 'points')
     throw new Error(`${latex} is ${relation.kind}`);
   return relation;
 };
@@ -199,5 +199,35 @@ describe('classifyRelation: restrictions', () => {
     expect(read('y=x\\{hello\\}')).toBeNull();
     expect(read('y=x\\{z>1\\}')).toBeNull();
     expect(read('y=x\\{x=1\\}')).toBeNull();
+  });
+});
+
+describe('classifyRelation: points', () => {
+  const points = (latex: string) => {
+    const r = must(latex);
+    if (r.kind !== 'points') throw new Error(`${latex} is ${r.kind}`);
+    return r.points;
+  };
+  it('reads a point, in any bracket, with values the engine can work out', () => {
+    expect(points('(1,2)')).toEqual([[1, 2]]);
+    expect(points('\\left(1,2\\right)')).toEqual([[1, 2]]);
+    expect(points('(-1.5, \\frac{2}{3})')[0]?.[0]).toBe(-1.5);
+    expect(points('(-1.5, \\frac{2}{3})')[0]?.[1]).toBeCloseTo(2 / 3);
+    expect(points('(\\sqrt{4}, 1+1)')).toEqual([[2, 2]]);
+  });
+  it('reads a list of points', () => {
+    expect(points('(1,2),(3,4)')).toEqual([
+      [1, 2],
+      [3, 4],
+    ]);
+  });
+  it('keeps the points a restriction allows, and draws nothing when none is', () => {
+    expect(points('(1,2),(-3,4)\\left\\lbrace x>0\\right\\rbrace')).toEqual([[1, 2]]);
+    expect(read('(-1,2)\\left\\lbrace x>0\\right\\rbrace')).toBeNull();
+  });
+  it('draws nothing for what is not a point', () => {
+    expect(read('(1,2,3)')).toBeNull();
+    expect(read('(a,2)')).toBeNull();
+    expect(read('(1,)')).toBeNull();
   });
 });

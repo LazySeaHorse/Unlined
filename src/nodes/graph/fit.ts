@@ -167,6 +167,13 @@ export function fitBox(relations: ReadonlyArray<Relation | null>): Box | undefin
   const x: number[] = [];
   const y: number[] = [];
   for (const relation of relations) {
+    if (relation?.kind === 'points') {
+      // Points are shown whole, with room round them, and the origin when it is near.
+      const [px, py] = [relation.points.map((p) => p[0]), relation.points.map((p) => p[1])];
+      x.push(...frame([Math.min(...px), Math.max(...px)]));
+      y.push(...frame([Math.min(...py), Math.max(...py)]));
+      continue;
+    }
     const f = relation && asFunction(relation);
     const seen = f && view(f.fn);
     if (!f || !seen) continue;

@@ -19,7 +19,9 @@ export type Relation =
   | { kind: 'x'; fn: PlotFn; where?: Where }
   | { kind: 'implicit'; fn: PlotFn2 }
   | { kind: 'shade'; fn: PlotFn2; strict: boolean }
-  | { kind: 'region'; axis: 'x' | 'y'; op: Comparison; fn: PlotFn };
+  | { kind: 'region'; axis: 'x' | 'y'; op: Comparison; fn: PlotFn }
+  /** `(1,2)`, or a list of them: single points. */
+  | { kind: 'points'; points: ReadonlyArray<readonly [x: number, y: number]> };
 
 const COMPARISONS: Record<string, Comparison | '='> = {
   Equal: '=',
@@ -74,6 +76,7 @@ function classifyBody(engine: Engine, latex: string): Relation | null {
   try {
     const expr: Parts = engine.ce.parse(latex);
     if (!expr.isValid) return null;
+    if (expr.operator === 'Tuple') return points(engine, expr);
     const comparison = COMPARISONS[expr.operator];
     if (!comparison) return onlyUses(expr, 'x') ? curve(engine, expr, 'y') : null;
 
@@ -106,6 +109,22 @@ function classifyBody(engine: Engine, latex: string): Relation | null {
   } catch {
     return null;
   }
+}
+
+/** `(1,2)`, `(\sqrt2,\frac12)` or a list `(1,2),(3,4)`: points, each coordinate a number the engine can work out. */
+function points(engine: Engine, expr: Parts): Relation | null {
+  const operands = expr.ops ?? [];
+  const pairs = operands.length > 0 && operands.every((op) => op.operator === 'Tuple') ? operands : [expr];
+  const found: Array<readonly [number, number]> = [];
+  for (const pair of pairs) {
+    const coordinates = pair.ops ?? [];
+    if (coordinates.length !== 2 || coordinates.some((c) => c.operator === 'Tuple' || c.unknowns.length > 0))
+      return null;
+    const [x, y] = coordinates.map((c) => compileXY(engine, c)?.(0, 0) ?? Number.NaN);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+    found.push([x, y]);
+  }
+  return { kind: 'points', points: found };
 }
 
 function curve(engine: Engine, expr: Expression, kind: 'x' | 'y'): Relation | null {
@@ -209,11 +228,15 @@ function condition(engine: Engine, expr: Parts): Where | null {
 }
 
 /** `relation` drawn only where `where` holds. Areas and implicit curves leave the rest out; curves keep `where`. */
-function restrict(relation: Relation, where: Where): Relation {
+function restrict(relation: Relation, where: Where): Relation | null {
   switch (relation.kind) {
     case 'y':
     case 'x':
       return { ...relation, where };
+    case 'points': {
+      const kept = relation.points.filter(([x, y]) => where(x, y));
+      return kept.length > 0 ? { kind: 'points', points: kept } : null;
+    }
     case 'implicit':
       return { kind: 'implicit', fn: (x, y) => (where(x, y) ? relation.fn(x, y) : Number.NaN) };
     case 'shade':
