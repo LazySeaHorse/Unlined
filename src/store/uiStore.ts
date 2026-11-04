@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { NodeKind } from '@/model/types';
+import type { NodeKind, SectionColor } from '@/model/types';
 
 export type Theme = 'light' | 'dark';
 export type AiTab = 'connect' | 'activity' | 'device';
@@ -26,6 +26,9 @@ interface UiState {
   /** The stack whose cards are spread out to pick from, if any, and the card highlighted there. */
   fanned: string | null;
   fanFocus: number;
+  /** The colour new links are drawn in: the last one picked for any link; null is the automatic one. */
+  linkColor: SectionColor | null;
+  setLinkColor: (color: SectionColor | null) => void;
   setTool: (tool: NodeKind) => void;
   setLinking: (linking: boolean) => void;
   toggleTheme: () => void;
@@ -67,6 +70,8 @@ export const useUiStore = create<UiState>()(
       aiPanelOpen: false,
       aiTab: 'connect',
       linking: false,
+      linkColor: 'blue',
+      setLinkColor: (linkColor) => set({ linkColor }),
       renamingSection: null,
       renamingNode: null,
       renamingLink: null,
@@ -95,6 +100,6 @@ export const useUiStore = create<UiState>()(
       setStackDropTarget: (stackDropTarget) =>
         set((s) => (s.stackDropTarget === stackDropTarget ? s : { stackDropTarget })),
     }),
-    { name: 'unlined-ui', partialize: ({ tool, theme }) => ({ tool, theme }) },
+    { name: 'unlined-ui', partialize: ({ tool, theme, linkColor }) => ({ tool, theme, linkColor }) },
   ),
 );

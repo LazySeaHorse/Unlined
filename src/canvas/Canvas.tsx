@@ -94,7 +94,8 @@ function connect({ source: from, target: to }: Connection) {
   const target = cardFor(nodes, fronts, to);
   const existing = findLink(edges, source, target);
   const loop = closesMathPlusLoop(nodes, edges, source, target);
-  const id = linkNodes(source, target);
+  const { linkColor } = useUiStore.getState();
+  const id = linkNodes(source, target, linkColor ? { color: linkColor } : undefined);
   if (existing) toast(ALREADY_LINKED);
   else if (id && loop)
     toast.warning(
