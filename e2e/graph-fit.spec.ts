@@ -67,8 +67,27 @@ test('points are drawn, and rulers hold the edges once the axes are panned away'
   await page.mouse.down();
   await page.mouse.move(at.x + at.width / 2 - 400, at.y + at.height / 2 - 300, { steps: 10 });
   await page.mouse.up();
-  await expect.poll(async () => (await labels()).includes('-2.5')).toBe(true);
-  await expect.poll(async () => /\b5\b/.test(await labels())).toBe(true);
+  // Mafs keeps its own labels in the DOM when the axes are off screen, so look for labels that are really inside
+  // the plot: one along the left edge and one along the bottom edge, which only the rulers can put there.
+  const inside = async (edge: 'left' | 'bottom') => {
+    const texts = nodes(page).locator('svg text');
+    const box = (await plot.boundingBox()) as { x: number; y: number; width: number; height: number };
+    for (let i = 0; i < (await texts.count()); i++) {
+      const b = await texts.nth(i).boundingBox();
+      if (!b || b.width === 0) continue;
+      const within =
+        b.x >= box.x - 1 &&
+        b.y >= box.y - 1 &&
+        b.x + b.width <= box.x + box.width + 1 &&
+        b.y + b.height <= box.y + box.height + 1;
+      if (!within) continue;
+      if (edge === 'left' && b.x < box.x + 30) return true;
+      if (edge === 'bottom' && b.y + b.height > box.y + box.height - 30) return true;
+    }
+    return false;
+  };
+  await expect.poll(() => inside('left')).toBe(true);
+  await expect.poll(() => inside('bottom')).toBe(true);
 });
 
 test('hovering a graph shows coordinates, snapped to where two lines cross', async ({ page }) => {
@@ -86,7 +105,7 @@ test('hovering a graph shows coordinates, snapped to where two lines cross', asy
   const plot = nodes(page).getByRole('application', { name: 'Graph' });
   await expect(nodes(page).locator('svg text').first()).toBeVisible();
   const at = (await plot.boundingBox()) as { x: number; y: number; width: number; height: number };
-  const tip = nodes(page).locator('[role=status]');
+  const tip = nodes(page).locator('[data-hover-tip]');
   // Sweep along the plot: near the crossing the tooltip reads exactly (2, 2), however the pointer lines up.
   await page.mouse.move(at.x + 5, at.y + at.height / 2);
   // The window refits as the rows arrive, so sweep until the tooltip has been to the crossing.
@@ -102,4 +121,20 @@ test('hovering a graph shows coordinates, snapped to where two lines cross', asy
       { timeout: 15_000 },
     )
     .toBe(true);
+});
+
+test('typing y=e^x fits a sane window and the page stays responsive', async ({ page }) => {
+  await openApp(page);
+  await placeNode(page, 'Graph');
+  const field = nodes(page).locator('li').first().locator('math-field');
+  await field.click();
+  await field.evaluate((f: HTMLElement & { value: string }) => {
+    f.value = 'y=e^x';
+    f.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await expect(
+    nodes(page).locator('svg path[stroke-linejoin="round"], svg .mafs-plot-of-x').first(),
+  ).toBeAttached();
+  await expect.poll(async () => (await nodes(page).locator('svg text').count()) < 60).toBe(true);
+  await expect(nodes(page).getByRole('application', { name: 'Graph' })).toBeVisible();
 });

@@ -10,7 +10,17 @@ interface GraphViewState {
   markMoved: (id: string) => void;
   /** Fits the window to the equations again, whatever the user did to it. */
   fit: (id: string) => void;
+  /** The window is gone (the plot unmounted), so the next one fits again. */
+  unmove: (id: string) => void;
+  /** The node is gone. */
+  forget: (id: string) => void;
 }
+
+const without = <T>(record: Record<string, T>, id: string) => {
+  if (!(id in record)) return record;
+  const { [id]: _, ...rest } = record;
+  return rest;
+};
 
 export const useGraphView = create<GraphViewState>((set) => ({
   moved: {},
@@ -21,4 +31,6 @@ export const useGraphView = create<GraphViewState>((set) => ({
       const { [id]: _, ...moved } = s.moved;
       return { moved, fits: { ...s.fits, [id]: (s.fits[id] ?? 0) + 1 } };
     }),
+  unmove: (id) => set((s) => (s.moved[id] ? { moved: without(s.moved, id) } : s)),
+  forget: (id) => set((s) => ({ moved: without(s.moved, id), fits: without(s.fits, id) })),
 }));

@@ -3,7 +3,16 @@ import { Plus, X } from 'lucide-react';
 import { Coordinates, Mafs, Plot, Point, usePaneContext, useTransformContext, vec } from 'mafs';
 import 'mafs/core.css';
 import { Popover } from 'radix-ui';
-import { type PointerEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  type PointerEvent,
+  type RefObject,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { AskSlot } from '@/ai/AskSlot';
 import { CompleteSlot } from '@/ai/CompleteSlot';
 import { useInlineAsk } from '@/ai/useInlineAsk';
@@ -19,7 +28,7 @@ import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
 import { graphAsk, graphComplete } from './ask';
 import { newEquation } from './equations';
-import { DEFAULT_BOX, fitBox, niceStep } from './fit';
+import { DEFAULT_BOX, fitBox, niceStep, sane } from './fit';
 import { buildProbe, coordinate, type Frame, type Hit, type Probe, probeAt, toPx } from './hover';
 import { implicitSegments, segmentsPath, shadedPath } from './implicit';
 import { classifyRelation, type PlotFn, type PlotFn2, type Relation, type Where } from './relation';
@@ -33,6 +42,10 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
   const plotRef = useRef<HTMLDivElement>(null);
   const { height } = useElementSize(plotRef);
   const { equations } = data;
+  // Only a drag that began on the plot is a pan, not a text selection that happens to cross it.
+  const dragging = useRef(false);
+  // The node going away takes its window state with it.
+  useEffect(() => () => useGraphView.getState().forget(id), [id]);
 
   const setRow = (index: number, patch: Partial<GraphEquation>) =>
     update({ equations: equations.map((e, i) => (i === index ? { ...e, ...patch } : e)) });
@@ -111,7 +124,19 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
         aria-label="Graph"
         className="nodrag nopan nowheel min-h-0 flex-1"
         // Dragging, wheeling or keying the plot is the user taking the window: edits stop refitting it.
-        onPointerMove={(e) => e.buttons === 1 && useGraphView.getState().markMoved(id)}
+        onPointerDown={(e) => {
+          dragging.current = e.button === 0;
+        }}
+        onPointerUp={() => {
+          dragging.current = false;
+        }}
+        onPointerCancel={() => {
+          dragging.current = false;
+        }}
+        onPointerMove={(e) => {
+          if (e.buttons !== 1) dragging.current = false;
+          else if (dragging.current) useGraphView.getState().markMoved(id);
+        }}
         onWheel={() => useGraphView.getState().markMoved(id)}
         onKeyDown={(e) => /^(Arrow|[+\-=_])/.test(e.key) && useGraphView.getState().markMoved(id)}
       >
@@ -154,18 +179,33 @@ function Plot2D({
   const moved = useGraphView((s) => s.moved[id] === true);
   const fits = useGraphView((s) => s.fits[id] ?? 0);
   const fitted = useMemo(() => fitBox(compiled), [compiled]);
+  // Unmounting (the canvas is switched, the node is squeezed to nothing) drops the window, so it is fitted again.
+  useEffect(() => () => useGraphView.getState().unmove(id), [id]);
   // While the rows do not parse the last window stays, rather than jumping back to the default and again.
   const shown = useRef<{ box: typeof DEFAULT_BOX; key: string }>({ box: DEFAULT_BOX, key: 'start' });
   if (!moved) {
     const box = fitted ?? (shown.current.key === 'start' ? DEFAULT_BOX : shown.current.box);
     shown.current = { box, key: `${box.x}/${box.y}/${fits}/${equalAxes}` };
   }
-  const { box, key } = shown.current;
+  // A window Mafs could not label (and would hang trying to) is never shown.
+  const { box, key } = sane(shown.current.box) ? shown.current : { box: DEFAULT_BOX, key: 'default' };
 
   // Hovering shows the coordinates of the curve under the pointer, snapped to the places that matter: where curves
   // cross each other and the axes, and drawn points. The probe of the window is built when first needed.
   const [frame, setFrame] = useState<Frame>();
+  const onFrame = useCallback(
+    (f: Frame) =>
+      setFrame((old) =>
+        old && old.width === f.width && old.height === f.height && same(old.x, f.x) && same(old.y, f.y)
+          ? old
+          : f,
+      ),
+    [],
+  );
   const [hover, setHover] = useState<{ hit: Hit; at: readonly [number, number] }>();
+  // The mark is at pixels: once pan, zoom or size moves the window it is no longer where it was found.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: clears when the frame changes.
+  useEffect(() => setHover(undefined), [frame]);
   const probe = useRef<{ compiled: unknown; frame: Frame; probe: Probe } | undefined>(undefined);
   const probeFor = (f: Frame) => {
     if (probe.current?.compiled !== compiled || probe.current.frame !== f)
@@ -194,7 +234,7 @@ function Plot2D({
         preserveAspectRatio={equalAxes ? 'contain' : false}
       >
         <Axes />
-        <FrameReporter onFrame={setFrame} />
+        <FrameReporter onFrame={onFrame} />
         {compiled.map((relation, index) =>
           relation ? (
             // biome-ignore lint/suspicious/noArrayIndexKey: one plot per row.
@@ -207,25 +247,53 @@ function Plot2D({
   );
 }
 
+const same = (a: readonly [number, number], b: readonly [number, number]) => a[0] === b[0] && a[1] === b[1];
+
+type ViewBox = { x: number; y: number; w: number; h: number };
+
+/**
+ * The visible part of Mafs' drawing space, read from the svg's viewBox. Panning moves the viewBox without changing
+ * anything Mafs shares with its children (the view transform stays the same), so it is watched on the svg itself.
+ */
+function useViewBox(): [RefObject<SVGGElement | null>, ViewBox | undefined] {
+  const anchor = useRef<SVGGElement>(null);
+  const [view, setView] = useState<ViewBox>();
+  useLayoutEffect(() => {
+    const svg = anchor.current?.ownerSVGElement;
+    if (!svg) return;
+    const read = () => {
+      const box = svg.viewBox.baseVal;
+      setView((old) =>
+        old && old.x === box.x && old.y === box.y && old.w === box.width && old.h === box.height
+          ? old
+          : { x: box.x, y: box.y, w: box.width, h: box.height },
+      );
+    };
+    read();
+    const watch = new MutationObserver(read);
+    watch.observe(svg, { attributes: true, attributeFilter: ['viewBox'] });
+    return () => watch.disconnect();
+  }, []);
+  return [anchor, view];
+}
+
 /** Tells Plot2D which part of the plane the window shows, in graph coordinates, whenever pan, zoom or size changes it. */
 function FrameReporter({ onFrame }: { onFrame: (frame: Frame) => void }) {
   const { viewTransform } = useTransformContext();
-  const anchor = useRef<SVGGElement>(null);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the svg's viewBox follows the transform.
+  const [anchor, box] = useViewBox();
   useLayoutEffect(() => {
-    const box = anchor.current?.ownerSVGElement?.viewBox.baseVal;
     if (!box) return;
     const origin = vec.transform([0, 0], viewTransform);
     const scaleX = vec.transform([1, 0], viewTransform)[0] - origin[0];
     const scaleY = vec.transform([0, 1], viewTransform)[1] - origin[1];
     if (!scaleX || !scaleY) return;
     onFrame({
-      x: [box.x / scaleX, (box.x + box.width) / scaleX],
-      y: [(box.y + box.height) / scaleY, box.y / scaleY],
-      width: box.width,
-      height: box.height,
+      x: [box.x / scaleX, (box.x + box.w) / scaleX],
+      y: [(box.y + box.h) / scaleY, box.y / scaleY],
+      width: box.w,
+      height: box.h,
     });
-  }, [viewTransform]);
+  }, [viewTransform, box, onFrame]);
   return <g ref={anchor} />;
 }
 
@@ -241,7 +309,9 @@ function HoverTip({ hit, at, frame }: { hit: Hit; at: readonly [number, number];
         style={{ left: x, top: y }}
       />
       <span
-        role="status"
+        // A mouse-only aid that follows the pointer: not for a screen reader to announce on every move.
+        aria-hidden
+        data-hover-tip=""
         className="pointer-events-none absolute rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-2xs whitespace-nowrap tabular-nums"
         style={{
           left: x,
@@ -300,8 +370,9 @@ function Curve({ relation, color }: { relation: Relation; color: string }) {
     case 'points':
       return (
         <>
-          {relation.points.map(([x, y]) => (
-            <Point key={`${x},${y}`} x={x} y={y} color={color} />
+          {relation.points.map(([x, y], i) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: the same point can be given twice.
+            <Point key={`${i}:${x},${y}`} x={x} y={y} color={color} />
           ))}
         </>
       );
@@ -415,8 +486,18 @@ function Axes() {
     vec.transform([1, 0], viewTransform),
     vec.transform([0, 1], viewTransform),
   ];
-  const xStep = niceStep(GRID_PX.x / Math.abs(unitX[0] - origin[0]));
-  const yStep = niceStep(GRID_PX.y / Math.abs(unitY[1] - origin[1]));
+  const [pxX, pxY] = [Math.abs(unitX[0] - origin[0]), Math.abs(unitY[1] - origin[1])];
+  // Mafs rounds its scale to 5 places: a window so wide that it rounds to 0 cannot be gridded (a step of 1 would be
+  // billions of labels), so it gets bare axes.
+  if (!(pxX > 0 && pxY > 0 && Number.isFinite(pxX + pxY)))
+    return (
+      <Coordinates.Cartesian
+        xAxis={{ lines: false, labels: false }}
+        yAxis={{ lines: false, labels: false }}
+      />
+    );
+  const xStep = niceStep(GRID_PX.x / pxX);
+  const yStep = niceStep(GRID_PX.y / pxY);
   return (
     <>
       <Coordinates.Cartesian xAxis={{ lines: xStep }} yAxis={{ lines: yStep }} />
@@ -442,19 +523,7 @@ function multiples(lo: number, hi: number, step: number): number[] {
  */
 function Rulers({ xStep, yStep }: { xStep: number; yStep: number }) {
   const { viewTransform } = useTransformContext();
-  const anchor = useRef<SVGGElement>(null);
-  // The visible part of Mafs' drawing space, read from the svg it is drawn in.
-  const [view, setView] = useState<{ x: number; y: number; w: number; h: number }>();
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the svg's viewBox follows the transform.
-  useLayoutEffect(() => {
-    const box = anchor.current?.ownerSVGElement?.viewBox.baseVal;
-    if (!box) return;
-    setView((old) =>
-      old && old.x === box.x && old.y === box.y && old.w === box.width && old.h === box.height
-        ? old
-        : { x: box.x, y: box.y, w: box.width, h: box.height },
-    );
-  }, [viewTransform]);
+  const [anchor, view] = useViewBox();
 
   const origin = vec.transform([0, 0], viewTransform);
   const scaleX = vec.transform([1, 0], viewTransform)[0] - origin[0];
