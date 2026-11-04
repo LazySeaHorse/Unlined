@@ -21,7 +21,8 @@ import { graphAsk, graphComplete } from './ask';
 import { newEquation } from './equations';
 import { DEFAULT_BOX, fitBox, niceStep } from './fit';
 import { implicitSegments, segmentsPath, shadedPath } from './implicit';
-import { classifyRelation, type PlotFn2, type Relation } from './relation';
+import { classifyRelation, type PlotFn, type PlotFn2, type Relation, type Where } from './relation';
+import { restrictedPath } from './restricted';
 import { useGraphView } from './view';
 
 export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'graph'>>) {
@@ -209,9 +210,17 @@ function ColorDot({ color, onChange }: { color: SectionColor; onChange?: (color:
 function Curve({ relation, color }: { relation: Relation; color: string }) {
   switch (relation.kind) {
     case 'y':
-      return <Plot.OfX y={relation.fn} color={color} />;
+      return relation.where ? (
+        <RestrictedCurve fn={relation.fn} where={relation.where} swapped={false} color={color} />
+      ) : (
+        <Plot.OfX y={relation.fn} color={color} />
+      );
     case 'x':
-      return <Plot.OfY x={relation.fn} color={color} />;
+      return relation.where ? (
+        <RestrictedCurve fn={relation.fn} where={relation.where} swapped color={color} />
+      ) : (
+        <Plot.OfY x={relation.fn} color={color} />
+      );
     case 'implicit':
       return <ImplicitCurve fn={relation.fn} color={color} />;
     case 'shade':
@@ -247,6 +256,42 @@ function ShadedArea({ fn, strict, color }: { fn: PlotFn2; strict: boolean; color
         }}
       />
     </>
+  );
+}
+
+/** A curve drawn only where its restriction holds, over the part of the plane Mafs has panes for. */
+function RestrictedCurve({
+  fn,
+  where,
+  swapped,
+  color,
+}: {
+  fn: PlotFn;
+  where: Where;
+  swapped: boolean;
+  color: string;
+}) {
+  const { xPaneRange, yPaneRange } = usePaneContext();
+  const d = useMemo(
+    () =>
+      swapped
+        ? restrictedPath(fn, where, true, yPaneRange, xPaneRange)
+        : restrictedPath(fn, where, false, xPaneRange, yPaneRange),
+    [fn, where, swapped, xPaneRange, yPaneRange],
+  );
+  return (
+    <path
+      d={d}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={{
+        fill: 'none',
+        stroke: color,
+        vectorEffect: 'non-scaling-stroke',
+        transform: 'var(--mafs-view-transform)',
+      }}
+    />
   );
 }
 

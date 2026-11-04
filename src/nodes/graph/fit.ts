@@ -50,8 +50,19 @@ function interesting(fn: PlotFn, scale: number): Point[] {
   if (finite(atZero)) points.push({ t: 0, v: atZero });
   const biggest = Math.max(0, ...vs.filter(finite).map(Math.abs));
   const noise = 1e-10 * biggest;
+  const sizes = vs
+    .filter(finite)
+    .map(Math.abs)
+    .sort((p, q) => p - q);
+  const typical = sizes[Math.floor(sizes.length / 2)] ?? 0;
   for (let i = 0; i < SAMPLES - 1; i++) {
     const [a, b] = [vs[i], vs[i + 1]];
+    // Where the curve starts or stops being drawn (a restriction, the edge of a domain) is worth seeing.
+    if (finite(a) !== finite(b)) {
+      // Not at a pole, where the value on the finite side is already enormous.
+      const edge = finite(a) ? { t: ts[i], v: a } : { t: ts[i + 1], v: b };
+      if (Math.abs(edge.v) <= 10 * typical + 1e-12) points.push(edge);
+    }
     if (!finite(a) || !finite(b)) continue;
     if (a === 0) points.push({ t: ts[i], v: 0 });
     else if (a * b < 0) {
@@ -124,8 +135,19 @@ function view(fn: PlotFn): { t: [number, number]; v: [number, number] } | undefi
 
 /** The function a row draws over `y = fn(x)` or `x = fn(y)`, which is all that is fitted. */
 const asFunction = (relation: Relation): { fn: PlotFn; swapped: boolean } | undefined => {
-  if (relation.kind === 'y') return { fn: relation.fn, swapped: false };
-  if (relation.kind === 'x') return { fn: relation.fn, swapped: true };
+  if (relation.kind === 'y' || relation.kind === 'x') {
+    const { fn, where } = relation;
+    const swapped = relation.kind === 'x';
+    // Where a restriction holds nowhere the function has no value, as outside its own domain.
+    if (!where) return { fn, swapped };
+    return {
+      swapped,
+      fn: (t) => {
+        const v = fn(t);
+        return (swapped ? where(v, t) : where(t, v)) ? v : Number.NaN;
+      },
+    };
+  }
   if (relation.kind === 'region') return { fn: relation.fn, swapped: relation.axis === 'x' };
   return undefined;
 };

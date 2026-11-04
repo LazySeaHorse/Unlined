@@ -31,3 +31,17 @@ test('the graph window fits what is typed, and the right-click menu has Fit and 
   await page.keyboard.press('Escape');
   await page.screenshot({ path: test.info().outputPath('fit.png') });
 });
+
+test('a row restricted with braces is drawn only where the restriction holds', async ({ page }) => {
+  await openApp(page);
+  await placeNode(page, 'Graph');
+  const field = nodes(page).locator('li').first().locator('math-field');
+  await field.click();
+  await field.evaluate((f: HTMLElement & { value: string }) => {
+    f.value = 'y=x\\left\\{1<x<5\\right\\}';
+    f.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  const curve = nodes(page).locator('svg path[stroke-linejoin="round"]');
+  await expect(curve).toHaveCount(1);
+  await page.screenshot({ path: test.info().outputPath('restricted.png') });
+});

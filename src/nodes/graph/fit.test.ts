@@ -72,6 +72,21 @@ describe('fitBox', () => {
   });
 });
 
+describe('fitBox with restrictions', () => {
+  it('shows a restricted segment, from its ends', () => {
+    const relation: Relation = { kind: 'y', fn: (t) => 100 * t, where: (px) => px > 20 && px < 50 };
+    const b = fitBox([relation]) as NonNullable<ReturnType<typeof fitBox>>;
+    expect(b.x[0]).toBeLessThanOrEqual(20);
+    expect(b.x[1]).toBeGreaterThanOrEqual(50);
+    expect(b.y[1]).toBeGreaterThanOrEqual(5000);
+  });
+  it('shows where a square root starts', () => {
+    const b = fitBox([y(Math.sqrt)]) as NonNullable<ReturnType<typeof fitBox>>;
+    expect(b.x[0]).toBeLessThanOrEqual(0);
+    expect(b.x[1]).toBeGreaterThan(0);
+  });
+});
+
 describe('niceStep', () => {
   it('rounds up to 1, 2 or 5 times a power of ten', () => {
     expect(niceStep(0.8)).toBe(1);

@@ -1,6 +1,6 @@
 import { ComputeEngine, compile } from '@cortex-js/compute-engine';
 import { describe, expect, it } from 'vitest';
-import { classifyRelation, type Relation } from './relation';
+import { classifyRelation, type Relation, splitRestrictions } from './relation';
 
 const engine = { ce: new ComputeEngine(), compile };
 const read = (latex: string) => classifyRelation(engine, latex);
@@ -124,5 +124,73 @@ describe('classifyRelation: what it cannot draw', () => {
     expect(read('t<2')).toBeNull();
     expect(read('1<2')).toBeNull();
     expect(read('1=1')).toBeNull();
+  });
+});
+
+describe('splitRestrictions', () => {
+  it('takes braces off the end of a row, in any spelling', () => {
+    for (const latex of [
+      'y=x\\{1<x<5\\}',
+      'y=x\\left\\{1<x<5\\right\\}',
+      'y=x \\lbrace 1<x<5\\rbrace',
+      'y=x\\,\\{1<x<5\\}',
+    ])
+      expect(splitRestrictions(latex)).toEqual({ body: 'y=x', where: ['1<x<5'] });
+  });
+  it('takes several groups, and leaves plain braces alone', () => {
+    expect(splitRestrictions('y=\\frac{1}{x}\\{x>0\\}\\{y<3\\}')).toEqual({
+      body: 'y=\\frac{1}{x}',
+      where: ['x>0', 'y<3'],
+    });
+    expect(splitRestrictions('y=x^{2}')).toEqual({ body: 'y=x^{2}', where: [] });
+  });
+});
+
+describe('classifyRelation: restrictions', () => {
+  const where = (latex: string) => {
+    const r = must(latex);
+    if (r.kind !== 'y' && r.kind !== 'x') throw new Error(`${latex} is ${r.kind}`);
+    return r.where as NonNullable<typeof r.where>;
+  };
+
+  it('keeps a curve where its restriction holds', () => {
+    const w = where('y=x\\{1<x<5\\}');
+    expect(w(3, 3)).toBe(true);
+    expect(w(1, 1)).toBe(false);
+    expect(w(6, 6)).toBe(false);
+    expect(must('y=x').kind).toBe('y');
+  });
+
+  it('takes one-sided, inclusive and chained restrictions, joined by commas', () => {
+    expect(where('y=x\\{x\\ge2\\}')(2, 2)).toBe(true);
+    expect(where('y=x\\{x>2\\}')(2, 2)).toBe(false);
+    expect(where('y=x\\{1<x\\le5\\}')(5, 5)).toBe(true);
+    const both = where('y=x\\{x>0,y<3\\}');
+    expect(both(2, 2)).toBe(true);
+    expect(both(2, 4)).toBe(false);
+    expect(both(-1, -1)).toBe(false);
+  });
+
+  it('may restrict y, and an x = row', () => {
+    expect(where('y=x\\{y>1\\}')(0, 2)).toBe(true);
+    expect(where('y=x\\{y>1\\}')(0, 0)).toBe(false);
+    expect(where('x=3\\{0<y<2\\}')(3, 1)).toBe(true);
+  });
+
+  it('cuts areas and implicit curves out where the restriction fails', () => {
+    const circle = must('x^2+y^2=1\\{y>0\\}');
+    if (circle.kind !== 'implicit') throw new Error('not implicit');
+    expect(Number.isNaN(circle.fn(0, -1))).toBe(true);
+    expect(circle.fn(0, 1)).toBe(0);
+    const area = must('y>x\\{x>0\\}');
+    if (area.kind !== 'shade') throw new Error('not shade');
+    expect(area.fn(1, 3)).toBe(2);
+    expect(Number.isNaN(area.fn(-1, 3))).toBe(true);
+  });
+
+  it('draws nothing for a restriction it cannot read', () => {
+    expect(read('y=x\\{hello\\}')).toBeNull();
+    expect(read('y=x\\{z>1\\}')).toBeNull();
+    expect(read('y=x\\{x=1\\}')).toBeNull();
   });
 });
