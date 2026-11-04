@@ -36,7 +36,7 @@ export const CURVE_PX = 10;
 const GRID = 32;
 
 /** Pixels from the window's left and top edge. */
-const toPx = (f: Frame, [x, y]: Pt): Pt => [
+export const toPx = (f: Frame, [x, y]: Pt): Pt => [
   ((x - f.x[0]) / (f.x[1] - f.x[0])) * f.width,
   ((f.y[1] - y) / (f.y[1] - f.y[0])) * f.height,
 ];

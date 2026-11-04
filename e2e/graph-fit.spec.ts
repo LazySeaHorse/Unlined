@@ -70,3 +70,36 @@ test('points are drawn, and rulers hold the edges once the axes are panned away'
   await expect.poll(async () => (await labels()).includes('-2.5')).toBe(true);
   await expect.poll(async () => /\b5\b/.test(await labels())).toBe(true);
 });
+
+test('hovering a graph shows coordinates, snapped to where two lines cross', async ({ page }) => {
+  await openApp(page);
+  await placeNode(page, 'Graph');
+  await nodes(page).getByRole('button', { name: 'Add equation' }).click();
+  const fields = nodes(page).locator('li math-field');
+  const set = (i: number, value: string) =>
+    fields.nth(i).evaluate((f: HTMLElement & { value: string }, v: string) => {
+      f.value = v;
+      f.dispatchEvent(new Event('input', { bubbles: true }));
+    }, value);
+  await set(0, 'y=x');
+  await set(1, 'y=-x+4');
+  const plot = nodes(page).getByRole('application', { name: 'Graph' });
+  await expect(nodes(page).locator('svg text').first()).toBeVisible();
+  const at = (await plot.boundingBox()) as { x: number; y: number; width: number; height: number };
+  const tip = nodes(page).locator('[role=status]');
+  // Sweep along the plot: near the crossing the tooltip reads exactly (2, 2), however the pointer lines up.
+  await page.mouse.move(at.x + 5, at.y + at.height / 2);
+  // The window refits as the rows arrive, so sweep until the tooltip has been to the crossing.
+  await expect
+    .poll(
+      async () => {
+        for (let i = 0; i <= 60; i++) {
+          await page.mouse.move(at.x + (at.width * i) / 60, at.y + at.height * 0.45);
+          if ((await tip.allTextContents()).join(' ').includes('(2, 2)')) return true;
+        }
+        return false;
+      },
+      { timeout: 15_000 },
+    )
+    .toBe(true);
+});

@@ -3,7 +3,7 @@ import { Plus, X } from 'lucide-react';
 import { Coordinates, Mafs, Plot, Point, usePaneContext, useTransformContext, vec } from 'mafs';
 import 'mafs/core.css';
 import { Popover } from 'radix-ui';
-import { useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type PointerEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AskSlot } from '@/ai/AskSlot';
 import { CompleteSlot } from '@/ai/CompleteSlot';
 import { useInlineAsk } from '@/ai/useInlineAsk';
@@ -20,6 +20,7 @@ import { useUpdateNodeData } from '../useNodeData';
 import { graphAsk, graphComplete } from './ask';
 import { newEquation } from './equations';
 import { DEFAULT_BOX, fitBox, niceStep } from './fit';
+import { buildProbe, coordinate, type Frame, type Hit, type Probe, probeAt, toPx } from './hover';
 import { implicitSegments, segmentsPath, shadedPath } from './implicit';
 import { classifyRelation, type PlotFn, type PlotFn2, type Relation, type Where } from './relation';
 import { restrictedPath } from './restricted';
@@ -160,23 +161,98 @@ function Plot2D({
     shown.current = { box, key: `${box.x}/${box.y}/${fits}/${equalAxes}` };
   }
   const { box, key } = shown.current;
+
+  // Hovering shows the coordinates of the curve under the pointer, snapped to the places that matter: where curves
+  // cross each other and the axes, and drawn points. The probe of the window is built when first needed.
+  const [frame, setFrame] = useState<Frame>();
+  const [hover, setHover] = useState<{ hit: Hit; at: readonly [number, number] }>();
+  const probe = useRef<{ compiled: unknown; frame: Frame; probe: Probe } | undefined>(undefined);
+  const probeFor = (f: Frame) => {
+    if (probe.current?.compiled !== compiled || probe.current.frame !== f)
+      probe.current = { compiled, frame: f, probe: buildProbe(compiled, f) };
+    return probe.current.probe;
+  };
+  const point = (e: PointerEvent<HTMLDivElement>) => {
+    if (!frame || e.pointerType !== 'mouse' || e.buttons !== 0) return setHover(undefined);
+    const rect = e.currentTarget.getBoundingClientRect();
+    const hit = probeAt(probeFor(frame), e.clientX - rect.left, e.clientY - rect.top);
+    setHover((old) =>
+      hit && old && old.hit.x === hit.x && old.hit.y === hit.y && old.hit.kind === hit.kind
+        ? old
+        : hit && { hit, at: toPx(frame, [hit.x, hit.y]) },
+    );
+  };
   return (
-    <Mafs
-      key={key}
-      height={height}
-      pan
-      zoom={{ min: 0.0001, max: 10000 }}
-      viewBox={{ x: box.x, y: box.y, padding: 0 }}
-      preserveAspectRatio={equalAxes ? 'contain' : false}
-    >
-      <Axes />
-      {compiled.map((relation, index) =>
-        relation ? (
-          // biome-ignore lint/suspicious/noArrayIndexKey: one plot per row.
-          <Curve key={index} relation={relation} color={linkSwatch(equations[index].color)} />
-        ) : null,
-      )}
-    </Mafs>
+    // biome-ignore lint/a11y/noStaticElementInteractions: hovering only adds a tooltip over the graph.
+    <div className="relative size-full" onPointerMove={point} onPointerLeave={() => setHover(undefined)}>
+      <Mafs
+        key={key}
+        height={height}
+        pan
+        zoom={{ min: 0.0001, max: 10000 }}
+        viewBox={{ x: box.x, y: box.y, padding: 0 }}
+        preserveAspectRatio={equalAxes ? 'contain' : false}
+      >
+        <Axes />
+        <FrameReporter onFrame={setFrame} />
+        {compiled.map((relation, index) =>
+          relation ? (
+            // biome-ignore lint/suspicious/noArrayIndexKey: one plot per row.
+            <Curve key={index} relation={relation} color={linkSwatch(equations[index].color)} />
+          ) : null,
+        )}
+      </Mafs>
+      {hover && frame && <HoverTip hit={hover.hit} at={hover.at} frame={frame} />}
+    </div>
+  );
+}
+
+/** Tells Plot2D which part of the plane the window shows, in graph coordinates, whenever pan, zoom or size changes it. */
+function FrameReporter({ onFrame }: { onFrame: (frame: Frame) => void }) {
+  const { viewTransform } = useTransformContext();
+  const anchor = useRef<SVGGElement>(null);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the svg's viewBox follows the transform.
+  useLayoutEffect(() => {
+    const box = anchor.current?.ownerSVGElement?.viewBox.baseVal;
+    if (!box) return;
+    const origin = vec.transform([0, 0], viewTransform);
+    const scaleX = vec.transform([1, 0], viewTransform)[0] - origin[0];
+    const scaleY = vec.transform([0, 1], viewTransform)[1] - origin[1];
+    if (!scaleX || !scaleY) return;
+    onFrame({
+      x: [box.x / scaleX, (box.x + box.width) / scaleX],
+      y: [(box.y + box.height) / scaleY, box.y / scaleY],
+      width: box.width,
+      height: box.height,
+    });
+  }, [viewTransform]);
+  return <g ref={anchor} />;
+}
+
+/** A mark on the place found, and its coordinates beside it. */
+function HoverTip({ hit, at, frame }: { hit: Hit; at: readonly [number, number]; frame: Frame }) {
+  const [x, y] = at;
+  const special = hit.kind !== 'curve';
+  return (
+    <>
+      <span
+        aria-hidden
+        className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-fg bg-surface ${special ? 'size-3.5' : 'size-2'}`}
+        style={{ left: x, top: y }}
+      />
+      <span
+        role="status"
+        className="pointer-events-none absolute rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-2xs whitespace-nowrap tabular-nums"
+        style={{
+          left: x,
+          top: y,
+          // Away from the mark, towards the middle of the graph, so it stays in view.
+          transform: `translate(${x > frame.width / 2 ? 'calc(-100% - 12px)' : '12px'}, ${y < 36 ? '12px' : 'calc(-100% - 12px)'})`,
+        }}
+      >
+        ({coordinate(hit.x)}, {coordinate(hit.y)})
+      </span>
+    </>
   );
 }
 
