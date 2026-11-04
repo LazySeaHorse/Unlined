@@ -35,7 +35,7 @@ export function Bubble({ anchor, label, passive, onOutside, className, children 
         <Popover.Content
           side="bottom"
           align="start"
-          sideOffset={6}
+          sideOffset={passive ? 6 : 2}
           collisionPadding={8}
           updatePositionStrategy="always"
           aria-label={passive ? undefined : label}

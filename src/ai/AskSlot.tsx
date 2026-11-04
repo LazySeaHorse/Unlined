@@ -1,4 +1,4 @@
-import { Loader2, Sparkles, TriangleAlert } from 'lucide-react';
+import { TriangleAlert } from 'lucide-react';
 import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef } from 'react';
 import { type FieldSnapshot, snapshotField } from './askField';
 import { Bubble } from './Bubble';
@@ -22,8 +22,8 @@ interface AskSlotProps<Key extends string | number, Value> {
 
 /**
  * Where a field and its ask (useInlineAsk) meet. The field is never swapped or resized: an open ask is a bubble
- * (Bubble) that hangs below it, with a box for the words, what the keys do, a "thinking" state while the answer is
- * worked out, the answer for Tab or Enter to take, and the reason when there is none.
+ * (Bubble) that hangs flush below it, drawn as one quiet row (the words, the keys) with a line that sweeps while
+ * the answer is worked out, then the answer for Tab or Enter to take, or the reason when there is none.
  */
 export function AskSlot<Key extends string | number, Value>({
   ask,
@@ -123,6 +123,7 @@ export function AskSlot<Key extends string | number, Value>({
         <Bubble
           anchor={() => snapshot.current?.anchor?.() ?? slot.current?.firstElementChild}
           label="Ask AI"
+          className="ask-surface"
           onOutside={ask.close}
         >
           <AskPanel
@@ -173,31 +174,43 @@ function AskPanel<Key, Value>({
           ];
   return (
     <div className="ask-bubble" data-state={error ? 'failed' : state.phase}>
-      <div className="ask-head">
-        <Sparkles aria-hidden className="size-3.5" />
-        <span>Ask AI</span>
+      {/* A hairline that sweeps with colour while the answer is worked out. */}
+      <div aria-hidden className="ask-line" />
+      <div className="ask-row">
+        <span aria-hidden className="ask-tag">
+          ASK
+        </span>
+        <input
+          ref={input}
+          aria-label="Describe it"
+          placeholder={placeholder}
+          className="ask-input nodrag nopan nokey"
+          data-state={error ? 'failed' : state.phase}
+          aria-invalid={error ? true : undefined}
+          title={error}
+          value={state.words}
+          onChange={(event) => onWords(event.target.value)}
+          onKeyDown={onKeyDown}
+          spellCheck={false}
+          autoComplete="off"
+        />
+        <span className="ask-keys">
+          {hints.map(([key, what]) => (
+            <span key={key} className="ask-key" title={what}>
+              <kbd>{key}</kbd>
+              {/* Named only when there is an answer to take or leave. */}
+              {state.phase === 'ghost' ? (
+                <span className="ask-key-name"> {what}</span>
+              ) : (
+                <span className="sr-only"> {what}</span>
+              )}
+            </span>
+          ))}
+        </span>
       </div>
-      <input
-        ref={input}
-        aria-label="Describe it"
-        placeholder={placeholder}
-        className="ask-input nodrag nopan nokey"
-        data-state={error ? 'failed' : state.phase}
-        aria-invalid={error ? true : undefined}
-        title={error}
-        value={state.words}
-        onChange={(event) => onWords(event.target.value)}
-        onKeyDown={onKeyDown}
-        spellCheck={false}
-        autoComplete="off"
-      />
       {/* There while the ask is open, so a screen reader reads each change once: the wait, the reason, the answer. */}
       <div role="status" aria-live="polite" className="ask-status">
-        {state.phase === 'running' && (
-          <p className="ask-note">
-            <Loader2 aria-hidden className="ask-spin size-3.5" /> Thinking…
-          </p>
-        )}
+        {state.phase === 'running' && <p className="sr-only">Thinking…</p>}
         {error && (
           <p className="ask-note ask-error">
             <TriangleAlert aria-hidden className="size-3.5 shrink-0" /> {error}
@@ -205,13 +218,6 @@ function AskPanel<Key, Value>({
         )}
         {state.phase === 'ghost' && <div className="ask-ghost">{ghost}</div>}
       </div>
-      <p className="ask-hints">
-        {hints.map(([key, what]) => (
-          <span key={key}>
-            <kbd>{key}</kbd> {what}
-          </span>
-        ))}
-      </p>
     </div>
   );
 }

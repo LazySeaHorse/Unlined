@@ -1116,62 +1116,84 @@ math-field::part(virtual-keyboard-toggle) {
     monospace;
   color: var(--muted);
 }
-.ask-bubble {
-  display: grid;
-  gap: 0.375rem;
-  padding: 0.5rem 0.625rem 0.5rem;
+.ai-bubble.ask-surface {
+  width: max(16rem, min(var(--radix-popper-anchor-width), 28rem));
+  border-color: var(--border);
+  border-radius: 0.5rem;
+  outline: none;
+  box-shadow: var(--elevation-float);
 }
-.ask-head {
+.ask-bubble {
+  position: relative;
+  display: grid;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem 0.375rem;
+}
+/* The hairline: still while typing, sweeping with the accent while the answer is worked out. */
+.ask-line {
+  position: absolute;
+  inset: 0 0.5rem auto;
+  height: 1px;
+  background: var(--border);
+}
+.ask-bubble[data-state="running"] .ask-line {
+  background: linear-gradient(90deg, var(--border) 30%, var(--accent) 50%, var(--border) 70%) 0 0 / 300% 100%;
+}
+.ask-bubble[data-state="failed"] .ask-line {
+  background: var(--danger);
+}
+.ask-row {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  color: var(--accent);
-  font-size: 0.75rem;
-  font-weight: 600;
+  gap: 0.5rem;
+  min-width: 0;
+  padding-top: 0.125rem;
+}
+.ask-tag {
+  flex: none;
+  color: var(--muted);
+  font:
+    500 0.625rem / 1rem "JetBrains Mono",
+    ui-monospace,
+    monospace;
+  letter-spacing: 0.04em;
 }
 .ask-input {
+  flex: 1;
   width: 100%;
   min-width: 0;
   box-sizing: border-box;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  background: var(--surface-2);
-  padding: 0.375rem 0.5rem;
+  border: 0;
+  background: none;
+  padding: 0;
   color: inherit;
   font: inherit;
-  font-size: 0.875rem;
   outline: none;
 }
 .ask-input::placeholder {
   color: var(--muted);
 }
-.ask-input:focus {
-  border-color: var(--accent);
-}
 .ask-input[data-state="running"] {
-  background:
-    linear-gradient(
-      90deg,
-      transparent 30%,
-      color-mix(in srgb, var(--accent) 16%, transparent) 50%,
-      transparent 70%
-    )
-    0 0 / 300% 100% var(--surface-2);
+  color: var(--muted);
 }
 .ask-input[data-state="failed"] {
-  border-color: var(--danger);
+  color: var(--danger);
 }
-@keyframes ask-shimmer {
+.ask-keys {
+  display: flex;
+  flex: none;
+  gap: 0.5rem;
+}
+.ask-key-name {
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+@keyframes ask-sweep {
   from {
     background-position-x: 100%;
   }
   to {
     background-position-x: 0%;
-  }
-}
-@keyframes ask-spin {
-  to {
-    transform: rotate(360deg);
   }
 }
 @keyframes ask-failed {
@@ -1183,19 +1205,16 @@ math-field::part(virtual-keyboard-toggle) {
   }
 }
 @media (prefers-reduced-motion: no-preference) {
-  .ask-input[data-state="running"] {
-    animation: ask-shimmer 1.4s linear infinite;
+  .ask-bubble[data-state="running"] .ask-line {
+    animation: ask-sweep 1.4s linear infinite;
   }
   .ask-input[data-state="failed"] {
     animation: ask-failed 0.25s ease-out;
   }
-  .ask-spin {
-    animation: ask-spin 0.9s linear infinite;
-  }
 }
 /* Empty until there is something to say, and then no gap above it either. */
 .ask-status:empty {
-  margin-top: -0.375rem;
+  display: none;
 }
 .ask-note {
   display: flex;
@@ -1208,14 +1227,13 @@ math-field::part(virtual-keyboard-toggle) {
 .ask-error {
   color: var(--danger);
 }
-/* The answer waiting to be taken, as it would look in the field. */
+/* The answer waiting to be taken, as it would look in the field: a quiet suggestion row. */
 .ask-ghost {
   max-height: 12rem;
   overflow: auto;
-  border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--border));
-  border-radius: 0.5rem;
-  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
-  padding: 0.375rem 0.5rem;
+  border-radius: 0.375rem;
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+  padding: 0.25rem 0.5rem;
 }
 .ask-code {
   margin: 0;
@@ -1225,13 +1243,6 @@ math-field::part(virtual-keyboard-toggle) {
     monospace;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
-}
-.ask-hints {
-  display: flex;
-  gap: 0.875rem;
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.6875rem;
 }
 /* A completion waiting for Tab: one line, beside nothing, never in the way of typing. */
 .ai-bubble-passive {
