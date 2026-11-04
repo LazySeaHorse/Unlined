@@ -138,3 +138,59 @@ test('typing y=e^x fits a sane window and the page stays responsive', async ({ p
   await expect.poll(async () => (await nodes(page).locator('svg text').count()) < 60).toBe(true);
   await expect(nodes(page).getByRole('application', { name: 'Graph' })).toBeVisible();
 });
+
+for (const equal of [false, true]) {
+  test(`the hover mark is under the pointer when the canvas is zoomed${equal ? ' (axes 1:1)' : ''}`, async ({
+    page,
+  }) => {
+    await openApp(page);
+    await placeNode(page, 'Graph');
+    await nodes(page).getByRole('button', { name: 'Add equation' }).click();
+    const fields = nodes(page).locator('li math-field');
+    const set = (i: number, value: string) =>
+      fields.nth(i).evaluate((f: HTMLElement & { value: string }, v: string) => {
+        f.value = v;
+        f.dispatchEvent(new Event('input', { bubbles: true }));
+      }, value);
+    await set(0, 'y=x');
+    await set(1, 'y=-x+4');
+    const plot = nodes(page).getByRole('application', { name: 'Graph' });
+    if (equal) {
+      const at0 = (await plot.boundingBox()) as { x: number; y: number };
+      await page.mouse.click(at0.x + 30, at0.y + 30, { button: 'right' });
+      const item = page
+        .getByRole('menuitemcheckbox', { name: 'Keep axes 1:1' })
+        .or(page.getByRole('menuitem', { name: 'Keep axes 1:1' }));
+      await item.click();
+    }
+    // Zoom the canvas away from 100%: the node is then drawn scaled.
+    for (let i = 0; i < 3; i++) await page.getByRole('button', { name: 'Zoom in' }).click();
+    await page.waitForTimeout(800);
+    const tip = nodes(page).locator('[data-hover-tip]');
+    const mark = nodes(page).locator('[data-hover-mark]').first();
+    await expect(nodes(page).locator('svg text').first()).toBeVisible();
+    const at = (await plot.boundingBox()) as { x: number; y: number; width: number; height: number };
+    // Sweep until the tooltip reads the crossing, then compare the mark with the pointer.
+    let found: { x: number; y: number } | undefined;
+    await expect
+      .poll(
+        async () => {
+          for (let i = 0; i <= 80; i++) {
+            const [mx, my] = [at.x + (at.width * i) / 80, at.y + at.height * 0.45];
+            await page.mouse.move(mx, my);
+            if ((await tip.allTextContents()).join(' ').includes('(2, 2)')) {
+              found = { x: mx, y: my };
+              return true;
+            }
+          }
+          return false;
+        },
+        { timeout: 15_000 },
+      )
+      .toBe(true);
+    const m = (await mark.boundingBox()) as { x: number; y: number; width: number; height: number };
+    const [cx, cy] = [m.x + m.width / 2, m.y + m.height / 2];
+    // Snapping moves the mark off the pointer by up to the snap radius at most; unscaled it was hundreds of pixels.
+    expect(Math.hypot(cx - (found?.x ?? 0), cy - (found?.y ?? 0))).toBeLessThan(25);
+  });
+}

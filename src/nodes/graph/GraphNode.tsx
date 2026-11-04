@@ -215,7 +215,11 @@ function Plot2D({
   const point = (e: PointerEvent<HTMLDivElement>) => {
     if (!frame || e.pointerType !== 'mouse' || e.buttons !== 0) return setHover(undefined);
     const rect = e.currentTarget.getBoundingClientRect();
-    const hit = probeAt(probeFor(frame), e.clientX - rect.left, e.clientY - rect.top);
+    if (!rect.width || !rect.height) return setHover(undefined);
+    // The canvas may be zoomed: the wrapper is then drawn scaled, and the frame is in its own unscaled pixels.
+    const px = ((e.clientX - rect.left) * frame.width) / rect.width;
+    const py = ((e.clientY - rect.top) * frame.height) / rect.height;
+    const hit = probeAt(probeFor(frame), px, py);
     setHover((old) =>
       hit && old && old.hit.x === hit.x && old.hit.y === hit.y && old.hit.kind === hit.kind
         ? old
@@ -305,6 +309,7 @@ function HoverTip({ hit, at, frame }: { hit: Hit; at: readonly [number, number];
     <>
       <span
         aria-hidden
+        data-hover-mark=""
         className={`pointer-events-none absolute -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-fg bg-surface ${special ? 'size-3.5' : 'size-2'}`}
         style={{ left: x, top: y }}
       />
