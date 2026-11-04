@@ -30,7 +30,7 @@ Most digital study tools require a tablet and stylus. Computational notebooks hi
 - **Stacks**: put several nodes on one spot behind tabs, one shown at a time, e.g. a problem, its textbook page and your working. Each card keeps its scroll and state while hidden. Tap Space to fan the cards out and pick one. See [Controls](#controls).
 - **Links**: connect nodes with grid-snapped orthogonal pipes (arrow, dot or bar ends, colour, dashed, a label that may contain `$math$`). Turn on linking mode (toolbar button next to Organise, or `L`), drag from one node to another; click a link for its options, double-click it to name it, right-click for the menu. Between two Math+ nodes a link passes the source's result to the target as a variable: name it `k` (a single letter other than `e` or `i`) to use `k`, or leave it as `ans`. See [Links](#links).
 - **AI control**: let a coding agent (Claude Code, Codex, Gemini CLI, …) read and edit the open canvas through a small local bridge, or a browser agent through WebMCP. See [AI control](#ai-control).
-- **On-device writing help** (opt-in, desktop Chrome): start a line with `?` and say what you want, and Chrome's built-in model writes it in the node's own syntax; or press Tab for the rest of a line. See [On-device writing help](#on-device-writing-help).
+- **On-device writing help** (opt-in): start a line with `?` and say what you want, and Chrome's built-in model or a local server (LM Studio, Ollama, Jan, ...) writes it in the node's own syntax; or press Tab for the rest of a line. See [On-device writing help](#on-device-writing-help).
 - **Dark mode**, **offline PWA**.
 - **Mobile**: read-only viewer. Pan, zoom and switch canvases; editing is desktop-only.
 
@@ -102,7 +102,12 @@ Off on every page load. Open the AI panel (robot button in the toolbar) and turn
 Agents get a small fixed-size overview (counts, groups of nearby nodes, links, the selection), then list, search and read only what they need, using short handles (`n3`, `g2`, `l1`) instead of ids. Edits are find/replace, cell updates or whole fields; each call is one undo step. While an agent is editing, the canvas is read-only for you (Take over turns AI control off), changed nodes flash, and the panel keeps the session's activity.
 
 ### On-device writing help
-Off by default and per device. Needs desktop Chrome with its built-in AI; turn it on in the AI panel's On-device tab, which also shows whether your device supports it and downloads the model once (about 2 GB). It runs on your computer, so nothing leaves the device.
+Off by default and per device. Turn it on in the AI panel's On-device tab and pick whose model answers:
+
+- **Chrome's built-in model**: needs desktop Chrome with its built-in AI. The tab shows whether your device supports it and downloads the model once (about 2 GB).
+- **Local server**: any server that speaks the OpenAI API, such as LM Studio, Ollama, Jan, llama.cpp or KoboldCpp. Pick its preset (or type the address), start its local server with a model loaded, and choose the model from the list the server offers. The server has to allow requests from the page (CORS): in LM Studio turn on "Enable CORS" under Developer, for Ollama set `OLLAMA_ORIGINS` to the site's address. Requests wait up to three times as long as with Chrome's model, since a local model may need loading first.
+
+Either way it runs on your computer, so nothing leaves the device (unless you point the address at another machine, which the tab warns about).
 
 Type `?` in an empty field (or at the start of an empty line), say what you want and press Enter. The answer shows faintly; Tab or Enter accepts it (one undo step), Esc dismisses it. (A graph row takes its answer straight away, as a normal row you can edit; Ctrl+Z takes it back.)
 
@@ -130,7 +135,7 @@ src/
   chrome/       toolbar, canvas manager, search bar, zoom controls, mobile bar
   ui/           Radix-based primitives and prompt/confirm dialogs
   lib/          small shared helpers (MathField, Markdown, files, grid, clusters, …)
-  ai/           on-device model wrapper, the `?` ask (hook, slot), title suggestions
+  ai/           on-device model wrapper (Chrome's, or a local OpenAI-compatible server), the `?` ask (hook, slot), title suggestions
   agent/        AI tools (transport-agnostic), bridge client, WebMCP adapter, activity log
 app/            HTML entry for the app, served at /app/
 landing/        the marketing page served at / (its own entry, styles and static UI mocks)
