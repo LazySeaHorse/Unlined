@@ -17,20 +17,23 @@ import { AskSlot } from '@/ai/AskSlot';
 import { CompleteSlot } from '@/ai/CompleteSlot';
 import { useInlineAsk } from '@/ai/useInlineAsk';
 import { useInlineComplete } from '@/ai/useInlineComplete';
+import { InlineTex } from '@/canvas/links/LinkLabel';
+import { splitLabel } from '@/canvas/links/labels';
 import { useReadOnly } from '@/canvas/readOnly';
 import { type Engine, useEngine } from '@/lib/math/engine';
 import { MathField } from '@/lib/math/MathField';
 import { Tex } from '@/lib/math/Tex';
 import { useElementSize } from '@/lib/useElementSize';
-import type { GraphEquation, NodeOf, SectionColor } from '@/model/types';
+import { GRAPH_NAME_MAX, type GraphEquation, type NodeOf, type SectionColor } from '@/model/types';
 import { ColorSwatches, linkSwatch } from '../ColorSwatches';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
 import { graphAsk, graphComplete } from './ask';
-import { newEquation } from './equations';
+import { cleanName, newEquation } from './equations';
 import { DEFAULT_BOX, fitBox, niceStep, sane } from './fit';
 import { buildProbe, coordinate, type Frame, type Hit, type Probe, probeAt, toPx } from './hover';
 import { implicitSegments, segmentsPath, shadedPath } from './implicit';
+import { NameLabels } from './NameLabels';
 import { classifyRelation, type PlotFn, type PlotFn2, type Relation, type Where } from './relation';
 import { restrictedPath } from './restricted';
 import { useGraphView } from './view';
@@ -49,6 +52,15 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
 
   const setRow = (index: number, patch: Partial<GraphEquation>) =>
     update({ equations: equations.map((e, i) => (i === index ? { ...e, ...patch } : e)) });
+  // A name that is blank is no name: the key goes, as a row saved without one has none.
+  const setName = (index: number, name: string) =>
+    update({
+      equations: equations.map((e, i) => {
+        if (i !== index) return e;
+        const { name: _old, ...rest } = e;
+        return name.trim() ? { ...rest, name } : rest;
+      }),
+    });
   const ask = useInlineAsk(graphAsk, {
     data,
     context: () => equations,
@@ -78,21 +90,25 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
       }
     >
       <ul className="shrink-0 divide-y divide-border border-b border-border">
-        {equations.map(({ latex, color }, index) => (
+        {equations.map(({ latex, color, name }, index) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: rows are edited in place by position.
           <li key={index} className="flex flex-wrap items-center gap-x-2 px-3 py-1">
-            <ColorDot color={color} onChange={readOnly ? undefined : (c) => setRow(index, { color: c })} />
+            <ColorDot
+              color={color}
+              name={name}
+              onChange={readOnly ? undefined : (c) => setRow(index, { color: c })}
+              onName={readOnly ? undefined : (n) => setName(index, n)}
+            />
             <CompleteSlot
               complete={complete}
               at={index}
               renderGhost={(row) => <Tex latex={row} className="text-base" />}
-              className="order-last basis-full pl-4.5"
             >
               <AskSlot
                 ask={ask}
                 at={index}
                 renderGhost={(answer) => <Tex latex={answer} className="text-base" />}
-                className="min-w-0 flex-1"
+                placeholder="Describe the equation"
               >
                 <MathField
                   value={latex}
@@ -172,9 +188,13 @@ function Plot2D({
   height: number;
   equalAxes: boolean;
 }) {
+  // Compiled from the rows' text alone: naming or recolouring a row does not parse, refit or unpin anything.
+  const sources = equations.map((e) => e.latex);
+  const sourcesKey = JSON.stringify(sources);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `sourcesKey` stands for the text of the rows.
   const compiled = useMemo(
-    () => equations.map(({ latex }) => classifyRelation(engine, latex)),
-    [engine, equations],
+    () => sources.map((latex) => classifyRelation(engine, latex)),
+    [engine, sourcesKey],
   );
   const moved = useGraphView((s) => s.moved[id] === true);
   const fits = useGraphView((s) => s.fits[id] ?? 0);
@@ -280,7 +300,15 @@ function Plot2D({
           ) : null,
         )}
       </Mafs>
-      {shownHover && frame && <HoverTip hit={shownHover.hit} at={shownHover.at} frame={frame} />}
+      {frame && <NameLabels id={id} frame={frame} relations={compiled} rows={equations} />}
+      {shownHover && frame && (
+        <HoverTip
+          hit={shownHover.hit}
+          at={shownHover.at}
+          frame={frame}
+          name={nameOf(shownHover.hit, equations)}
+        />
+      )}
       {frame &&
         pins.map((pin) => {
           const at = toPx(frame, [pin.x, pin.y]);
@@ -292,6 +320,7 @@ function Plot2D({
               hit={pin}
               at={at}
               frame={frame}
+              name={nameOf(pin, equations)}
               onUnpin={() => setPins((old) => old.filter((p) => p !== pin))}
             />
           );
@@ -353,8 +382,33 @@ function FrameReporter({ onFrame }: { onFrame: (frame: Frame) => void }) {
   return <g ref={anchor} />;
 }
 
+/** The name of the row a hit is on, for the chip: only a curve or a point belongs to one row; crossings and axes show none. */
+function nameOf(hit: Hit, rows: readonly GraphEquation[]): string | undefined {
+  if ((hit.kind !== 'curve' && hit.kind !== 'point') || hit.row === undefined) return undefined;
+  return cleanName(rows[hit.row]?.name);
+}
+
+/** A name in a chip: text, with its formulas typeset. */
+function ChipName({ name }: { name: string }) {
+  return (
+    <span data-chip-name="" className="mr-1.5 font-sans font-medium">
+      <InlineTex parts={splitLabel(name)} />
+    </span>
+  );
+}
+
 /** A mark on the place found, and its coordinates beside it. */
-function HoverTip({ hit, at, frame }: { hit: Hit; at: readonly [number, number]; frame: Frame }) {
+function HoverTip({
+  hit,
+  at,
+  frame,
+  name,
+}: {
+  hit: Hit;
+  at: readonly [number, number];
+  frame: Frame;
+  name?: string;
+}) {
   const [x, y] = at;
   const special = hit.kind !== 'curve';
   return (
@@ -377,22 +431,43 @@ function HoverTip({ hit, at, frame }: { hit: Hit; at: readonly [number, number];
           transform: `translate(${x > frame.width / 2 ? 'calc(-100% - 12px)' : '12px'}, ${y < 36 ? '12px' : 'calc(-100% - 12px)'})`,
         }}
       >
-        ({coordinate(hit.x)}, {coordinate(hit.y)})
+        {name && <ChipName name={name} />}({coordinate(hit.x)}, {coordinate(hit.y)})
       </span>
     </>
   );
 }
 
-/** The curve's colour; pressing it opens the palette unless the node is read-only. */
-function ColorDot({ color, onChange }: { color: SectionColor; onChange?: (color: SectionColor) => void }) {
+/**
+ * The curve's colour; pressing it opens the palette and the row's name, unless the node is read-only (then it is a
+ * plain dot, and no name can be set). The name applies as it is typed; Enter or Escape closes the popover.
+ */
+function ColorDot({
+  color,
+  name,
+  onChange,
+  onName,
+}: {
+  color: SectionColor;
+  name?: string;
+  onChange?: (color: SectionColor) => void;
+  onName?: (name: string) => void;
+}) {
   const dot = 'size-2.5 shrink-0 rounded-full';
-  if (!onChange) return <span className={dot} style={{ background: linkSwatch(color) }} />;
+  const [open, setOpen] = useState(false);
+  if (!onChange || !onName) return <span className={dot} style={{ background: linkSwatch(color) }} />;
   return (
-    <Popover.Root>
+    <Popover.Root
+      open={open}
+      onOpenChange={(next) => {
+        setOpen(next);
+        // Spaces left at the ends are not part of the name.
+        if (!next && name !== undefined && name !== name.trim()) onName(name.trim());
+      }}
+    >
       <Popover.Trigger asChild>
         <button
           type="button"
-          aria-label="Curve colour"
+          aria-label={cleanName(name) ? `Curve colour and name: ${cleanName(name)}` : 'Curve colour and name'}
           className={`nodrag cursor-pointer ring-offset-2 ring-offset-transparent hover:ring-2 hover:ring-fg/25 ${dot}`}
           style={{ background: linkSwatch(color) }}
         />
@@ -401,8 +476,23 @@ function ColorDot({ color, onChange }: { color: SectionColor; onChange?: (color:
         <Popover.Content
           align="start"
           sideOffset={6}
-          className="pop z-50 rounded-xl border border-border bg-surface p-2 shadow-xl"
+          className="pop z-50 flex flex-col gap-2 rounded-xl border border-border bg-surface p-2 shadow-xl"
         >
+          <label className="flex flex-col gap-1 text-2xs font-medium text-muted">
+            Name
+            <input
+              type="text"
+              value={name ?? ''}
+              placeholder="Name this line ($math$ ok)"
+              maxLength={GRAPH_NAME_MAX}
+              onChange={(e) => onName(e.target.value)}
+              onFocus={(e) => e.currentTarget.select()}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') setOpen(false);
+              }}
+              className="nokey w-48 rounded-md border border-border bg-surface px-2 py-1 text-sm font-normal text-fg outline-none focus:border-accent"
+            />
+          </label>
           <ColorSwatches value={color} onChange={onChange} links />
         </Popover.Content>
       </Popover.Portal>
@@ -620,11 +710,13 @@ function PinnedChip({
   hit,
   at,
   frame,
+  name,
   onUnpin,
 }: {
   hit: Hit;
   at: readonly [number, number];
   frame: Frame;
+  name?: string;
   onUnpin: () => void;
 }) {
   const [x, y] = at;
@@ -652,6 +744,7 @@ function PinnedChip({
           transform: `translate(${x > frame.width / 2 ? 'calc(-100% - 10px)' : '10px'}, ${y < 36 ? '10px' : 'calc(-100% - 10px)'})`,
         }}
       >
+        {name && <ChipName name={name} />}
         {text}
       </button>
     </>

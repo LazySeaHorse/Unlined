@@ -163,7 +163,9 @@ export function nodeBody(node: AppNode, mathPlusResults?: LineResult[], inputs?:
     case 'mathPlus':
       return mathPlusBody(node.data.latex, mathPlusResults, inputs);
     case 'graph':
-      return node.data.equations.map((e) => `${e.latex} (${e.color})`).join('\n');
+      return node.data.equations
+        .map((e) => `${e.latex} (${e.color}${e.name ? `, named ${JSON.stringify(e.name)}` : ''})`)
+        .join('\n');
     case 'table':
     case 'sheet':
       return gridBody(node.data.cells);

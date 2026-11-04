@@ -10,7 +10,7 @@ import { type Geom, MIN_LABEL_PATH, type Pt, readableReverse, reversedPath, roun
 import { hasMath, type LabelPart, measureLabel, placeLabel, splitLabel } from './labels';
 
 /** Below this zoom labels are too small to read and only clutter. */
-const HIDE_BELOW_ZOOM = 0.3;
+export const HIDE_BELOW_ZOOM = 0.3;
 /** Gap between the line and the label, before counter-scaling. */
 const GAP = 7;
 
@@ -128,7 +128,8 @@ function MathLabel({
   );
 }
 
-function InlineTex({ parts }: { parts: LabelPart[] }) {
+/** Plain text and typeset formulas in a row. */
+export function InlineTex({ parts }: { parts: LabelPart[] }) {
   return (
     <>
       {parts.map((p, i) =>

@@ -3,7 +3,7 @@ import { besideCandidates, boundsOf, CLUSTER_PADDING, findFreeSpot, type Rect } 
 import { setCell } from '@/lib/grid';
 import { sectionContents } from '@/lib/sections';
 import { placedId, placedNodes } from '@/lib/stacks';
-import { type AppNode, type NodeDataMap, type NodeKind, SECTION_COLORS } from '@/model/types';
+import { type AppNode, GRAPH_NAME_MAX, type NodeDataMap, type NodeKind, SECTION_COLORS } from '@/model/types';
 import { createNode } from '@/nodes/factory';
 import { withColors } from '@/nodes/graph/equations';
 import { splitLines } from '@/nodes/mathPlus/evaluate';
@@ -60,6 +60,14 @@ const content = {
         z.object({
           latex: z.string().max(500).describe('As typed: "y=x^2", "x^2", "x=3", "y>x", "x^2+y^2=1".'),
           color: z.enum(SECTION_COLORS).optional().describe('Curve colour; omit for the next free one.'),
+          name: z
+            .string()
+            .max(GRAPH_NAME_MAX)
+            .optional()
+            .describe(
+              'Optional name of the line, written along it in its colour (y= and x= curves, and points) and shown ' +
+                'when the user hovers it. Plain text; $math$ is typeset.',
+            ),
         }),
       )
       .min(1)

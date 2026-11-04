@@ -10,8 +10,14 @@ export type SectionColor = (typeof SECTION_COLORS)[number];
  */
 export type Titled = { title?: string; color?: SectionColor };
 
-/** One row of a graph: what the user typed (`y=x^2`, `x=3`, `y>x`, `x^2+y^2=1`) and the colour it is drawn in. */
-export type GraphEquation = { latex: string; color: SectionColor };
+/** The longest name a graph row can have. */
+export const GRAPH_NAME_MAX = 60;
+
+/**
+ * One row of a graph: what the user typed (`y=x^2`, `x=3`, `y>x`, `x^2+y^2=1`), the colour it is drawn in and,
+ * optionally, a name for the line (plain text, with `$math$` allowed) that is written along it.
+ */
+export type GraphEquation = { latex: string; color: SectionColor; name?: string };
 
 /** Per-kind payload stored in `node.data`. This is the single source of truth for node shapes. */
 export type NodeDataMap = {

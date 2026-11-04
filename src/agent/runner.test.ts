@@ -196,6 +196,28 @@ describe('writing', () => {
     ).toBe('not_resizable');
   });
 
+  it('names graph rows, keeps the names through updates and shows them when read', async () => {
+    await call('create_nodes', {
+      nodes: [
+        {
+          kind: 'graph',
+          equations: [
+            { latex: 'y=x', name: ' Revenue ' },
+            { latex: 'y=2x', name: ' ' },
+          ],
+        },
+      ],
+    });
+    expect(canvas().nodes[0].data).toMatchObject({
+      equations: [{ latex: 'y=x', name: 'Revenue' }, { latex: 'y=2x' }],
+    });
+    expect(await call('read_nodes', { ids: ['n1'] })).toContain('named "Revenue"');
+    await call('update_nodes', {
+      updates: [{ id: 'n1', set: { equations: [{ latex: 'y=3x', name: 'Cost' }] } }],
+    });
+    expect(canvas().nodes[0].data).toMatchObject({ equations: [{ latex: 'y=3x', name: 'Cost' }] });
+  });
+
   it('creates web nodes with a normalised address and refuses other schemes', async () => {
     await call('create_nodes', { nodes: [{ kind: 'web', url: 'example.com', width: 700 }] });
     expect(canvas().nodes[0]).toMatchObject({

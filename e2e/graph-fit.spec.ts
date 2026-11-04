@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, type Page, test } from '@playwright/test';
 import { nodes, openApp, placeNode } from './helpers';
 
 test('the graph window fits what is typed, and the right-click menu has Fit and 1:1', async ({ page }) => {
@@ -262,4 +262,69 @@ test('clicking while hovering pins the chip; pins stack and a click on a chip un
   await pins.filter({ hasText: '(2, 2)' }).click();
   await expect(pins).toHaveCount(1);
   await expect(pins.first()).toHaveText('(4, 0)');
+});
+
+/** Sets row `i` of the open graph to `value`, and names it through the colour dot's popover. */
+async function setRow(page: Page, i: number, value: string, name?: string) {
+  const row = nodes(page).locator('li').nth(i);
+  await row.locator('math-field').evaluate((f: HTMLElement & { value: string }, v: string) => {
+    f.value = v;
+    f.dispatchEvent(new Event('input', { bubbles: true }));
+  }, value);
+  if (name === undefined) return;
+  await row.getByRole('button', { name: /^Curve colour and name/ }).click();
+  await page.getByLabel('Name', { exact: true }).fill(name);
+  await page.keyboard.press('Enter');
+  await expect(page.getByLabel('Name', { exact: true })).toHaveCount(0);
+}
+
+test('a named line is written along its curve, and the name goes when it is cleared', async ({ page }) => {
+  await openApp(page);
+  await placeNode(page, 'Graph');
+  await setRow(page, 0, 'y=2x+1', 'Revenue');
+  const names = nodes(page).locator('[data-graph-names]');
+  // Plain text sits on the curve as text on a path.
+  await expect(names.locator('textPath', { hasText: 'Revenue' })).toHaveCount(2);
+  // The dot says what it names.
+  const dot = nodes(page).getByRole('button', { name: 'Curve colour and name: Revenue' });
+  await expect(dot).toBeVisible();
+  // The label is near the curve: inside the plot, upright (the text box is wider than tall).
+  const plot = nodes(page).getByRole('application', { name: 'Graph' });
+  const box = (await plot.boundingBox()) as { x: number; y: number; width: number; height: number };
+  const label = names.locator('text').last();
+  const at = (await label.boundingBox()) as { x: number; y: number; width: number; height: number };
+  expect(at.x).toBeGreaterThanOrEqual(box.x);
+  expect(at.x + at.width).toBeLessThanOrEqual(box.x + box.width);
+  expect(at.y).toBeGreaterThanOrEqual(box.y);
+  expect(at.y + at.height).toBeLessThanOrEqual(box.y + box.height);
+
+  // Hovering the curve names it in the chip: sweep across the plot until the pointer is on the line.
+  const chip = async () => {
+    for (const h of [0.3, 0.7])
+      for (let i = 0; i <= 40; i++) {
+        await page.mouse.move(box.x + (box.width * i) / 40, box.y + box.height * h);
+        const text = (await nodes(page).locator('[data-hover-tip]').allTextContents()).join(' ');
+        if (text.includes('Revenue')) return text;
+      }
+    return '';
+  };
+  await expect.poll(chip).toMatch(/^Revenue\s*\(/);
+
+  await dot.click();
+  await page.getByLabel('Name', { exact: true }).fill('');
+  await page.keyboard.press('Escape');
+  await expect(names).toHaveCount(0);
+  await expect(nodes(page).getByRole('button', { name: 'Curve colour and name', exact: true })).toBeVisible();
+});
+
+test('names with maths are typeset, and a point is named beside its dot', async ({ page }) => {
+  await openApp(page);
+  await placeNode(page, 'Graph');
+  await nodes(page).getByRole('button', { name: 'Add equation' }).click();
+  await setRow(page, 0, 'y=x^2', 'parabola $f(x)=x^2$');
+  await setRow(page, 1, '(1,2)', 'peak');
+  const names = nodes(page).locator('[data-graph-names]');
+  await expect(names.locator('.katex')).toHaveCount(1);
+  await expect(names.locator('[data-graph-name]')).toContainText('f(x)');
+  await expect(names.locator('text', { hasText: 'peak' })).toHaveCount(2);
 });

@@ -13,11 +13,13 @@ export interface Hit {
   x: number;
   y: number;
   kind: 'point' | 'crossing' | 'axis' | 'curve';
+  /** The row a 'point' or 'curve' hit belongs to (a crossing or an axis belongs to two or none). */
+  row?: number;
 }
 
 type Pt = readonly [number, number];
 /** A piece of a curve without gaps. `owner` is the row it belongs to; the axes are -1 (x axis) and -2 (y axis). */
-interface Run {
+export interface Run {
   owner: number;
   pts: Pt[];
 }
@@ -42,7 +44,7 @@ export const toPx = (f: Frame, [x, y]: Pt): Pt => [
 ];
 
 /** The pieces of a row's curve over the window: where it has no value, or the restriction fails, or it jumps across more than a few windows' height (a pole), the curve is broken. */
-function runsOf(relation: Relation, owner: number, f: Frame): Run[] {
+export function runsOf(relation: Relation, owner: number, f: Frame): Run[] {
   if (relation.kind !== 'y' && relation.kind !== 'x') return [];
   const swapped = relation.kind === 'x';
   const [from, to] = swapped ? f.y : f.x;
@@ -128,7 +130,7 @@ export function buildProbe(relations: ReadonlyArray<Relation | null>, frame: Fra
     if (relation.kind === 'points')
       for (const [x, y] of relation.points)
         if (x >= frame.x[0] && x <= frame.x[1] && y >= frame.y[0] && y <= frame.y[1])
-          specials.push({ x, y, kind: 'point' });
+          specials.push({ x, y, kind: 'point', row: index });
   });
   const axes: Run[] = [
     {
@@ -163,7 +165,7 @@ export function probeAt(probe: Probe, px: number, py: number): Hit | undefined {
   }
   if (best) return best.hit;
   let near: { hit: Hit; d: number } | undefined;
-  for (const { pts } of runs)
+  for (const { owner, pts } of runs)
     for (let i = 0; i + 1 < pts.length; i++) {
       const [ax, ay] = toPx(frame, pts[i]);
       const [bx, by] = toPx(frame, pts[i + 1]);
@@ -173,7 +175,10 @@ export function probeAt(probe: Probe, px: number, py: number): Hit | undefined {
       const d = Math.hypot(ax + t * dx - px, ay + t * dy - py);
       if (d <= CURVE_PX && (!near || d < near.d)) {
         const [p, q] = [pts[i], pts[i + 1]];
-        near = { d, hit: { x: p[0] + t * (q[0] - p[0]), y: p[1] + t * (q[1] - p[1]), kind: 'curve' } };
+        near = {
+          d,
+          hit: { x: p[0] + t * (q[0] - p[0]), y: p[1] + t * (q[1] - p[1]), kind: 'curve', row: owner },
+        };
       }
     }
   return near?.hit;

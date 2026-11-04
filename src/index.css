@@ -354,6 +354,22 @@ body,
   user-select: none;
   cursor: pointer;
 }
+/* Names of graph rows: like link labels, but haloed in the node's surface colour, which is what is behind them. */
+.graph-name-halo {
+  fill: var(--surface);
+  stroke: var(--surface);
+  stroke-width: 4.5px;
+  stroke-linejoin: round;
+}
+.graph-name-math {
+  /* Placed by a guess of its width, so it must not be cut where the guess was short. */
+  overflow: visible;
+  cursor: default;
+  text-shadow:
+    0 0 3px var(--surface),
+    0 0 3px var(--surface),
+    0 0 3px var(--surface);
+}
 .link-label-input {
   position: absolute;
   left: 0;
@@ -619,7 +635,7 @@ math-field::part(virtual-keyboard-toggle) {
   outline-color: var(--live);
 }
 /* Typing in a node brightens its tile to the surface colour. */
-.node:not([data-live]) .node-tile:focus-within {
+.node:not([data-live]) .node-tile:is(:focus-within, :has([data-asking])) {
   --tone: var(--surface);
 }
 .react-flow__node:focus-visible {
@@ -1071,40 +1087,79 @@ math-field::part(virtual-keyboard-toggle) {
 }
 
 /*
- * A field asking for its content in words (ai/AskSlot). The input takes the field's place and looks like it; it
- * shimmers while the answer is worked out, then the answer shows faintly over it until accepted. A failure
- * underlines it in red for a moment.
+ * The on-device AI's bubble (ai/Bubble): a floating surface below a field, in a portal, so it takes no room in the
+ * node. An ask (ai/AskSlot) fills it with a box for the words, a wait, the answer and what the keys do; a
+ * completion waiting for Tab (ai/CompleteSlot) with just the line. Accent outline: this is the AI, not the node.
  */
-.ask-slot {
-  position: relative;
+.ai-bubble {
+  z-index: 60;
+  box-sizing: border-box;
+  width: max(18rem, min(var(--radix-popper-anchor-width), 28rem));
+  max-width: calc(100vw - 1rem);
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, var(--border));
+  border-radius: 0.75rem;
+  outline: 3px solid color-mix(in srgb, var(--accent) 22%, transparent);
+  background: var(--surface);
+  color: var(--fg);
+  box-shadow: var(--elevation-float);
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+.ai-bubble kbd {
+  border: 1px solid var(--border);
+  border-radius: 0.25rem;
+  background: var(--surface-2);
+  padding: 0 0.3rem;
+  font:
+    500 0.625rem / 1rem "JetBrains Mono",
+    ui-monospace,
+    monospace;
+  color: var(--muted);
+}
+.ask-bubble {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.5rem 0.625rem 0.5rem;
+}
+.ask-head {
   display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 .ask-input {
-  flex: 1;
+  width: 100%;
   min-width: 0;
-  background: transparent;
+  box-sizing: border-box;
+  border: 1px solid var(--border);
+  border-radius: 0.5rem;
+  background: var(--surface-2);
+  padding: 0.375rem 0.5rem;
   color: inherit;
   font: inherit;
-  border: none;
+  font-size: 0.875rem;
   outline: none;
-  border-radius: 0.25rem;
 }
-.ask-input[data-state="ghost"] {
-  color: transparent;
-  caret-color: transparent;
+.ask-input::placeholder {
+  color: var(--muted);
+}
+.ask-input:focus {
+  border-color: var(--accent);
 }
 .ask-input[data-state="running"] {
   background:
     linear-gradient(
       90deg,
       transparent 30%,
-      color-mix(in srgb, var(--accent) 14%, transparent) 50%,
+      color-mix(in srgb, var(--accent) 16%, transparent) 50%,
       transparent 70%
     )
-    0 0 / 300% 100%;
+    0 0 / 300% 100% var(--surface-2);
 }
 .ask-input[data-state="failed"] {
-  animation: ask-failed 1.6s ease-out;
+  border-color: var(--danger);
 }
 @keyframes ask-shimmer {
   from {
@@ -1114,56 +1169,84 @@ math-field::part(virtual-keyboard-toggle) {
     background-position-x: 0%;
   }
 }
+@keyframes ask-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 @keyframes ask-failed {
-  from,
-  50% {
-    box-shadow: inset 0 -2px 0 var(--danger);
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
   }
 }
 @media (prefers-reduced-motion: no-preference) {
   .ask-input[data-state="running"] {
     animation: ask-shimmer 1.4s linear infinite;
   }
+  .ask-input[data-state="failed"] {
+    animation: ask-failed 0.25s ease-out;
+  }
+  .ask-spin {
+    animation: ask-spin 0.9s linear infinite;
+  }
 }
-/* The answer waiting to be accepted: in the field, and wherever else the node previews it (a graph's curve). */
-.ask-ghost {
-  opacity: 0.5;
+/* Empty until there is something to say, and then no gap above it either. */
+.ask-status:empty {
+  margin-top: -0.375rem;
 }
-.ask-ghost-over {
-  position: absolute;
-  inset: 0;
+.ask-note {
   display: flex;
   align-items: center;
-  overflow: hidden;
+  gap: 0.375rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.ask-error {
+  color: var(--danger);
+}
+/* The answer waiting to be taken, as it would look in the field. */
+.ask-ghost {
+  max-height: 12rem;
+  overflow: auto;
+  border: 1px dashed color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface));
+  padding: 0.375rem 0.5rem;
+}
+.ask-code {
+  margin: 0;
+  font:
+    0.75rem / 1.2rem "JetBrains Mono",
+    ui-monospace,
+    monospace;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.ask-hints {
+  display: flex;
+  gap: 0.875rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.6875rem;
+}
+/* A completion waiting for Tab: one line, beside nothing, never in the way of typing. */
+.ai-bubble-passive {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: auto;
+  max-width: min(28rem, calc(100vw - 1rem));
+  padding: 0.25rem 0.5rem;
   pointer-events: none;
 }
-/* A field that grows with its content (a Math node, a table cell) grows with the answer too, rather than clip it. */
-.ask-slot.ask-fit {
-  display: grid;
-}
-.ask-slot.ask-fit > * {
-  grid-area: 1 / 1;
-}
-.ask-fit .ask-ghost-over {
-  position: static;
-}
-.ask-fit .ask-input {
-  field-sizing: content;
-}
-/* A field of several lines asks from one line: its other lines stay, the words keep showing, the answer goes under. */
-.ask-slot.ask-lines {
-  flex-direction: column;
-}
-.ask-lines .ask-input {
-  flex: none;
-  /* The field's width, not the input's own (twenty characters) or its words', which would widen a node that is
-   * sized to its content. */
-  width: 0;
-  min-width: 100%;
-}
-.ask-lines .ask-input[data-state="ghost"] {
-  color: inherit;
-  caret-color: auto;
+.ai-bubble-passive .complete-ghost {
+  min-width: 0;
+  overflow-x: auto;
+  opacity: 1;
 }
 
 /*

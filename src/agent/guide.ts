@@ -26,8 +26,9 @@ FIELDS (create_nodes takes them flat next to "kind"; update_nodes "set" replaces
   the name fail. Two links with the same name into one node fail only if that node uses the name. If the target
   assigns the name itself (k := 3) its own value wins from that line on. Links can form loops (allowed): the loop
   is broken at its node earliest in reading order, whose link from the loop is ignored ("loop: link ignored"). Links touching other kinds of node carry nothing.
-- graph: equations, a list of rows {latex, color}, each plotted on one grid in its colour (a section colour name; omit
-  to get a free one). ${SYNTAX.graph}
+- graph: equations, a list of rows {latex, color, name}, each plotted on one grid in its colour (a section colour name;
+  omit to get a free one). name is optional: a short label for the line (text, $math$ allowed) that the user sees
+  written along y= and x= curves and beside points, and in the hover chip. ${SYNTAX.graph}
 - table: cells, rows of LaTeX math cells.
 - sheet: cells, rows of spreadsheet cells; ${SYNTAX.sheet}
 - code: source, JavaScript. run_code runs it in a sandbox and returns console output and the last value.
