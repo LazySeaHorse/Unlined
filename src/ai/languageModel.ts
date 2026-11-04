@@ -1,7 +1,9 @@
 import { z } from 'zod';
+import { type LocalServerConfig, localApi } from './localServer';
 
 /**
- * The only file that touches Chrome's built-in Prompt API (`LanguageModel`, Gemini Nano). Everything else asks
+ * The only file that touches a language model: Chrome's built-in Prompt API (`LanguageModel`, Gemini Nano), or a
+ * local server that speaks the OpenAI API (see localServer.ts), which is made to look the same. Everything else asks
  * through `ask()` and gets a typed, validated answer or a reason it could not have one.
  *
  * The model translates (words to LaTeX, to a formula, to a title) or continues a field's text by a line. Whatever it
@@ -37,7 +39,23 @@ const LANGUAGES = {
   expectedOutputs: [{ type: 'text', languages: ['en'] }],
 };
 
-const getApi = (): Api | undefined => (globalThis as { LanguageModel?: Api }).LanguageModel;
+/** The local server in use instead of Chrome's model; undefined for Chrome's. */
+let server: LocalServerConfig | undefined;
+const serverApi = localApi(() => server as LocalServerConfig);
+
+/** Chooses the model that answers: a local server, or (undefined) Chrome's built-in one. */
+export function setServer(config: LocalServerConfig | undefined): void {
+  const switched = Boolean(config) !== Boolean(server);
+  server = config;
+  // Sessions of the other kind are of no use now.
+  if (switched) releaseSessions();
+}
+
+/** A local model may need to be loaded into memory first, which Chrome's never does. */
+const SERVER_PATIENCE = 3;
+
+const getApi = (): Api | undefined =>
+  server ? serverApi : (globalThis as { LanguageModel?: Api }).LanguageModel;
 
 export async function checkAvailability(): Promise<Availability> {
   const api = getApi();
@@ -58,7 +76,7 @@ export async function downloadModel(
   signal?: AbortSignal,
 ): Promise<void> {
   const api = getApi();
-  if (!api) throw new Error('On-device AI is not supported in this browser.');
+  if (!api || server) throw new Error('On-device AI is not supported in this browser.');
   const session = await api.create({
     ...LANGUAGES,
     signal,
@@ -200,7 +218,8 @@ const isAbort = (e: unknown, signal?: AbortSignal) =>
 
 export function ask<T, U>(options: AskOptions<T, U>): Promise<AskResult<U>> {
   const { feature, system, examples, input, schema, check, signal } = options;
-  const { format = 'json', limitMs = TURN_LIMIT_MS } = options;
+  const { format = 'json' } = options;
+  const limitMs = (options.limitMs ?? TURN_LIMIT_MS) * (server ? SERVER_PATIENCE : 1);
   if (signal?.aborted) return Promise.resolve({ status: 'aborted' });
   return enqueue(async (): Promise<AskResult<U>> => {
     if (signal?.aborted) return { status: 'aborted' };
