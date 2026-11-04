@@ -59,6 +59,11 @@ describe('listModels', () => {
     expect(await listModels(config)).toEqual(['a-chat', 'b-chat']);
     expect(calls[0]?.url).toBe('http://localhost:1234/v1/models');
   });
+  it('sends no headers without a key, so the browser needs no preflight', async () => {
+    fakeServer([]);
+    await listModels(config);
+    expect(vi.mocked(fetch).mock.calls[0]?.[1]?.headers).toEqual({});
+  });
   it('sends the key as a bearer token', async () => {
     fakeServer([]);
     await listModels({ ...config, key: ' sk-1 ' });

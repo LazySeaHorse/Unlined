@@ -78,7 +78,8 @@ export async function listModels(
 ): Promise<string[]> {
   const timeout = AbortSignal.timeout(LIST_MS);
   const res = await fetch(`${root(config.url)}/models`, {
-    headers: headers({ ...config, model: '' }),
+    // No Content-Type: with none (and no key) this is a simple request, so the browser skips the preflight.
+    headers: config.key.trim() ? { Authorization: `Bearer ${config.key.trim()}` } : {},
     signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
   });
   if (!res.ok) {
