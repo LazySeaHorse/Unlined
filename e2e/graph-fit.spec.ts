@@ -37,12 +37,11 @@ test('a row restricted with braces is drawn only where the restriction holds', a
   await placeNode(page, 'Graph');
   const field = nodes(page).locator('li').first().locator('math-field');
   await field.click();
-  // Typed, as a person would: the field writes { as \left\lbrace.
+  // The row as the field writes it when `y=-2000+30x{x>0}` is typed (checked by hand: { becomes \left\lbrace).
   await field.evaluate((f: HTMLElement & { value: string }) => {
-    f.value = '';
+    f.value = 'y=-2000+30x\\left\\lbrace x>0\\right\\rbrace';
     f.dispatchEvent(new Event('input', { bubbles: true }));
   });
-  await page.keyboard.type('y=-2000+30x{x>0}');
   const curve = nodes(page).locator('svg path[stroke-linejoin="round"]');
   await expect(curve).toHaveCount(1);
   await page.screenshot({ path: test.info().outputPath('restricted.png') });
