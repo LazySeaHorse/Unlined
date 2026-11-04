@@ -238,7 +238,8 @@ function restrict(relation: Relation, where: Where): Relation {
  * 1<x<5 (see `splitRestrictions`). A restriction that cannot be read gives null.
  */
 export function classifyRelation(engine: Engine, latex: string): Relation | null {
-  const { body, where } = splitRestrictions(latex);
+  // LaTeX pasted with its math delimiters, `$$ y=x $$` or `$y=x$`, is the same row.
+  const { body, where } = splitRestrictions(latex.trim().replace(/^\$\$?|\$\$?$/g, ''));
   const relation = classifyBody(engine, body);
   if (!relation || where.length === 0) return relation;
   try {

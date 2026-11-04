@@ -149,6 +149,11 @@ describe('splitRestrictions', () => {
 });
 
 describe('classifyRelation: restrictions', () => {
+  it('reads a row pasted with its $ or $$ delimiters', () => {
+    expect(must('$$ y=-2000+30x\\left\\lbrace x>0\\right\\rbrace $$').kind).toBe('y');
+    expect(must('$y=x$').kind).toBe('y');
+  });
+
   const where = (latex: string) => {
     const r = must(latex);
     if (r.kind !== 'y' && r.kind !== 'x') throw new Error(`${latex} is ${r.kind}`);
