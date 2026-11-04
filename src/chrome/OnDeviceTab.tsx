@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { isLoopback, LOCAL_PRESETS } from '@/ai/localServer';
-import { type Provider, useAiAssist } from '@/ai/store';
+import { useAiAssist } from '@/ai/store';
 import { Button } from '@/ui/Button';
 import { Field } from '@/ui/Field';
 import { Modal } from '@/ui/Modal';
@@ -64,24 +64,19 @@ export function OnDeviceTab() {
           </span>
         </span>
       </div>
-      <fieldset className="m-0 flex min-w-0 gap-1 border-0 p-0" aria-label="Model">
-        {(
-          [
-            ['chrome', "Chrome's built-in"],
-            ['server', 'Local server'],
-          ] as Array<[Provider, string]>
-        ).map(([value, label]) => (
-          <Button
-            key={value}
-            size="xs"
-            variant={provider === value ? 'primary' : 'ghost'}
-            aria-pressed={provider === value}
-            onClick={() => setProvider(value)}
-          >
-            {label}
-          </Button>
-        ))}
-      </fieldset>
+      <div className="flex items-start gap-3">
+        <Switch
+          checked={provider === 'chrome'}
+          onCheckedChange={(on) => setProvider(on ? 'chrome' : 'server')}
+          aria-label="Use Chrome's built-in model"
+        />
+        <span className="min-w-0 text-sm">
+          <span className="font-medium">Use Chrome's built-in model</span>
+          <span className="mt-0.5 block text-xs text-muted">
+            Turn off to use a model server on this computer instead, such as LM Studio or Ollama.
+          </span>
+        </span>
+      </div>
       {provider === 'server' ? (
         <ServerSettings />
       ) : (
@@ -231,11 +226,13 @@ function ServerSettings() {
         </p>
       )}
       <p className="text-xs text-muted" role="status">
-        {!enabled && 'Switch on writing help to connect.'}
-        {enabled && availability === 'available' && 'Connected. Ready.'}
-        {enabled && serverError && availability === 'unavailable' && (
+        {availability === 'available' &&
+          (enabled ? 'Connected. Ready.' : 'Connected. Switch on writing help to use it.')}
+        {serverError && availability === 'unavailable' && (
           <>
-            {serverError === 'unreachable' ? 'Could not reach the server. ' : `${serverError} `}
+            {serverError === 'unreachable'
+              ? `Could not reach ${server.url.trim() || 'the server'}. `
+              : `${serverError} `}
             Check that its local server is running and allows requests from this page (CORS, and Chrome may
             ask to allow access to devices on your network: in LM Studio turn on "Enable CORS" under
             Developer; Ollama needs OLLAMA_ORIGINS set to this site; Jan has a CORS option in its server

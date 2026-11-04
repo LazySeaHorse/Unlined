@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { releaseSessions, setServer } from './languageModel';
-import { aiAvailable, useAiAssist } from './store';
+import { aiAvailable, initAiAssist, useAiAssist } from './store';
 
 const models = (ids: string[]) =>
   new Response(JSON.stringify({ data: ids.map((id) => ({ id })) }), { status: 200 });
@@ -113,11 +113,21 @@ describe('the local server provider', () => {
     expect(JSON.parse(chat?.[1].body as string).model).toBe('a');
   });
 
-  it('sends nothing to a server while writing help is off', async () => {
+  it('sends nothing to a server at startup while writing help is off', async () => {
     const fetchMock = vi.fn(async () => models(['a']));
     vi.stubGlobal('fetch', fetchMock);
     useAiAssist.setState({ enabled: false });
-    await useAiAssist.getState().refresh();
+    initAiAssist();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('lists the models for the settings even before writing help is on', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => models(['a'])),
+    );
+    useAiAssist.setState({ enabled: false });
+    await useAiAssist.getState().refresh();
+    expect(useAiAssist.getState().models).toEqual(['a']);
   });
 });

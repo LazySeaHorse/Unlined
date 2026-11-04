@@ -19,7 +19,7 @@ describe('OnDeviceTab', () => {
       server: { url: 'http://localhost:1234/v1', model: '', key: '' },
     });
     render(<OnDeviceTab />);
-    fireEvent.click(screen.getByRole('button', { name: 'Local server' }));
+    fireEvent.click(screen.getByRole('switch', { name: "Use Chrome's built-in model" }));
     fireEvent.click(await screen.findByRole('button', { name: 'Ollama' }));
     expect((screen.getByLabelText('Server address') as HTMLInputElement).value).toBe(
       'http://localhost:11434/v1',

@@ -56,7 +56,7 @@ export const useAiAssist = create<AiAssistState>()(
         set((s) => ({ server: { ...s.server, ...config }, ...(config.url !== undefined && { models: [] }) }));
         // The model is read at each request, so choosing one needs no new look at the server.
         if (get().provider === 'server') setServer(get().server);
-        if (!reach || !get().enabled || get().provider !== 'server') return;
+        if (!reach || get().provider !== 'server') return;
         // Typing an address or key changes it with every key: ask the server once the typing pauses.
         clearTimeout(pause);
         pause = setTimeout(() => void get().refresh(), 400);
@@ -77,8 +77,6 @@ export const useAiAssist = create<AiAssistState>()(
           if (current()) set({ availability });
           return;
         }
-        // Nothing is sent to a server until the switch is on.
-        if (!get().enabled) return;
         try {
           const models = await listModels(server);
           if (!current()) return;
