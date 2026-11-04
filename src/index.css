@@ -1185,7 +1185,7 @@ math-field::part(virtual-keyboard-toggle) {
   color: var(--muted);
   font-size: 0.6875rem;
 }
-@keyframes ask-sweep {
+@keyframes ask-shimmer {
   from {
     background-position-x: 100%;
   }
@@ -1203,7 +1203,7 @@ math-field::part(virtual-keyboard-toggle) {
 }
 @media (prefers-reduced-motion: no-preference) {
   .ask-bubble[data-state="running"] .ask-line {
-    animation: ask-sweep 1.4s linear infinite;
+    animation: ask-shimmer 1.4s linear infinite;
   }
   .ask-input[data-state="failed"] {
     animation: ask-failed 0.25s ease-out;
