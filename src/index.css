@@ -1008,7 +1008,7 @@ math-field::part(virtual-keyboard-toggle) {
   left: 0;
   height: 2.25rem;
   margin-top: -1.125rem;
-  border-radius: 0.75rem;
+  border-radius: 999px;
   background: var(--accent);
   opacity: 0;
   pointer-events: none;

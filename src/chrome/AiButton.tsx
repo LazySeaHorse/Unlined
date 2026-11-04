@@ -24,7 +24,7 @@ export function AiButton() {
         aria-pressed={open}
         onClick={toggle}
         className={cn(
-          'flex h-9 cursor-pointer items-center gap-2 rounded-xl px-2.5 text-sm font-medium transition-colors',
+          'flex h-9 cursor-pointer items-center gap-2 rounded-full px-3 text-sm font-medium transition-colors',
           open ? 'bg-accent/15 text-accent' : 'text-fg hover:bg-accent/10 hover:text-accent',
         )}
       >
