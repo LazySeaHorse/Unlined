@@ -57,7 +57,12 @@ const headers = (config: LocalServerConfig): Record<string, string> => ({
 export function isLoopback(url: string): boolean {
   try {
     const host = new URL(url).hostname.replace(/^\[|\]$/g, '');
-    return host === 'localhost' || host.endsWith('.localhost') || host === '::1' || /^127\./.test(host);
+    return (
+      host === 'localhost' ||
+      host.endsWith('.localhost') ||
+      host === '::1' ||
+      /^127(\.\d{1,3}){3}$/.test(host)
+    );
   } catch {
     return false;
   }
@@ -76,7 +81,10 @@ export async function listModels(
     headers: headers({ ...config, model: '' }),
     signal: signal ? AbortSignal.any([signal, timeout]) : timeout,
   });
-  if (!res.ok) throw new Error(`The server answered ${res.status}.`);
+  if (!res.ok) {
+    void res.body?.cancel().catch(() => {});
+    throw new Error(`The server answered ${res.status}.`);
+  }
   const body = (await res.json()) as { data?: Array<{ id?: unknown }> };
   const ids = (body.data ?? []).flatMap((m) => (typeof m.id === 'string' ? [m.id] : []));
   return ids.filter(isChatModel).sort((a, b) => a.localeCompare(b));
@@ -84,7 +92,11 @@ export async function listModels(
 
 /** `<think>…</think>` blocks that reasoning models write into their content, off; a block still open goes too. */
 export function stripThinking(text: string): string {
-  return text.replace(/<think>[\s\S]*?<\/think>/g, '').replace(/<think>[\s\S]*$/, '');
+  // Some chat templates open the block in the prompt, so only its end shows in the reply.
+  return text
+    .replace(/^(?:(?!<think>)[\s\S])*?<\/think>/, '')
+    .replace(/<think>[\s\S]*?<\/think>/g, '')
+    .replace(/<think>[\s\S]*$/, '');
 }
 
 /** The JSON inside a ```json fence, for models that fence their answer even when asked for bare JSON. */
@@ -116,7 +128,6 @@ export function sseText(body: ReadableStream<Uint8Array>, onStop: () => void): R
           else pending += decoder.decode(value, { stream: true });
           const lines = pending.split(/\r?\n/);
           pending = done ? '' : (lines.pop() ?? '');
-          if (done && lines.length === 0) lines.push('');
           for (const line of lines) {
             const data = line.match(/^data:\s?(.*)$/)?.[1]?.trim();
             if (data === '[DONE]') {
@@ -133,6 +144,7 @@ export function sseText(body: ReadableStream<Uint8Array>, onStop: () => void): R
           }
         }
         const text = visible(raw, finished);
+        // Reasoning that showed before its closing tag cannot be taken back; later text still follows on.
         if (text.length > shown) {
           const next = text.slice(shown);
           shown = text.length;
@@ -160,6 +172,9 @@ const withInput = (history: Turn[], input: string): Turn[] => [...history, { rol
  */
 const noSchema = new Set<string>();
 
+/** Forgets which servers refused a schema, e.g. after one is upgraded. */
+export const forgetQuirks = () => noSchema.clear();
+
 /** The server as a `LanguageModel`. `read` is called for every request, so a changed setting applies at once. */
 export function localApi(read: () => LocalServerConfig): LocalApi {
   const post = async (
@@ -180,7 +195,10 @@ export function localApi(read: () => LocalServerConfig): LocalApi {
         ...extra,
       }),
     });
-    if (!res.ok) throw new Error(`The server answered ${res.status}.`);
+    if (!res.ok) {
+      void res.body?.cancel().catch(() => {});
+      throw new Error(`The server answered ${res.status}.`);
+    }
     return res;
   };
 
@@ -206,8 +224,9 @@ export function localApi(read: () => LocalServerConfig): LocalApi {
           });
         } catch (e) {
           if (!constrained || options?.signal?.aborted || !/answered (400|422)\b/.test(String(e))) throw e;
-          noSchema.add(host);
           res = await post(messages, options?.signal, { stream: false });
+          // Only a request that works without the schema shows the schema was the trouble.
+          noSchema.add(host);
         }
         const body = (await res.json()) as { choices?: Array<{ message?: { content?: unknown } }> };
         const content = body.choices?.[0]?.message?.content;

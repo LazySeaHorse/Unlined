@@ -64,7 +64,7 @@ export function OnDeviceTab() {
           </span>
         </span>
       </div>
-      <div className="flex gap-1" role="radiogroup" aria-label="Model">
+      <fieldset className="m-0 flex min-w-0 gap-1 border-0 p-0" aria-label="Model">
         {(
           [
             ['chrome', "Chrome's built-in"],
@@ -75,14 +75,13 @@ export function OnDeviceTab() {
             key={value}
             size="xs"
             variant={provider === value ? 'primary' : 'ghost'}
-            role="radio"
-            aria-checked={provider === value}
+            aria-pressed={provider === value}
             onClick={() => setProvider(value)}
           >
             {label}
           </Button>
         ))}
-      </div>
+      </fieldset>
       {provider === 'server' ? (
         <ServerSettings />
       ) : (
@@ -237,9 +236,10 @@ function ServerSettings() {
         {enabled && serverError && availability === 'unavailable' && (
           <>
             {serverError === 'unreachable' ? 'Could not reach the server. ' : `${serverError} `}
-            Check that its local server is running and allows requests from this page (CORS: in LM Studio turn
-            on "Enable CORS" under Developer; Ollama needs OLLAMA_ORIGINS set to this site; Jan has a CORS
-            option in its server settings).
+            Check that its local server is running and allows requests from this page (CORS, and Chrome may
+            ask to allow access to devices on your network: in LM Studio turn on "Enable CORS" under
+            Developer; Ollama needs OLLAMA_ORIGINS set to this site; Jan has a CORS option in its server
+            settings).
           </>
         )}
       </p>

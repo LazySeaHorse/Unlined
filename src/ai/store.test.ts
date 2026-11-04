@@ -67,17 +67,19 @@ describe('the local server provider', () => {
     expect(useAiAssist.getState().serverError).toContain('no chat models');
   });
 
-  it('ignores an answer for an address that has since changed', async () => {
-    let release: (r: Response) => void = () => {};
+  it('ignores an answer to a look that a later look has replaced', async () => {
+    const answers: Array<(r: Response) => void> = [];
     vi.stubGlobal(
       'fetch',
-      vi.fn(() => new Promise<Response>((r) => (release = r))),
+      vi.fn(() => new Promise<Response>((r) => answers.push(r))),
     );
-    const pending = useAiAssist.getState().refresh();
-    useAiAssist.setState({ server: { url: 'http://localhost:11434/v1', model: '', key: '' } });
-    release(models(['old']));
-    await pending;
-    expect(useAiAssist.getState().models).toEqual([]);
+    const first = useAiAssist.getState().refresh();
+    const second = useAiAssist.getState().refresh();
+    answers[1]?.(models(['new']));
+    await second;
+    answers[0]?.(models(['old']));
+    await first;
+    expect(useAiAssist.getState().models).toEqual(['new']);
   });
 
   it('clears the models when the provider changes', () => {
@@ -85,5 +87,37 @@ describe('the local server provider', () => {
     useAiAssist.getState().setProvider('chrome');
     expect(useAiAssist.getState().models).toEqual([]);
     expect(useAiAssist.getState().provider).toBe('chrome');
+  });
+
+  it('sends the model it picked in requests', async () => {
+    const fetchMock = vi.fn(async (url: string) =>
+      url.endsWith('/models')
+        ? models(['a'])
+        : new Response(JSON.stringify({ choices: [{ message: { content: '{}' } }] })),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    await useAiAssist.getState().refresh();
+    const { ask } = await import('./languageModel');
+    const { z } = await import('zod');
+    await ask({
+      feature: 'picked',
+      system: 's',
+      examples: [],
+      input: 'i',
+      schema: z.object({}),
+      check: async () => ({ ok: true as const, value: 1 }),
+    });
+    const chat = (fetchMock.mock.calls as unknown as Array<[string, RequestInit]>).find(([u]) =>
+      u.endsWith('/chat/completions'),
+    );
+    expect(JSON.parse(chat?.[1].body as string).model).toBe('a');
+  });
+
+  it('sends nothing to a server while writing help is off', async () => {
+    const fetchMock = vi.fn(async () => models(['a']));
+    vi.stubGlobal('fetch', fetchMock);
+    useAiAssist.setState({ enabled: false });
+    await useAiAssist.getState().refresh();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

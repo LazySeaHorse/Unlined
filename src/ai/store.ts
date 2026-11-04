@@ -33,6 +33,7 @@ interface AiAssistState {
   download: (signal?: AbortSignal) => Promise<void>;
 }
 
+let latest = 0;
 let pause: ReturnType<typeof setTimeout> | undefined;
 
 export const useAiAssist = create<AiAssistState>()(
@@ -47,15 +48,18 @@ export const useAiAssist = create<AiAssistState>()(
       serverError: undefined,
       setProvider: (provider) => {
         set({ provider, availability: 'unsupported', models: [], serverError: undefined });
-        if (get().enabled) void get().refresh();
+        void get().refresh();
       },
       setServerConfig: (config) => {
-        const urlChanged = config.url !== undefined && config.url !== get().server.url;
-        set((s) => ({ server: { ...s.server, ...config }, ...(urlChanged && { models: [] }) }));
-        if (!get().enabled || get().provider !== 'server') return;
-        // Typing an address changes it with every key: ask the server once the typing pauses.
+        const reach =
+          (config.url !== undefined && config.url !== get().server.url) || config.key !== undefined;
+        set((s) => ({ server: { ...s.server, ...config }, ...(config.url !== undefined && { models: [] }) }));
+        // The model is read at each request, so choosing one needs no new look at the server.
+        if (get().provider === 'server') setServer(get().server);
+        if (!reach || !get().enabled || get().provider !== 'server') return;
+        // Typing an address or key changes it with every key: ask the server once the typing pauses.
         clearTimeout(pause);
-        pause = setTimeout(() => void get().refresh(), urlChanged ? 400 : 0);
+        pause = setTimeout(() => void get().refresh(), 400);
       },
       setEnabled: (enabled) => {
         if (!enabled) releaseSessions();
@@ -65,24 +69,31 @@ export const useAiAssist = create<AiAssistState>()(
       refresh: async () => {
         const { provider, server } = get();
         setServer(provider === 'server' ? server : undefined);
+        // Only the latest look at the model counts.
+        const mine = ++latest;
+        const current = () => mine === latest;
         if (provider === 'chrome') {
-          set({ availability: await checkAvailability() });
+          const availability = await checkAvailability();
+          if (current()) set({ availability });
           return;
         }
+        // Nothing is sent to a server until the switch is on.
+        if (!get().enabled) return;
         try {
           const models = await listModels(server);
-          // A refresh for settings that have since changed is of no use.
-          if (get().provider !== 'server' || get().server.url !== server.url) return;
+          if (!current()) return;
           // Nothing chosen yet: the first model, as the server has it loaded or at hand.
-          if (!server.model && models[0])
+          if (!server.model && models[0]) {
             set((s) => ({ server: { ...s.server, model: models[0] as string } }));
+            setServer(get().server);
+          }
           set({
             models,
             availability: models.length ? 'available' : 'unavailable',
             serverError: models.length ? undefined : 'The server has no chat models.',
           });
         } catch (e) {
-          if (get().provider !== 'server' || get().server.url !== server.url) return;
+          if (!current()) return;
           set({
             models: [],
             availability: 'unavailable',

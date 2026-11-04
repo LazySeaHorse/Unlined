@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 import { ask, checkAvailability, releaseSessions, setServer } from './languageModel';
-import { isLoopback, listModels, sseText, stripThinking } from './localServer';
+import { forgetQuirks, isLoopback, listModels, sseText, stripThinking } from './localServer';
 
 const config = { url: 'http://localhost:1234/v1/', model: 'qwen', key: '' };
 
@@ -36,6 +36,7 @@ function fakeServer(
 }
 
 afterEach(() => {
+  forgetQuirks();
   setServer(undefined);
   releaseSessions();
   vi.unstubAllGlobals();
@@ -76,7 +77,12 @@ describe('isLoopback', () => {
   it('knows this computer from another', () => {
     for (const u of ['http://localhost:1/v1', 'http://127.0.0.1:1/v1', 'http://[::1]:1/v1'])
       expect(isLoopback(u)).toBe(true);
-    for (const u of ['http://192.168.1.4:1/v1', 'https://api.example.com/v1', 'nonsense'])
+    for (const u of [
+      'http://192.168.1.4:1/v1',
+      'http://127.evil.com/v1',
+      'https://api.example.com/v1',
+      'nonsense',
+    ])
       expect(isLoopback(u)).toBe(false);
   });
 });
@@ -85,6 +91,7 @@ describe('stripThinking', () => {
   it('removes closed and open think blocks', () => {
     expect(stripThinking('<think>hmm</think>answer')).toBe('answer');
     expect(stripThinking('answer<think>still going')).toBe('answer');
+    expect(stripThinking('reasoning</think>answer')).toBe('answer');
   });
 });
 
@@ -219,5 +226,14 @@ describe('the server as a model', () => {
     await new Promise((r) => setTimeout(r, 10));
     controller.abort();
     expect(await pending).toEqual({ status: 'aborted' });
+  });
+
+  it('does not give up on schemas for a server that fails either way', async () => {
+    fakeServer([json({}, 400), json({}, 400)]);
+    setServer(config);
+    expect(await ask(base)).toEqual({ status: 'unavailable' });
+    fakeServer([reply('{"word":"good"}')]);
+    await ask(base);
+    expect(calls.find((c) => c.body)?.body).toHaveProperty('response_format');
   });
 });
