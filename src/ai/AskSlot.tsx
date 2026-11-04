@@ -1,4 +1,4 @@
-import { TriangleAlert } from 'lucide-react';
+import { CircleQuestionMark, TriangleAlert } from 'lucide-react';
 import { type KeyboardEvent, type ReactNode, useEffect, useLayoutEffect, useRef } from 'react';
 import { type FieldSnapshot, snapshotField } from './askField';
 import { Bubble } from './Bubble';
@@ -177,9 +177,7 @@ function AskPanel<Key, Value>({
       {/* A hairline that sweeps with colour while the answer is worked out. */}
       <div aria-hidden className="ask-line" />
       <div className="ask-row">
-        <span aria-hidden className="ask-tag">
-          ASK
-        </span>
+        <CircleQuestionMark aria-hidden className="ask-icon" />
         <input
           ref={input}
           aria-label="Describe it"

@@ -1149,14 +1149,11 @@ math-field::part(virtual-keyboard-toggle) {
   min-width: 0;
   padding-top: 0.125rem;
 }
-.ask-tag {
+.ask-icon {
   flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
   color: var(--muted);
-  font:
-    500 0.625rem / 1rem "JetBrains Mono",
-    ui-monospace,
-    monospace;
-  letter-spacing: 0.04em;
 }
 .ask-input {
   flex: 1;
