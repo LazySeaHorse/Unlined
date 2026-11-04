@@ -142,8 +142,8 @@ function shade(
   };
 }
 
-const OPEN = /\\left\\\{|\\lbrace|\\\{/g;
-const CLOSE = /\\right\\\}|\\rbrace|\\\}/g;
+const OPEN = /\\left\s*(?:\\\{|\\lbrace)|\\lbrace|\\\{/g;
+const CLOSE = /\\right\s*(?:\\\}|\\rbrace)|\\rbrace|\\\}/g;
 
 /**
  * The row without its restrictions, and the restrictions' text. A restriction is a group in braces at the end of

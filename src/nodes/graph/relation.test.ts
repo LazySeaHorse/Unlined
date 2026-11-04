@@ -134,6 +134,8 @@ describe('splitRestrictions', () => {
       'y=x\\left\\{1<x<5\\right\\}',
       'y=x \\lbrace 1<x<5\\rbrace',
       'y=x\\,\\{1<x<5\\}',
+      // What the math field writes when { is typed in it.
+      'y=x\\left\\lbrace 1<x<5\\right\\rbrace',
     ])
       expect(splitRestrictions(latex)).toEqual({ body: 'y=x', where: ['1<x<5'] });
   });
