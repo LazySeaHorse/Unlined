@@ -212,23 +212,57 @@ function Plot2D({
       probe.current = { compiled, frame: f, probe: buildProbe(compiled, f) };
     return probe.current.probe;
   };
-  const point = (e: PointerEvent<HTMLDivElement>) => {
-    if (!frame || e.pointerType !== 'mouse' || e.buttons !== 0) return setHover(undefined);
+  /** What is under the pointer: its place in the window's own pixels (the canvas may be zoomed, which draws the wrapper scaled), then the snap. */
+  const hitAt = (e: PointerEvent<HTMLDivElement>): Hit | undefined => {
+    if (!frame || e.pointerType !== 'mouse') return undefined;
     const rect = e.currentTarget.getBoundingClientRect();
-    if (!rect.width || !rect.height) return setHover(undefined);
-    // The canvas may be zoomed: the wrapper is then drawn scaled, and the frame is in its own unscaled pixels.
+    if (!rect.width || !rect.height) return undefined;
     const px = ((e.clientX - rect.left) * frame.width) / rect.width;
     const py = ((e.clientY - rect.top) * frame.height) / rect.height;
-    const hit = probeAt(probeFor(frame), px, py);
+    return probeAt(probeFor(frame), px, py);
+  };
+  const point = (e: PointerEvent<HTMLDivElement>) => {
+    const hit = e.buttons === 0 ? hitAt(e) : undefined;
     setHover((old) =>
       hit && old && old.hit.x === hit.x && old.hit.y === hit.y && old.hit.kind === hit.kind
         ? old
-        : hit && { hit, at: toPx(frame, [hit.x, hit.y]) },
+        : hit && frame && { hit, at: toPx(frame, [hit.x, hit.y]) },
     );
   };
+
+  // A click (not a drag, which pans) pins what is hovered; clicking a pin, or the place again, unpins it. Pins belong
+  // to the rows they were taken from, so editing a row drops them.
+  const [pins, setPins] = useState<Hit[]>([]);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: the rows changing is the trigger.
+  useEffect(() => setPins([]), [compiled]);
+  const pressed = useRef<{ x: number; y: number } | undefined>(undefined);
+  const near = (f: Frame, a: Hit, b: Hit) => {
+    const [p, q] = [toPx(f, [a.x, a.y]), toPx(f, [b.x, b.y])];
+    return Math.hypot(p[0] - q[0], p[1] - q[1]) <= PIN_PX;
+  };
+  const press = (e: PointerEvent<HTMLDivElement>) => {
+    pressed.current = e.button === 0 ? { x: e.clientX, y: e.clientY } : undefined;
+  };
+  const release = (e: PointerEvent<HTMLDivElement>) => {
+    const start = pressed.current;
+    pressed.current = undefined;
+    if (!start || !frame || Math.hypot(e.clientX - start.x, e.clientY - start.y) > 4) return;
+    const hit = hitAt(e);
+    if (!hit) return;
+    setPins((old) =>
+      old.some((pin) => near(frame, pin, hit)) ? old.filter((pin) => !near(frame, pin, hit)) : [...old, hit],
+    );
+  };
+  const shownHover = hover && frame && !pins.some((pin) => near(frame, pin, hover.hit)) ? hover : undefined;
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: hovering only adds a tooltip over the graph.
-    <div className="relative size-full" onPointerMove={point} onPointerLeave={() => setHover(undefined)}>
+    <div
+      className="relative size-full"
+      onPointerMove={point}
+      onPointerLeave={() => setHover(undefined)}
+      onPointerDown={press}
+      onPointerUp={release}
+    >
       <Mafs
         key={key}
         height={height}
@@ -246,10 +280,28 @@ function Plot2D({
           ) : null,
         )}
       </Mafs>
-      {hover && frame && <HoverTip hit={hover.hit} at={hover.at} frame={frame} />}
+      {shownHover && frame && <HoverTip hit={shownHover.hit} at={shownHover.at} frame={frame} />}
+      {frame &&
+        pins.map((pin) => {
+          const at = toPx(frame, [pin.x, pin.y]);
+          // Out of the window, a pin waits where it is until it comes back into view.
+          if (at[0] < -2 || at[0] > frame.width + 2 || at[1] < -2 || at[1] > frame.height + 2) return null;
+          return (
+            <PinnedChip
+              key={`${pin.x},${pin.y}`}
+              hit={pin}
+              at={at}
+              frame={frame}
+              onUnpin={() => setPins((old) => old.filter((p) => p !== pin))}
+            />
+          );
+        })}
     </div>
   );
 }
+
+/** How near, in pixels, a click must be to a pin to take it off again. */
+const PIN_PX = 8;
 
 const same = (a: readonly [number, number], b: readonly [number, number]) => a[0] === b[0] && a[1] === b[1];
 
@@ -560,5 +612,48 @@ function Rulers({ xStep, yStep }: { xStep: number; yStep: number }) {
     <g ref={anchor} className="mafs-axis">
       {labels}
     </g>
+  );
+}
+
+/** A pinned place: a mark and a chip that stay where they were put, and unpin when clicked. */
+function PinnedChip({
+  hit,
+  at,
+  frame,
+  onUnpin,
+}: {
+  hit: Hit;
+  at: readonly [number, number];
+  frame: Frame;
+  onUnpin: () => void;
+}) {
+  const [x, y] = at;
+  const text = `(${coordinate(hit.x)}, ${coordinate(hit.y)})`;
+  return (
+    <>
+      <span
+        aria-hidden
+        className="pointer-events-none absolute size-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-surface bg-accent"
+        style={{ left: x, top: y }}
+      />
+      <button
+        type="button"
+        data-pin=""
+        aria-label={`Unpin ${text}`}
+        title="Click to unpin"
+        // The graph underneath would take these as the start of a click of its own.
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerUp={(e) => e.stopPropagation()}
+        onClick={onUnpin}
+        className="absolute cursor-pointer rounded-md border border-accent bg-surface px-1.5 py-0.5 font-mono text-2xs whitespace-nowrap tabular-nums text-fg hover:bg-accent/10"
+        style={{
+          left: x,
+          top: y,
+          transform: `translate(${x > frame.width / 2 ? 'calc(-100% - 10px)' : '10px'}, ${y < 36 ? '10px' : 'calc(-100% - 10px)'})`,
+        }}
+      >
+        {text}
+      </button>
+    </>
   );
 }

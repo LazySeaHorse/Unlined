@@ -194,3 +194,72 @@ for (const equal of [false, true]) {
     expect(Math.hypot(cx - (found?.x ?? 0), cy - (found?.y ?? 0))).toBeLessThan(25);
   });
 }
+
+test('clicking while hovering pins the chip; pins stack and a click on a chip unpins it', async ({
+  page,
+}) => {
+  await openApp(page);
+  await placeNode(page, 'Graph');
+  await nodes(page).getByRole('button', { name: 'Add equation' }).click();
+  const fields = nodes(page).locator('li math-field');
+  const set = (i: number, value: string) =>
+    fields.nth(i).evaluate((f: HTMLElement & { value: string }, v: string) => {
+      f.value = v;
+      f.dispatchEvent(new Event('input', { bubbles: true }));
+    }, value);
+  await set(0, 'y=x');
+  await set(1, 'y=-x+4');
+  const plot = nodes(page).getByRole('application', { name: 'Graph' });
+  await expect(nodes(page).locator('svg text').first()).toBeVisible();
+  const at = (await plot.boundingBox()) as { x: number; y: number; width: number; height: number };
+  const tip = nodes(page).locator('[data-hover-tip]');
+  const pins = nodes(page).locator('[data-pin]');
+
+  /** Sweeps the pointer over the plot until the tooltip reads `text`, and leaves it there. */
+  const hoverOn = (text: string) =>
+    expect
+      .poll(
+        async () => {
+          for (let r = 0.1; r < 1; r += 0.07)
+            for (let c = 0.02; c < 1; c += 0.04) {
+              const [x, y] = [at.x + at.width * c, at.y + at.height * r];
+              // A pinned chip over the place would take the click: it is not a place to try.
+              if (
+                await page.evaluate(
+                  ([px, py]) => !!document.elementFromPoint(px, py)?.closest('[data-pin]'),
+                  [x, y],
+                )
+              )
+                continue;
+              await page.mouse.move(x, y);
+              if ((await tip.allTextContents()).join(' ').includes(text)) return true;
+            }
+          return false;
+        },
+        { timeout: 30_000 },
+      )
+      .toBe(true);
+
+  await hoverOn('(2, 2)');
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(pins).toHaveCount(1);
+  await expect(pins.first()).toHaveText('(2, 2)');
+  // It stays when the pointer goes elsewhere, and a second place can be pinned beside it.
+  await page.mouse.move(at.x + 3, at.y + 3);
+  await expect(pins).toHaveCount(1);
+  await hoverOn('(4, 0)');
+  await page.mouse.down();
+  await page.mouse.up();
+  await expect(pins).toHaveCount(2);
+  // A drag pans and pins nothing.
+  await page.mouse.move(at.x + at.width / 2, at.y + at.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(at.x + at.width / 2 + 40, at.y + at.height / 2 + 10, { steps: 5 });
+  await page.mouse.up();
+  await expect(pins).toHaveCount(2);
+  // Clicking a chip takes it off.
+  await pins.filter({ hasText: '(2, 2)' }).click();
+  await expect(pins).toHaveCount(1);
+  await expect(pins.first()).toHaveText('(4, 0)');
+});
