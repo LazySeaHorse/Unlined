@@ -103,13 +103,12 @@ export default function GraphNode({ id, data, selected }: NodeProps<NodeOf<'grap
               complete={complete}
               at={index}
               renderGhost={(row) => <Tex latex={row} className="text-base" />}
-              className="order-last basis-full pl-4.5"
             >
               <AskSlot
                 ask={ask}
                 at={index}
                 renderGhost={(answer) => <Tex latex={answer} className="text-base" />}
-                className="min-w-0 flex-1"
+                placeholder="Describe the equation"
               >
                 <MathField
                   value={latex}
