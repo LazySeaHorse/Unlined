@@ -42,6 +42,16 @@ describe('canvasRepo', () => {
     expect((await getCanvas(id))?.updatedAt).toBeGreaterThan(before);
   });
 
+  it('keeps a moved view without counting it as an edit', async () => {
+    const id = await createCanvas('View');
+    const before = (await getCanvas(id))?.updatedAt;
+    await new Promise((r) => setTimeout(r, 5));
+    const content = { nodes: [], viewport: { x: 40, y: -20, zoom: 2 } };
+    await saveContent(id, content, false);
+    expect(await loadContent(id)).toEqual(content);
+    expect((await getCanvas(id))?.updatedAt).toBe(before);
+  });
+
   it('lists most recently updated first', async () => {
     const a = await createCanvas('A');
     await new Promise((r) => setTimeout(r, 5));

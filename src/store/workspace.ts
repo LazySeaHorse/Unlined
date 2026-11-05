@@ -23,20 +23,24 @@ export const useWorkspace = create<WorkspaceState>(() => ({ currentId: null }));
 
 const currentId = () => useWorkspace.getState().currentId;
 
+/** Whether anything but the view changed since the last save: panning and zooming are saved, but are not edits. */
+let edited = false;
+
 const autosave = createAutosave(async () => {
   const id = currentId();
-  if (id) await repo.saveContent(id, getCanvasContent());
+  const wasEdited = edited;
+  edited = false;
+  if (id) await repo.saveContent(id, getCanvasContent(), wasEdited);
 });
 
 useCanvasStore.subscribe((state, prev) => {
-  if (
+  const changed =
     state.nodes !== prev.nodes ||
     state.edges !== prev.edges ||
-    state.viewport !== prev.viewport ||
     state.groups !== prev.groups ||
-    state.fronts !== prev.fronts
-  )
-    autosave.schedule();
+    state.fronts !== prev.fronts;
+  if (changed) edited = true;
+  if (changed || state.viewport !== prev.viewport) autosave.schedule();
 });
 
 if (typeof window !== 'undefined') {
@@ -45,13 +49,19 @@ if (typeof window !== 'undefined') {
   document.addEventListener('visibilitychange', () => document.visibilityState === 'hidden' && flushNow());
 }
 
+/** Drops a save still waiting, and the edits it would have carried. */
+const cancelSave = () => {
+  autosave.cancel();
+  edited = false;
+};
+
 export const flushSave = () => autosave.flush();
 
 export async function openCanvas(id: string): Promise<void> {
   if (id !== currentId()) await autosave.flush();
   const content = await repo.loadContent(id);
   useCanvasStore.getState().load(content);
-  autosave.cancel();
+  cancelSave();
   useWorkspace.setState({ currentId: id });
 }
 
@@ -74,7 +84,7 @@ export const renameCanvas = (id: string, name: string) => repo.renameCanvas(id, 
 
 export async function removeCanvas(id: string): Promise<void> {
   if (id === currentId()) {
-    autosave.cancel();
+    cancelSave();
     useWorkspace.setState({ currentId: null });
   }
   await repo.deleteCanvas(id);
@@ -95,7 +105,7 @@ export async function savePulledCanvas(
   rev: string,
 ): Promise<void> {
   const open = id === currentId();
-  if (open) autosave.cancel();
+  if (open) cancelSave();
   await repo.savePulled(id, name, content, rev);
   if (open) useCanvasStore.getState().load(content);
 }

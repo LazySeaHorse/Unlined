@@ -31,10 +31,14 @@ export async function loadContent(id: string): Promise<CanvasContent> {
   };
 }
 
-export async function saveContent(id: string, content: CanvasContent): Promise<void> {
+/**
+ * Stores a canvas's content. `edited` is false when only the view moved (pan, zoom): that is kept, but is not
+ * an edit, so the canvas stays as modified as it was and sync does not see a change.
+ */
+export async function saveContent(id: string, content: CanvasContent, edited = true): Promise<void> {
   await db.transaction('rw', db.canvases, db.contents, async () => {
     await db.contents.put({ id, ...content });
-    await db.canvases.update(id, { updatedAt: Date.now() });
+    if (edited) await db.canvases.update(id, { updatedAt: Date.now() });
   });
 }
 
