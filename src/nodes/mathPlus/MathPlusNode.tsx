@@ -61,7 +61,7 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
       className="min-w-56"
     >
       <InputChips id={id} />
-      <div className="flex items-stretch">
+      <div className="relative flex items-stretch">
         <div ref={fieldHost} className="min-w-0 flex-1 px-3 py-2">
           <CompleteSlot
             complete={complete}
@@ -90,6 +90,7 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
           </CompleteSlot>
         </div>
         <Answers results={results} latex={data.latex} boxes={boxes} />
+        <Tracks boxes={boxes} />
       </div>
     </NodeShell>
   );
@@ -120,13 +121,13 @@ function Answers({
         const box = boxes[filled[index] ?? -1];
         // Until the field has been measured, answers stack in a row each.
         const top = box ? Math.max(0, box.top - bottom) : 0;
-        if (box) bottom = box.top + Math.max(box.height, MIN_ROW);
+        if (box) bottom = box.top + box.height;
         return (
           <ResultLine
             // biome-ignore lint/suspicious/noArrayIndexKey: results are positional, one per input line.
             key={index}
             result={result}
-            style={box ? { marginTop: top, minHeight: box.height } : undefined}
+            style={box ? { marginTop: top, height: box.height } : { minHeight: ROW }}
           />
         );
       })}
@@ -134,8 +135,30 @@ function Answers({
   );
 }
 
-/** A row's least height, so two answers never overlap. */
-const MIN_ROW = 28;
+/** A row's height before its line has been measured. */
+const ROW = 28;
+
+/** The padding above the first line, in px: py-2 on the field and on the column both. */
+const PAD = 8;
+
+/** Faint rules between the lines, across the field and its answers alike: a track for each line. */
+function Tracks({ boxes }: { boxes: (LineBox | undefined)[] }) {
+  const measured = boxes.filter((box): box is LineBox => box !== undefined);
+  return measured.slice(1).map((box, index) => {
+    const above = measured[index];
+    // Halfway between the end of one line and the start of the next.
+    const at = PAD + (above.top + above.height + box.top) / 2;
+    return (
+      <div
+        // biome-ignore lint/suspicious/noArrayIndexKey: tracks are positional, one per gap between lines.
+        key={index}
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 border-t border-border/50"
+        style={{ top: at }}
+      />
+    );
+  });
+}
 
 /** Offered lines, each with the result Math+ will give it once they are in, links and all. */
 function AnswerLines({ id, latex, at, lines }: { id: string; latex: string; at: number; lines: string[] }) {
@@ -217,7 +240,7 @@ function ResultLine({ result, style }: { result: LineResult; style?: CSSProperti
   // The lines above the answer of a system: it is below them.
   if (result.solved && result.value === null) {
     return (
-      <li aria-hidden style={style} className="flex min-h-7 items-center text-muted">
+      <li aria-hidden style={style} className="flex items-center text-muted">
         ↓
       </li>
     );
@@ -225,7 +248,7 @@ function ResultLine({ result, style }: { result: LineResult; style?: CSSProperti
   const copyButton =
     'nodrag cursor-pointer rounded p-1 text-muted opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-2 hover:text-fg focus-visible:opacity-100 [@media(hover:none)]:opacity-100';
   return (
-    <li style={style} className="group flex min-h-7 items-center gap-2">
+    <li style={style} className="group flex items-center gap-2">
       <span className="text-muted">{result.solved ? '⟹' : '='}</span>
       {/* Keyed by value: a new result settles in rather than swapping in place. */}
       <span key={result.value} className="result-tick">
