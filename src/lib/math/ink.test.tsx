@@ -58,3 +58,10 @@ describe('neutral math colours follow the theme', () => {
     expect(colors).toContain('var(--ink-black)');
   });
 });
+
+describe('Tex', () => {
+  it('draws the commands MathLive writes for e, i and d, which KaTeX lacks', () => {
+    const { container } = render(<Tex latex="\exponentialE^{-1}+\imaginaryI\,\differentialD x" />);
+    expect(container.querySelector('.katex-error')).toBeNull();
+  });
+});
