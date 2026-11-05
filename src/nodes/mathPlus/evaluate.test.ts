@@ -314,4 +314,8 @@ describe('equations', () => {
     const singular = '\\begin{pmatrix}1&2\\\\2&4\\end{pmatrix}';
     expect(run(`${singular}${column('u', 'v')}=${column('1', '3')}`)[0].error).toBeTruthy();
   });
+
+  it('leaves a function written with = and no := as it was', () => {
+    expect(run('f(x)=x^2')[0]).toMatchObject({ solved: false, error: null });
+  });
 });

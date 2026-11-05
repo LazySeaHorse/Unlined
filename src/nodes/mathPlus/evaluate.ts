@@ -218,6 +218,13 @@ function rowEquations(ce: ComputeEngine, equation: BoxedExpression): BoxedExpres
   return lefts.map((l, i) => ce.box(['Equal', l.json, rights[i].json] as never));
 }
 
+/**
+ * A side that applies a function of the user's, `f(x) = x^2`: someone writing a definition without `:=`, not an
+ * equation to solve for x. The engine's own functions are capitalised (`Sin`, `Add`), the user's are not.
+ */
+const writesFunction = (equation: BoxedExpression) =>
+  opsOf(equation).some((side) => /^[a-z]/.test(side.operator));
+
 const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`;
 
 /**
@@ -408,7 +415,7 @@ export function evaluateLinked(
         }
         const expr = blocked || line.target ? null : substituted(ce, line, substitutions);
         const equations = expr && equationsOf(expr);
-        if (expr && equations && expr.unknowns.length > 0) {
+        if (expr && equations && expr.unknowns.length > 0 && !equations.some(writesFunction)) {
           pending.push({ line, substitutions, equations, unknowns: expr.unknowns });
         } else {
           flush();
