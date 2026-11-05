@@ -32,5 +32,8 @@ the unminified `mathlive.mjs` in every mode (see `vite.config.ts`), so that is t
   line deleted that line. `joinCells` replaces `deleteRow` there: it joins the cell to
   the one before (or after), as deleting the `&` would, and a line's first cell to the line above, cell by
   cell. In a matrix, where cells are separate entries, it steps into the neighbouring cell instead.
+- **`\pdiff` serialized infix.** The command is defined with two arguments, but `serialize` wrote
+  `a\pdiff b`, which reads back as `\pdiff` taking the next two tokens: a duplicated or reloaded
+  `∂x/∂x_1` came out as `x ∂x/∂_ 1`. It writes `\pdiff{a}{b}` now.
 
 When upgrading MathLive, re-apply these by hand to the new `mathlive.mjs` and run `npx patch-package mathlive`.
