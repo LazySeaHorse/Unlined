@@ -26,7 +26,7 @@ export function Capsule({ className, ...props }: ComponentPropsWithRef<'div'>) {
   return (
     <div
       className={cn(
-        'pointer-events-auto flex h-12 items-center gap-0.5 rounded-full border border-border bg-surface-2 px-1.5',
+        'pointer-events-auto flex h-12 items-center gap-0.5 rounded-full border border-border bg-white px-1.5 dark:bg-surface-2',
         className,
       )}
       {...props}
