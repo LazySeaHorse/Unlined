@@ -242,7 +242,11 @@ function solveEquations(
       unknowns.length === 1 ? solution : (opsOf(solution)[i] ?? solution);
     const value =
       solutions.length === 1
-        ? names.map((name, i) => `${name} = ${component(solutions[0], i).latex}`).join(',\\; ')
+        ? // A name left free (z in `x = z-1, y = 4-z`) is not said again as `z = z`.
+          names
+            .map((name, i) => `${name} = ${component(solutions[0], i).latex}`)
+            .filter((said, i) => said !== `${names[i]} = ${names[i]}`)
+            .join(',\\; ')
         : `${unknowns.length === 1 ? names[0] : `(${names.join(', ')})`} \\in \\{${solutions
             .map((solution) => solution.latex)
             .join(', ')}\\}`;
@@ -259,6 +263,37 @@ function solveEquations(
   } catch (err) {
     return failed(err instanceof Error ? err.message : 'Evaluation error');
   }
+}
+
+/** A line that states equations with names to solve for, waiting for the lines around it. */
+interface PendingEquation {
+  line: ParsedLine;
+  substitutions: Record<string, BoxedExpression>;
+  equations: BoxedExpression[];
+  unknowns: readonly string[];
+}
+
+/**
+ * The results of consecutive equation lines, in order: solved together as one system, the answer on the last line
+ * and the lines above it marked as part of it. One equation with several unknowns (`y = mx + b`) is no system to
+ * solve for, so it is evaluated as any line is.
+ */
+function solvePending(
+  ce: ComputeEngine,
+  pending: PendingEquation[],
+): { result: LineResult; value: BoxedExpression | null }[] {
+  if (pending.length === 0) return [];
+  const equations = pending.flatMap((p) => p.equations);
+  const unknowns = [...new Set(pending.flatMap((p) => p.unknowns))];
+  if (equations.length === 1 && unknowns.length > 1) {
+    return pending.map((p) => runLine(ce, p.line, p.substitutions));
+  }
+  const answer = solveEquations(ce, equations, unknowns);
+  const part = {
+    result: { value: null, approx: null, error: null, assigned: false, solved: true },
+    value: null,
+  };
+  return [...pending.slice(1).map(() => part), answer];
 }
 
 /** What a Math+ node hands on: the exact result of its last line, or why there is none. */
@@ -326,8 +361,18 @@ export function evaluateLinked(
       const results: LineResult[] = [];
       const values: (BoxedExpression | null)[] = [];
       const active = new Set(incoming.map((l) => l.name));
+      // Equations wait here until the line after them, so consecutive ones are solved together.
+      let pending: PendingEquation[] = [];
+      const flush = () => {
+        for (const line of solvePending(ce, pending)) {
+          results.push(line.result);
+          values.push(line.value);
+        }
+        pending = [];
+      };
       for (const line of parsed) {
         if (isFailure(line)) {
+          flush();
           results.push(line);
           values.push(null);
           continue;
@@ -344,21 +389,24 @@ export function evaluateLinked(
           else if ('error' in first.outcome) blocked ??= `${name}: ${first.outcome.error}`;
           else substitutions[name] = first.outcome.value;
         }
-        if (blocked) {
-          results.push({ value: null, approx: null, error: blocked, assigned: false, solved: false });
-          values.push(null);
+        const expr = blocked || line.target ? null : substituted(ce, line, substitutions);
+        const equations = expr && equationsOf(expr);
+        if (expr && equations && expr.unknowns.length > 0) {
+          pending.push({ line, substitutions, equations, unknowns: expr.unknowns });
         } else {
-          const expr = line.target ? null : substituted(ce, line, substitutions);
-          const equations = expr && equationsOf(expr);
-          const run =
-            expr && equations?.length === 1 && expr.unknowns.length === 1
-              ? solveEquations(ce, equations, expr.unknowns)
-              : runLine(ce, line, substitutions);
-          results.push(run.result);
-          values.push(run.value);
+          flush();
+          if (blocked) {
+            results.push({ value: null, approx: null, error: blocked, assigned: false, solved: false });
+            values.push(null);
+          } else {
+            const run = runLine(ce, line, substitutions);
+            results.push(run.result);
+            values.push(run.value);
+          }
         }
         if (line.assigns) active.delete(line.assigns);
       }
+      flush();
       lines[id] = results;
       outcomes.set(id, outcomeOf(results, values, parsed));
       inputs[id] = brought.map(({ link, outcome, ambiguous }) => {

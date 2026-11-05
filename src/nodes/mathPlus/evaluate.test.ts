@@ -252,4 +252,48 @@ describe('equations', () => {
     expect(lines[1].value).toBe('x = 3');
     expect(lines[2].value).toBe('3');
   });
+
+  it('solves consecutive equations as a system, the answer on the last line', () => {
+    const [first, last] = run('\\displaylines{x+y=3\\\\x-y=1}');
+    expect(first).toEqual({ value: null, approx: null, error: null, assigned: false, solved: true });
+    expect(last).toMatchObject({ value: 'x = 2,\\; y = 1', solved: true, error: null });
+  });
+
+  it('solves a cases block the same way', () => {
+    const [line] = run('\\begin{cases}x+y=3\\\\x-y=1\\end{cases}');
+    expect(line.value).toBe('x = 2,\\; y = 1');
+  });
+
+  it('lists the solutions of a system that has several', () => {
+    const [, last] = run('\\displaylines{x^2+y^2=25\\\\x-y=1}');
+    expect(last.value).toBe('(x, y) \\in \\{(4,3), (-3,-4)\\}');
+  });
+
+  it('tells a system with no unique solution', () => {
+    expect(run('\\displaylines{x+y=3\\\\x+y=4}')[1].error).toBe('no unique solution found');
+    expect(run('\\displaylines{2x+2y=6\\\\x+y=3}')[1].error).toBe('no unique solution found');
+  });
+
+  it('gives the rest in terms of the name left free when there are fewer equations than unknowns', () => {
+    expect(run('\\displaylines{x+y=3\\\\y+z=4}')[1].value).toBe('x = z-1,\\; y = 4-z');
+  });
+
+  it('ends a system at a line that is not an equation', () => {
+    const lines = run('\\displaylines{x+y=3\\\\x-y=1\\\\2+2\\\\x^2=4}');
+    expect(lines.map((l) => l.solved)).toEqual([true, true, false, true]);
+    expect(lines[2].value).toBe('4');
+    expect(lines[3].value).toBe('x \\in \\{2, -2\\}');
+  });
+
+  it('hands the solution along a link', () => {
+    const { lines } = evaluateLinked(
+      ce,
+      [
+        { id: 'a', latex: 'x+1=4' },
+        { id: 'b', latex: 's+1' },
+      ],
+      [{ id: 'l', source: 'a', target: 'b', name: 's' }],
+    );
+    expect(lines.b[0].value).toBe('\\bigl\\lbrack4\\bigr\\rbrack');
+  });
 });
