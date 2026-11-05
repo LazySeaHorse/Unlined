@@ -1,6 +1,6 @@
 import type { NodeProps } from '@xyflow/react';
 import { Copy, TriangleAlert } from 'lucide-react';
-import { useMemo } from 'react';
+import { type CSSProperties, useMemo, useRef } from 'react';
 import { AskSlot } from '@/ai/AskSlot';
 import { CompleteSlot } from '@/ai/CompleteSlot';
 import { askedLine, replaceLine, useInlineAsk } from '@/ai/useInlineAsk';
@@ -27,6 +27,7 @@ import {
   splitBody,
   splitLines,
 } from './evaluate';
+import { type LineBox, useLineBoxes } from './useLineBoxes';
 import { resultsWith, useMathPlusInputs, useMathPlusResults } from './useMathPlusResults';
 
 /** The node's LaTeX with its line at `at` replaced by `lines`. */
@@ -47,6 +48,8 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
   });
   // Tab asks for the rest of the line at the caret, shown under the field.
   const complete = useInlineComplete(mathPlusComplete, { data, context: () => ({ inputs: linked() }) });
+  const fieldHost = useRef<HTMLDivElement>(null);
+  const boxes = useLineBoxes(fieldHost, data.latex);
   const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;
 
   return (
@@ -58,48 +61,81 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
       className="min-w-56"
     >
       <InputChips id={id} />
-      <div className="px-3 py-2">
-        <CompleteSlot
-          complete={complete}
-          at={0}
-          renderGhost={(latex, caret) => <Tex latex={lineAt(latex, caret).line} />}
-        >
-          <AskSlot
-            ask={ask}
-            placeholder="Describe the lines"
-            renderGhost={(lines) =>
-              asking !== undefined && <AnswerLines id={id} latex={data.latex} at={asking} lines={lines} />
-            }
+      <div className="flex items-stretch">
+        <div ref={fieldHost} className="min-w-0 flex-1 px-3 py-2">
+          <CompleteSlot
+            complete={complete}
+            at={0}
+            renderGhost={(latex, caret) => <Tex latex={lineAt(latex, caret).line} />}
           >
-            <MathField
-              value={data.latex}
-              onChange={(latex) => {
-                const line = askedLine(linesBody(data.latex), linesBody(latex), MATH_LINES);
-                if (!line || !ask.open(line.index)) update({ latex });
-              }}
-              menuNodeId={id}
-              readOnly={readOnly}
-              multiline
-              placeholder="a := 2"
-            />
-          </AskSlot>
-        </CompleteSlot>
+            <AskSlot
+              ask={ask}
+              placeholder="Describe the lines"
+              renderGhost={(lines) =>
+                asking !== undefined && <AnswerLines id={id} latex={data.latex} at={asking} lines={lines} />
+              }
+            >
+              <MathField
+                value={data.latex}
+                onChange={(latex) => {
+                  const line = askedLine(linesBody(data.latex), linesBody(latex), MATH_LINES);
+                  if (!line || !ask.open(line.index)) update({ latex });
+                }}
+                menuNodeId={id}
+                readOnly={readOnly}
+                multiline
+                placeholder="a := 2"
+              />
+            </AskSlot>
+          </CompleteSlot>
+        </div>
+        <Answers results={results} latex={data.latex} boxes={boxes} />
       </div>
-      {results === undefined ? (
-        <p className="border-t border-border px-3 py-2 text-xs text-muted italic">Loading math engine…</p>
-      ) : (
-        results.length > 0 && (
-          <ol className="border-t border-border bg-surface-2/50 px-3 py-2 text-sm">
-            {results.map((result, index) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: results are positional, one per input line.
-              <ResultLine key={index} result={result} />
-            ))}
-          </ol>
-        )
-      )}
     </NodeShell>
   );
 }
+
+/**
+ * The answers, in a column to the right of the lines, each level with its own line (like Soulver): `boxes` say
+ * where the lines are, and an answer belongs to the line that holds something, in order.
+ */
+function Answers({
+  results,
+  latex,
+  boxes,
+}: {
+  results: LineResult[] | undefined;
+  latex: string;
+  boxes: (LineBox | undefined)[];
+}) {
+  if (results === undefined)
+    return <p className="self-center px-3 text-xs text-muted italic">Loading math engine…</p>;
+  const lines = splitBody(linesBody(latex));
+  const filled = lines.flatMap((line, index) => (line.trim() ? [index] : []));
+  // The field's padding above its first line (py-2) is the column's too, so tops line up.
+  let bottom = 0;
+  return (
+    <ol className="m-0 flex list-none flex-col border-l border-border bg-surface-2/50 px-3 py-2 text-sm">
+      {results.map((result, index) => {
+        const box = boxes[filled[index] ?? -1];
+        // Until the field has been measured, answers stack in a row each.
+        const top = box ? Math.max(0, box.top - bottom) : 0;
+        if (box) bottom = box.top + Math.max(box.height, MIN_ROW);
+        return (
+          <ResultLine
+            // biome-ignore lint/suspicious/noArrayIndexKey: results are positional, one per input line.
+            key={index}
+            result={result}
+            style={box ? { marginTop: top, minHeight: box.height } : undefined}
+          />
+        );
+      })}
+    </ol>
+  );
+}
+
+/** A row's least height, so two answers never overlap. */
+const MIN_ROW = 28;
 
 /** Offered lines, each with the result Math+ will give it once they are in, links and all. */
 function AnswerLines({ id, latex, at, lines }: { id: string; latex: string; at: number; lines: string[] }) {
@@ -170,10 +206,10 @@ function InputChip({ input }: { input: LinkInput }) {
   );
 }
 
-function ResultLine({ result }: { result: LineResult }) {
+function ResultLine({ result, style }: { result: LineResult; style?: CSSProperties }) {
   if (result.error) {
     return (
-      <li className="flex items-center gap-1.5 text-xs text-danger">
+      <li style={style} className="flex items-center gap-1.5 text-xs text-danger">
         <TriangleAlert className="size-3.5" /> {result.error}
       </li>
     );
@@ -181,7 +217,7 @@ function ResultLine({ result }: { result: LineResult }) {
   // The lines above the answer of a system: it is below them.
   if (result.solved && result.value === null) {
     return (
-      <li aria-hidden className="flex min-h-7 items-center text-muted">
+      <li aria-hidden style={style} className="flex min-h-7 items-center text-muted">
         ↓
       </li>
     );
@@ -189,7 +225,7 @@ function ResultLine({ result }: { result: LineResult }) {
   const copyButton =
     'nodrag cursor-pointer rounded p-1 text-muted opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-2 hover:text-fg focus-visible:opacity-100 [@media(hover:none)]:opacity-100';
   return (
-    <li className="group flex min-h-7 items-center gap-2">
+    <li style={style} className="group flex min-h-7 items-center gap-2">
       <span className="text-muted">{result.solved ? '⟹' : '='}</span>
       {/* Keyed by value: a new result settles in rather than swapping in place. */}
       <span key={result.value} className="result-tick">
