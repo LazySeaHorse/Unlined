@@ -339,13 +339,13 @@ function outcomeOf(
 }
 
 /**
- * Evaluates Math+ documents inside a fresh scope, so variables flow from earlier documents to later ones and
- * nothing leaks between evaluations. `documents` are in reading order. That is also the evaluation order, except
- * that a document waits for the documents linked into it (see `orderDocuments`).
+ * Evaluates Math+ documents, each in a scope of its own: what a document assigns or defines is its own, and
+ * nothing leaks between documents or between evaluations. `documents` are in reading order. That is also the
+ * evaluation order, except that a document waits for the documents linked into it (see `orderDocuments`).
  *
  * A link hands the exact result of the source's last line to the target as a variable, by substitution line by
- * line. Nothing is assigned for it, so the only names that reach later documents are those a document assigns
- * itself; and such an assignment of the same name replaces the link from that line on.
+ * line. It is the only thing that crosses between documents; a document that assigns the same name replaces the
+ * link from that line on.
  */
 export function evaluateLinked(
   ce: ComputeEngine,
@@ -362,9 +362,9 @@ export function evaluateLinked(
   const inputs: Record<string, LinkInput[]> = {};
   const outcomes = new Map<string, Outcome>();
 
-  ce.pushScope();
-  try {
-    for (const id of order) {
+  for (const id of order) {
+    ce.pushScope();
+    try {
       const incoming = usable.filter((l) => l.target === id);
       const spellAns = incoming.some((l) => l.name === 'ans');
       const parsed = splitLines(latexOf.get(id) ?? '').map((line) => parseLine(ce, line, spellAns));
@@ -450,9 +450,9 @@ export function evaluateLinked(
           used,
         };
       });
+    } finally {
+      ce.popScope();
     }
-  } finally {
-    ce.popScope();
   }
   return { lines, inputs };
 }

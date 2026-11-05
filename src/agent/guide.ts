@@ -16,7 +16,7 @@ ${kinds}
 FIELDS (create_nodes takes them flat next to "kind"; update_nodes "set" replaces them)
 - text: markdown. ${SYNTAX.text}
 - math: latex. Typeset only.
-- mathPlus: latex. ${SYNTAX.mathPlus} Math+ nodes are evaluated in reading order (top to bottom, then left to right), so position matters.
+- mathPlus: latex. ${SYNTAX.mathPlus} Each Math+ node has a scope of its own: variables and functions it defines are not seen by other nodes, linked or not; only a link carries a value across (below). Nodes are evaluated in reading order (top to bottom, then left to right), except that a node waits for those linked into it.
   read_nodes shows each line's result after ⟶.
   A link from one Math+ node to another hands the exact result of the source's last line to the target as a
   variable: named by the link's label when that is a single latin letter other than e and i ("k" or "$k$"), otherwise

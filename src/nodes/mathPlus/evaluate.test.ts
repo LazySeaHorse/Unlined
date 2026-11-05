@@ -29,13 +29,13 @@ describe('evaluateDocuments', () => {
     expect(a[1]).toMatchObject({ value: '\\frac{1}{3}', approx: '0.3333333333' });
   });
 
-  it('shares variables across documents in order', () => {
+  it("keeps each document's variables to itself", () => {
     const results = evaluateDocuments(ce, [
       { id: 'first', latex: 'x:=5' },
       { id: 'second', latex: 'x+1' },
     ]);
     expect(results.first[0]).toMatchObject({ value: '5', assigned: true });
-    expect(results.second[0].value).toBe('6');
+    expect(results.second[0].value).toBe('x+1');
   });
 
   it('does not leak variables between evaluations', () => {
@@ -70,7 +70,7 @@ describe('evaluateLinked', () => {
     expect(one('\\text{ans}+1')).toEqual(['Syntax error']);
     expect(one('ans+1')).toEqual(['4an+1']);
     expect(one('\\mathrm{ans}')).toEqual(['\\mathrm{ans}']);
-    expect(evaluateLinked(ce, [doc('a', 'x:=5'), doc('b', 'x+1')], []).lines.b[0].value).toBe('6');
+    expect(evaluateLinked(ce, [doc('a', 'x:=5'), doc('b', 'x+1')], []).lines.b[0].value).toBe('x+1');
   });
 
   it('spells ans as one symbol only where an ans link arrives, and not inside text groups', () => {
@@ -118,15 +118,16 @@ describe('evaluateLinked', () => {
     expect(r.inputs.t[0]).toMatchObject({ name: 'k', value: '5', error: null, used: false });
   });
 
-  it('lets what the target assigns reach later nodes, but not the link variable', () => {
+  it('lets nothing reach a later node but the link: not what the target assigns, nor the link variable', () => {
     const r = evaluateLinked(
       ce,
       [doc('s', '4'), doc('t', 'a:=ans+1'), doc('u', 'a*2+ans')],
       [link('l', 's', 't')],
     );
     expect(value(r, 't')).toBe('5');
-    // a is visible in u; ans is not (it only exists inside t), so u reads typed ans as a times n times s.
-    expect(value(r, 'u')).toBe('20n+10');
+    // u is not linked from t: a is not visible in it, and nor is ans (it only exists inside t), so both stay
+    // symbols (ans read as a times n times s; the 4 is the s that an earlier test here assigned).
+    expect(value(r, 'u')).toBe('4an+2a');
   });
 
   it('lets the target assign a linked name itself: the link stops there', () => {

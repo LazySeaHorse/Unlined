@@ -132,13 +132,12 @@ describe('reading', () => {
     expect(await call('read_nodes', { ids: ['n1'] })).toContain('  | A | B\n1 | 1 | =A1*2');
   });
 
-  it('reads Math+ with results that flow between nodes in reading order', async () => {
+  it('reads Math+ with its results, a link carrying them between nodes and nothing else', async () => {
     load([
       createNode('mathPlus', at(0, 300), { latex: 'a+1' }),
       createNode('mathPlus', at(0, 0), { latex: 'a:=2' }),
     ]);
-    const text = await call('read_nodes', { ids: ['n1'] });
-    expect(text).toContain('a+1  ⟶ 3');
+    expect(await call('read_nodes', { ids: ['n1'] })).toContain('a+1  ⟶ a+1');
   }, 20_000);
 
   it('never sends image data', async () => {
