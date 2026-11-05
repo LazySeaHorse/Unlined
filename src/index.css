@@ -1363,23 +1363,23 @@ math-field::part(virtual-keyboard-toggle) {
   fill: currentColor;
 }
 
-/* A node's title while a suggestion is worked out (shimmer) and while it waits to be accepted (faint). */
-.node-tab [data-pending] {
-  background:
-    linear-gradient(
-      90deg,
-      transparent 30%,
-      color-mix(in srgb, var(--accent) 18%, transparent) 50%,
-      transparent 70%
-    )
-    0 0 / 300% 100%;
-  border-radius: 0.25rem;
+/* A node's tab while a title suggestion is worked out: a light wave sweeps the whole chip, in the tab's own text colour. */
+.node-tab:has([data-pending]) {
+  background-image: linear-gradient(
+    90deg,
+    transparent 30%,
+    color-mix(in srgb, currentColor 22%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 300% 100%;
+  background-repeat: no-repeat;
 }
 @media (prefers-reduced-motion: no-preference) {
-  .node-tab [data-pending] {
+  .node-tab:has([data-pending]) {
     animation: ask-shimmer 1.4s linear infinite;
   }
 }
+/* A suggested title waiting to be accepted is faint. */
 .title-ghost {
   opacity: 0.5;
 }
