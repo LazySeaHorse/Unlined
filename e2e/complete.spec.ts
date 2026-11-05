@@ -1,5 +1,5 @@
 import { expect, type Locator, type Page, test } from '@playwright/test';
-import { nodes, openApp, placeNode } from './helpers';
+import { newRow, nodes, openApp, placeNode } from './helpers';
 
 // On-device AI switched on, with a stand-in for Chrome's model that streams a continuation for each kind of field,
 // in pieces, with more after the line that should never be read. Named by the line each message starts with.
@@ -153,15 +153,18 @@ test('Math: Tab shows the line with the rest of it in a bubble, and Tab puts it 
 test('Math+: Tab offers the rest of a line, told the values links bring in', async ({ page }) => {
   await placeNode(page, 'Math+');
   const node = nodes(page).first();
-  const field = node.locator('math-field');
-  await field.click();
-  await expect(field).toBeFocused();
-  await press(page, ['a', ':', '=', '2', 'Shift+Enter', 'a']);
+  const rows = node.locator('math-field');
+  await rows.first().click();
+  await expect(rows.first()).toBeFocused();
+  await press(page, ['a', ':', '=', '2']);
+  await newRow(page, rows, 1);
+  await press(page, ['a']);
   await page.keyboard.press('Tab');
   await expect(page.locator('.complete-ghost .katex')).toBeVisible();
+  // The model is shown the lines above the caret too, not only the line it is on.
   expect(await lastPrompt(page)).toContain('Math+ up to the cursor:\na\\coloneq2\n a');
   await page.keyboard.press('Tab');
-  await expect.poll(() => mathValue(field)).toBe('\\displaylines{a\\coloneq2\\\\ a+1}');
+  await expect.poll(() => mathValue(rows.nth(1))).toBe('a+1');
   await expect(node.getByText('3', { exact: true })).toBeVisible();
 });
 

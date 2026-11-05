@@ -1,5 +1,5 @@
 import { expect, type Locator, test } from '@playwright/test';
-import { nodes, openApp, placeNode } from './helpers';
+import { newRow, nodes, openApp, placeNode } from './helpers';
 
 test.use({ permissions: ['clipboard-read', 'clipboard-write'] });
 test.beforeEach(async ({ page }) => openApp(page));
@@ -110,16 +110,16 @@ test('duplicating a multi-line Math+ node works', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   await placeNode(page, 'Math+');
-  const field = nodes(page).locator('math-field');
+  const field = nodes(page).locator('math-field').first();
   await field.click();
   await expect(field).toBeFocused();
   await page.keyboard.type('a:=2');
-  await page.keyboard.press('Shift+Enter');
+  await newRow(page, nodes(page).locator('math-field'), 1);
   await page.keyboard.type('a*3');
   await page.keyboard.press('Escape');
   await page.keyboard.press('ControlOrMeta+d');
   await expect(nodes(page)).toHaveCount(2);
-  await expect(nodes(page).locator('math-field')).toHaveCount(2);
+  await expect(nodes(page).locator('math-field')).toHaveCount(4);
   expect(errors).toEqual([]);
 });
 
@@ -390,4 +390,57 @@ test('math pasted in with nested multi-line LaTeX loads, flattened', async ({ pa
     .poll(() => field.evaluate((el: HTMLElement & { value: string }) => el.value))
     .toBe('\\displaylines{a\\\\ b\\\\ c}');
   expect(errors).toEqual([]);
+});
+
+test('Math+: each line is a row of its own, with its answer level with it', async ({ page }) => {
+  await placeNode(page, 'Math+');
+  const rows = nodes(page).locator('math-field');
+  const values = () =>
+    rows.evaluateAll((all) => all.map((f) => (f as HTMLElement & { value: string }).value));
+  await rows.first().click();
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.type('2+3');
+  await newRow(page, rows, 1);
+  await page.keyboard.type('4*5');
+  await expect.poll(values).toEqual(['2+3', '4\\cdot5']);
+
+  // An answer sits in the row of its line, whatever height the line is.
+  const answers = nodes(page).locator('ol');
+  await expect(answers.nth(1)).toContainText('20');
+  for (const i of [0, 1]) {
+    const [row, answer] = await Promise.all([rows.nth(i).boundingBox(), answers.nth(i).boundingBox()]);
+    if (!row || !answer) throw new Error('missing box');
+    expect(answer.y).toBeLessThanOrEqual(row.y);
+    expect(answer.y + answer.height).toBeGreaterThanOrEqual(row.y + row.height);
+  }
+
+  // Up goes to the row above, Down back; Backspace at the start of a row joins it to the one above.
+  await page.keyboard.press('ArrowUp');
+  await expect(rows.first()).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  await expect(rows.nth(1)).toBeFocused();
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Backspace');
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toBeFocused();
+  await expect.poll(values).toEqual(['2+34\\cdot5']);
+  // Enter in the middle of a line cuts it in two.
+  await page.keyboard.press('Home');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Enter');
+  await expect(rows).toHaveCount(2);
+  await expect.poll(values).toEqual(['2+3', '4\\cdot5']);
+});
+
+test('Math+: math pasted in as several lines becomes several rows', async ({ page }) => {
+  await placeNode(page, 'Math+');
+  const rows = nodes(page).locator('math-field');
+  await rows.first().click();
+  await expect(rows.first()).toBeFocused();
+  await rows.first().evaluate((el: HTMLElement & { executeCommand: (c: [string, string]) => void }) => {
+    el.executeCommand(['insert', '\\displaylines{a\\\\ b\\\\ c}']);
+  });
+  await expect(rows).toHaveCount(3);
 });

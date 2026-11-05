@@ -1,9 +1,12 @@
 import type { NodeProps } from '@xyflow/react';
 import { Copy, TriangleAlert } from 'lucide-react';
-import { useMemo } from 'react';
+import type { MathfieldElement } from 'mathlive';
+import { type KeyboardEvent, useMemo, useRef } from 'react';
+import { flushSync } from 'react-dom';
 import { AskSlot } from '@/ai/AskSlot';
 import { CompleteSlot } from '@/ai/CompleteSlot';
-import { askedLine, replaceLine, useInlineAsk } from '@/ai/useInlineAsk';
+import { readField } from '@/ai/completeField';
+import { useInlineAsk } from '@/ai/useInlineAsk';
 import { useInlineComplete } from '@/ai/useInlineComplete';
 import { useReadOnly } from '@/canvas/readOnly';
 import { copyText } from '@/lib/clipboard';
@@ -16,38 +19,92 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
 import { mathPlusAsk, mathPlusComplete } from './ask';
-import {
-  fromLinesBody,
-  LINE_BREAK,
-  type LineResult,
-  type LinkInput,
-  lineAt,
-  linesBody,
-  MATH_LINES,
-  splitBody,
-  splitLines,
-} from './evaluate';
+import { type LineResult, type LinkInput, lineAt, splitLines } from './evaluate';
+import { around, atTopLevel, editRow, joinUp, latexOf, rowsOf, splitRow, withLines } from './rows';
 import { resultsWith, useMathPlusInputs, useMathPlusResults } from './useMathPlusResults';
 
-/** The node's LaTeX with its line at `at` replaced by `lines`. */
-const withLines = (latex: string, at: number, lines: string[]) =>
-  fromLinesBody(replaceLine(linesBody(latex), at, lines.join(LINE_BREAK), MATH_LINES));
+/** Where the caret goes in a row once it has been written: its start, its end, or an offset in MathLive's own count. */
+type Caret = 'start' | 'end' | number;
 
 export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'mathPlus'>>) {
   const readOnly = useReadOnly();
   const update = useUpdateNodeData<'mathPlus'>(id);
   const results = useMathPlusResults(id);
   const inputs = useMathPlusInputs(id);
-  // `?` at the start of an empty line asks for lines in words; they go in that line's place.
+  const rows = rowsOf(data.latex);
+  // `?` in an empty row asks for lines in words; they go in that row's place.
   const linked = () => inputs.flatMap(({ name, value }) => (value === null ? [] : [{ name, value }]));
   const ask = useInlineAsk(mathPlusAsk, {
     data,
     context: () => ({ lines: splitLines(data.latex), inputs: linked() }),
     apply: (lines, at: number) => update({ latex: withLines(data.latex, at, lines) }),
   });
-  // Tab asks for the rest of the line at the caret, shown under the field.
+  // Tab asks for the rest of the line at the caret, shown under the row.
   const complete = useInlineComplete(mathPlusComplete, { data, context: () => ({ inputs: linked() }) });
   const asking = ask.state.phase === 'closed' ? undefined : ask.state.at;
+
+  // Each row is a field of its own.
+  const fields = useRef<(MathfieldElement | null)[]>([]);
+  // A row just made takes focus once MathLive has mounted it, not before.
+  const mounted = useRef(new WeakSet<MathfieldElement>());
+  const place = (row: number, caret: Caret) => {
+    const field = fields.current[row];
+    if (!field) return;
+    if (!mounted.current.has(field)) {
+      field.addEventListener('mount', () => place(row, caret), { once: true });
+      return;
+    }
+    field.focus();
+    field.position = caret === 'end' ? field.lastOffset : caret === 'start' ? 0 : caret;
+  };
+  // Written and drawn at once, so that the next key already lands in the row the caret was moved to.
+  const write = (next: { rows: string[]; row: number }, caret: Caret) => {
+    flushSync(() => update({ latex: latexOf(next.rows) }));
+    // After the key that caused it is through, or the field it came from takes the focus back.
+    setTimeout(() => place(next.row, caret));
+  };
+
+  const keyDown = (row: number) => (event: KeyboardEvent) => {
+    const field =
+      event.target instanceof HTMLElement && event.target.tagName === 'MATH-FIELD' ? event.target : undefined;
+    if (!field || readOnly) return;
+    const math = field as MathfieldElement;
+    if (math.mode === 'latex' || !math.selectionIsCollapsed || event.ctrlKey || event.metaKey || event.altKey)
+      return;
+    const stop = () => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+    if (event.key === 'Enter') {
+      stop();
+      const before = math.getValue(0, math.position, 'latex');
+      // From inside a fraction or a bracket the row cannot be cut in two; a new row follows it instead.
+      if (atTopLevel(before))
+        write(
+          splitRow(rows, row, before.trim(), math.getValue(math.position, math.lastOffset, 'latex').trim()),
+          'start',
+        );
+      else write(splitRow(rows, row, math.value.trim(), ''), 'start');
+    } else if (event.key === 'Backspace' && row > 0 && math.position === 0) {
+      stop();
+      write(joinUp(rows, row), fields.current[row - 1]?.lastOffset ?? 'end');
+    } else if (event.key === 'Delete' && row < rows.length - 1 && math.position === math.lastOffset) {
+      stop();
+      write(joinUp(rows, row + 1), math.lastOffset);
+    }
+  };
+
+  // Past the edge of a row, the arrow keys go to the row next to it.
+  const moveOut = (row: number) => (direction: 'forward' | 'backward' | 'upward' | 'downward') => {
+    const to = direction === 'forward' || direction === 'downward' ? row + 1 : row - 1;
+    if (!fields.current[to]) return false;
+    place(to, direction === 'forward' ? 'start' : direction === 'backward' ? 'end' : 'end');
+    return true;
+  };
+
+  // Answers are for the rows that hold something, in order.
+  let answered = 0;
+  const shown = results !== undefined && results.length > 0;
 
   return (
     <NodeShell
@@ -58,44 +115,76 @@ export default function MathPlusNode({ id, data, selected }: NodeProps<NodeOf<'m
       className="min-w-56"
     >
       <InputChips id={id} />
-      <div className="px-3 py-2">
-        <CompleteSlot
-          complete={complete}
-          at={0}
-          renderGhost={(latex, caret) => <Tex latex={lineAt(latex, caret).line} />}
-        >
-          <AskSlot
-            ask={ask}
-            placeholder="Describe the lines"
-            renderGhost={(lines) =>
-              asking !== undefined && <AnswerLines id={id} latex={data.latex} at={asking} lines={lines} />
-            }
-          >
-            <MathField
-              value={data.latex}
-              onChange={(latex) => {
-                const line = askedLine(linesBody(data.latex), linesBody(latex), MATH_LINES);
-                if (!line || !ask.open(line.index)) update({ latex });
-              }}
-              menuNodeId={id}
-              readOnly={readOnly}
-              multiline
-              placeholder="a := 2"
-            />
-          </AskSlot>
-        </CompleteSlot>
+      <div className={cn('grid', shown ? 'grid-cols-[minmax(0,1fr)_auto]' : 'grid-cols-1')}>
+        {rows.map((row, index) => {
+          const result = row.trim() ? results?.[answered++] : undefined;
+          const last = index === rows.length - 1;
+          return (
+            // biome-ignore lint/suspicious/noArrayIndexKey: rows are positional, one per line.
+            <div key={index} className="contents">
+              <div
+                className={cn('min-w-0 px-3 py-1.5', !last && 'border-b border-border/50')}
+                onKeyDownCapture={keyDown(index)}
+              >
+                <CompleteSlot
+                  complete={complete}
+                  at={index}
+                  read={(target) => {
+                    const field = readField(target);
+                    return field && { ...field, ...around(rows, index, field.before, field.after) };
+                  }}
+                  renderGhost={(latex, caret) => <Tex latex={lineAt(latex, caret).line} />}
+                >
+                  <AskSlot
+                    ask={ask}
+                    at={index}
+                    placeholder="Describe the lines"
+                    renderGhost={(lines) =>
+                      asking !== undefined && (
+                        <AnswerLines id={id} latex={data.latex} at={asking} lines={lines} />
+                      )
+                    }
+                  >
+                    <MathField
+                      value={row}
+                      fieldRef={(field) => {
+                        fields.current[index] = field;
+                        if (field && !mounted.current.has(field)) {
+                          const known = mounted.current;
+                          field.addEventListener('mount', () => known.add(field), { once: true });
+                        }
+                      }}
+                      onChange={(latex) => {
+                        if (ask.trigger(index, row, latex)) return;
+                        const edited = editRow(rows, index, latex);
+                        // Math pasted in as several lines is several rows now: the caret goes to the end of them.
+                        if (edited.rows.length === rows.length) update({ latex: latexOf(edited.rows) });
+                        else write(edited, 'end');
+                      }}
+                      onMoveOut={moveOut(index)}
+                      menuNodeId={id}
+                      readOnly={readOnly}
+                      placeholder={rows.length === 1 ? 'a := 2' : undefined}
+                    />
+                  </AskSlot>
+                </CompleteSlot>
+              </div>
+              {shown && (
+                <ol
+                  className={cn(
+                    'm-0 flex list-none items-center border-l border-border bg-surface-2/50 px-3 text-sm',
+                    !last && 'border-b border-b-border/50',
+                  )}
+                >
+                  {result && <ResultLine result={result} />}
+                </ol>
+              )}
+            </div>
+          );
+        })}
       </div>
-      {results === undefined ? (
+      {results === undefined && (
         <p className="border-t border-border px-3 py-2 text-xs text-muted italic">Loading math engine…</p>
-      ) : (
-        results.length > 0 && (
-          <ol className="border-t border-border bg-surface-2/50 px-3 py-2 text-sm">
-            {results.map((result, index) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: results are positional, one per input line.
-              <ResultLine key={index} result={result} />
-            ))}
-          </ol>
-        )
       )}
     </NodeShell>
   );
@@ -109,7 +198,7 @@ function AnswerLines({ id, latex, at, lines }: { id: string; latex: string; at: 
     [engine, id, latex, at, lines],
   );
   // Results are for the lines that hold something.
-  const offset = splitBody(linesBody(latex))
+  const offset = rowsOf(latex)
     .slice(0, at)
     .filter((line) => line.trim()).length;
   return lines.map((line, index) => {
@@ -173,7 +262,7 @@ function InputChip({ input }: { input: LinkInput }) {
 function ResultLine({ result }: { result: LineResult }) {
   if (result.error) {
     return (
-      <li className="flex items-center gap-1.5 text-xs text-danger">
+      <li className="flex max-w-56 items-center gap-1.5 text-xs text-danger">
         <TriangleAlert className="size-3.5" /> {result.error}
       </li>
     );
@@ -181,7 +270,7 @@ function ResultLine({ result }: { result: LineResult }) {
   // The lines above the answer of a system: it is below them.
   if (result.solved && result.value === null) {
     return (
-      <li aria-hidden className="flex min-h-7 items-center text-muted">
+      <li aria-hidden className="flex items-center text-muted">
         ↓
       </li>
     );
@@ -189,7 +278,7 @@ function ResultLine({ result }: { result: LineResult }) {
   const copyButton =
     'nodrag cursor-pointer rounded p-1 text-muted opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-2 hover:text-fg focus-visible:opacity-100 [@media(hover:none)]:opacity-100';
   return (
-    <li className="group flex min-h-7 items-center gap-2">
+    <li className="group flex items-center gap-2">
       <span className="text-muted">{result.solved ? '⟹' : '='}</span>
       {/* Keyed by value: a new result settles in rather than swapping in place. */}
       <span key={result.value} className="result-tick">

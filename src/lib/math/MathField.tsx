@@ -1,7 +1,7 @@
 import { type Keybinding, MathfieldElement } from 'mathlive';
 import 'mathlive/fonts.css';
 import { Sigma, Type } from 'lucide-react';
-import { useEffect, useEffectEvent, useRef, useState } from 'react';
+import { type Ref, useCallback, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { cn } from '@/lib/cn';
 import { WithTooltip } from '@/ui/Button';
 import { registerMathField } from './fields';
@@ -32,6 +32,13 @@ interface MathFieldProps {
   /** The node whose context menu acts on this field (canvas/mathMenu.ts): a node's one field, not a cell's. */
   menuNodeId?: string;
   className?: string;
+  /** The `<math-field>` element, for a node that places the caret itself (a field per line). */
+  fieldRef?: Ref<MathfieldElement>;
+  /**
+   * An arrow key (or Tab) pressed with nowhere left to go in the field. Returns true when it moved the focus
+   * itself, so that MathLive does not.
+   */
+  onMoveOut?: (direction: 'forward' | 'backward' | 'upward' | 'downward') => boolean;
 }
 
 /** React wrapper around MathLive's `<math-field>` web component. */
@@ -44,8 +51,21 @@ export function MathField({
   modeToggle = false,
   menuNodeId,
   className,
+  fieldRef,
+  onMoveOut,
 }: MathFieldProps) {
   const ref = useRef<MathfieldElement>(null);
+  const moveOut = useEffectEvent((direction: Parameters<NonNullable<typeof onMoveOut>>[0]) =>
+    onMoveOut?.(direction),
+  );
+  const setRef = useCallback(
+    (element: MathfieldElement | null) => {
+      ref.current = element;
+      if (typeof fieldRef === 'function') fieldRef(element);
+      else if (fieldRef) fieldRef.current = element;
+    },
+    [fieldRef],
+  );
   const [focused, setFocused] = useState(false);
   const [textMode, setTextMode] = useState(false);
   const emitChange = useEffectEvent((latex: string) => onChange?.(flattenDisplaylines(latex)));
@@ -76,9 +96,20 @@ export function MathField({
     if (placeholder) field.placeholder = placeholder;
   }, [readOnly, placeholder]);
 
+  // A node with several fields (a line each) is acted on through the one last focused.
   useEffect(() => {
     const field = ref.current;
-    if (field && menuNodeId) return registerMathField(menuNodeId, field);
+    if (!field || !menuNodeId) return;
+    let unregister = registerMathField(menuNodeId, field);
+    const claim = () => {
+      unregister();
+      unregister = registerMathField(menuNodeId, field);
+    };
+    field.addEventListener('focus', claim);
+    return () => {
+      field.removeEventListener('focus', claim);
+      unregister();
+    };
   }, [menuNodeId]);
 
   useEffect(() => {
@@ -118,12 +149,20 @@ export function MathField({
         field.executeCommand(['insert', '\\\\']);
       }
     };
+    const handleMoveOut = (event: Event) => {
+      const { direction } = (
+        event as CustomEvent<{ direction: 'forward' | 'backward' | 'upward' | 'downward' }>
+      ).detail;
+      if (moveOut(direction)) event.preventDefault();
+    };
+    field.addEventListener('move-out', handleMoveOut);
     field.addEventListener('input', handleInput);
     field.addEventListener('focus', handleFocus);
     field.addEventListener('blur', handleBlur);
     field.addEventListener('mode-change', syncMode);
     field.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => {
+      field.removeEventListener('move-out', handleMoveOut);
       field.removeEventListener('input', handleInput);
       field.removeEventListener('focus', handleFocus);
       field.removeEventListener('blur', handleBlur);
@@ -133,7 +172,7 @@ export function MathField({
   }, [multiline]);
 
   const field = (
-    <math-field ref={ref} className={cn('nodrag nopan nowheel nokey canvas-history', className)} />
+    <math-field ref={setRef} className={cn('nodrag nopan nowheel nokey canvas-history', className)} />
   );
   if (!modeToggle) return field;
 

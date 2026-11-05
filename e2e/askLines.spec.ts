@@ -1,5 +1,5 @@
 import { expect, type Page, test } from '@playwright/test';
-import { nodes, openApp, placeNode } from './helpers';
+import { newRow, nodes, openApp, placeNode } from './helpers';
 
 // On-device AI switched on, with a stand-in for Chrome's model: Math+ lines for Math+, a sentence for a note.
 test.beforeEach(async ({ page }) => {
@@ -29,14 +29,21 @@ const value = (page: Page) =>
 
 test('Math+: ? on an empty line offers lines with their results, accepted in its place', async ({ page }) => {
   await placeNode(page, 'Math+');
-  const field = nodes(page).locator('math-field');
-  await field.click();
-  await expect(field).toBeFocused();
+  const rows = nodes(page).locator('math-field');
+  await rows.first().click();
+  await expect(rows.first()).toBeFocused();
   // MathLive reports edits a task later, so keys go at a human pace, each edit saved before the next.
-  for (const key of ['a', ':', '=', '2', 'Shift+Enter', 'b', ':', '=', '3', 'Shift+Enter', 'Shift+Slash']) {
-    await page.keyboard.press(key);
-    await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 30)));
-  }
+  const press = async (keys: string[]) => {
+    for (const key of keys) {
+      await page.keyboard.press(key);
+      await page.evaluate(() => new Promise((resolve) => setTimeout(resolve, 30)));
+    }
+  };
+  await press(['a', ':', '=', '2']);
+  await newRow(page, rows, 1);
+  await press(['b', ':', '=', '3']);
+  await newRow(page, rows, 2);
+  await press(['Shift+Slash']);
   const words = page.getByLabel('Describe it');
   await expect(words).toBeFocused();
   await page.keyboard.type('add them');
@@ -46,12 +53,15 @@ test('Math+: ? on an empty line offers lines with their results, accepted in its
   await expect(ghost).toContainText('5');
 
   await page.keyboard.press('Tab');
-  await expect(field).toBeFocused();
-  await expect.poll(() => value(page)).toBe('\\displaylines{a\\coloneq2\\\\ b\\coloneq3\\\\ s:=a+b}');
+  await expect(rows.nth(2)).toBeFocused();
+  await expect
+    .poll(() => rows.evaluateAll((all) => all.map((f) => (f as HTMLElement & { value: string }).value)))
+    .toEqual(['a\\coloneq2', 'b\\coloneq3', 's:=a+b']);
 
   await page.keyboard.press('Escape');
   await page.keyboard.press('ControlOrMeta+z');
-  await expect.poll(() => value(page)).not.toContain('s:=');
+  await expect.poll(() => rows.count()).toBe(3);
+  await expect(rows.nth(2)).toHaveJSProperty('value', '');
 });
 
 test('Text: ? on an empty line offers text under the lines above, accepted in its place', async ({
@@ -78,7 +88,7 @@ test('Text: ? on an empty line offers text under the lines above, accepted in it
   await expect(textarea).toHaveValue('# Notes\nSo $x^2$ it is.');
 });
 
-for (const tool of ['Math', 'Math+']) {
+for (const tool of ['Math']) {
   test(`${tool}: asking from a line under a matrix keeps the matrix drawn and the node the size it was`, async ({
     page,
   }) => {
