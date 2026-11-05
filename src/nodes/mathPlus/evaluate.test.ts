@@ -214,3 +214,42 @@ describe('evaluateLinked', () => {
     expect(evaluateLinked(ce, [doc('u', 'z+1')], []).lines.u[0].value).toBe('z+1');
   });
 });
+
+describe('equations', () => {
+  const run = (latex: string) => evaluateDocuments(ce, [{ id: 'n', latex }]).n;
+
+  it('solves an equation in one unknown, naming the unknown', () => {
+    const [line] = run('x^2-5x+6=0');
+    expect(line).toMatchObject({ solved: true, error: null, assigned: false });
+    expect(line.value).toBe('x \\in \\{3, 2\\}');
+  });
+
+  it('gives the one solution with its decimal', () => {
+    expect(run('3x=1')[0]).toMatchObject({ value: 'x = \\frac{1}{3}', approx: '0.3333333333' });
+  });
+
+  it('finds complex roots', () => {
+    expect(run('x^2+1=0')[0].value).toContain('\\imaginaryI');
+  });
+
+  it('says when there is no solution, or any value will do, or the engine cannot tell', () => {
+    expect(run('x=x+1')[0]).toMatchObject({ error: 'no solution', solved: true });
+    expect(run('x=x')[0]).toMatchObject({ error: 'infinitely many solutions' });
+    expect(run('\\cos x=x')[0]).toMatchObject({ error: 'no unique solution found' });
+  });
+
+  it('leaves a check on defined names, an echo of several unknowns and an inequality as they were', () => {
+    const [def, check] = run('\\displaylines{a:=2\\\\a=2}');
+    expect(def.assigned).toBe(true);
+    expect(check).toMatchObject({ solved: false, value: '\\top' });
+    expect(run('y=mx+b')[0]).toMatchObject({ solved: false, error: null });
+    expect(run('x+y=3')[0]).toMatchObject({ solved: false, error: null });
+    expect(run('x<3')[0].solved).toBe(false);
+  });
+
+  it('takes names an earlier line defined as known', () => {
+    const lines = run('\\displaylines{a:=2\\\\x+a=5\\\\a+1}');
+    expect(lines[1].value).toBe('x = 3');
+    expect(lines[2].value).toBe('3');
+  });
+});

@@ -102,6 +102,10 @@ const spellNames = (latex: string) =>
     m.startsWith('\\') ? m : '\\mathrm{ans}',
   );
 
+/** The operands of an expression that is a function (a list, a tuple, an equation), none for any other. */
+const opsOf = (expr: BoxedExpression): readonly BoxedExpression[] =>
+  (expr as unknown as { ops?: readonly BoxedExpression[] }).ops ?? [];
+
 /** The operands of an expression known to be a function with two (`Assign`). */
 type Operands = { readonly op1: BoxedExpression; readonly op2: BoxedExpression };
 
@@ -143,6 +147,19 @@ function approxOf(evaluated: BoxedExpression): string | null {
   return approx === evaluated.latex ? null : approx;
 }
 
+/** The line's expression with the values links bring put in for their names. */
+function substituted(
+  ce: ComputeEngine,
+  line: ParsedLine,
+  substitutions: Record<string, BoxedExpression>,
+): BoxedExpression {
+  if (Object.keys(substitutions).length === 0) return line.expr;
+  // Not the left of `:=`, or a link named like the variable being assigned would overwrite its own name.
+  return line.target
+    ? ce.box(['Assign', line.target.json, line.reads.subs(substitutions).json] as never)
+    : line.expr.subs(substitutions);
+}
+
 /** A line's result, and the evaluated expression for passing on along a link. */
 function runLine(
   ce: ComputeEngine,
@@ -150,14 +167,7 @@ function runLine(
   substitutions: Record<string, BoxedExpression>,
 ): { result: LineResult; value: BoxedExpression | null } {
   try {
-    let { expr } = line;
-    if (Object.keys(substitutions).length > 0) {
-      // Not the left of `:=`, or a link named like the variable being assigned would overwrite its own name.
-      expr = line.target
-        ? ce.box(['Assign', line.target.json, line.reads.subs(substitutions).json] as never)
-        : expr.subs(substitutions);
-    }
-    const evaluated = expr.evaluate();
+    const evaluated = substituted(ce, line, substitutions).evaluate();
     return {
       result: {
         value: evaluated.latex,
@@ -179,6 +189,75 @@ function runLine(
       },
       value: null,
     };
+  }
+}
+
+/** The equations a line states: itself, or each line of a `cases` block. Null when it is not equations. */
+function equationsOf(expr: BoxedExpression): BoxedExpression[] | null {
+  if (expr.operator === 'Equal') return [expr];
+  const items = expr.operator === 'List' ? opsOf(expr) : [];
+  return items.length > 0 && items.every((item: BoxedExpression) => item.operator === 'Equal')
+    ? [...items]
+    : null;
+}
+
+const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`;
+
+/**
+ * Solves `equations` for `unknowns` and words the answer: "x = 3", "x \in \{3, 2\}", "u = 1,\; v = 2" or, for
+ * a system with several solutions, "(x, y) \in \{(4,3), (-3,-4)\}". The engine hands back nothing it could not
+ * solve, a list with no solutions, or a new symbol where any value would do; each of those is told as an error.
+ */
+function solveEquations(
+  ce: ComputeEngine,
+  equations: BoxedExpression[],
+  unknowns: readonly string[],
+): { result: LineResult; value: BoxedExpression | null } {
+  const failed = (error: string) => ({
+    result: { value: null, approx: null, error, assigned: false, solved: true },
+    value: null,
+  });
+  try {
+    const solved = ce
+      .box([
+        'Solve',
+        equations.length === 1 ? equations[0].json : ['List', ...equations.map((e) => e.json)],
+        unknowns.length === 1 ? unknowns[0] : ['List', ...unknowns],
+      ] as never)
+      .evaluate();
+    if (solved.operator !== 'List') {
+      return failed(
+        unknowns.length > equations.length
+          ? `${plural(unknowns.length, 'unknown')}, ${plural(equations.length, 'equation')}`
+          : 'no unique solution found',
+      );
+    }
+    const solutions = opsOf(solved);
+    if (solutions.length === 0) return failed('no solution');
+    const known = new Set(equations.flatMap((e) => e.symbols));
+    if (solved.symbols.some((symbol) => !known.has(symbol))) return failed('infinitely many solutions');
+
+    const names = unknowns.map((name) => ce.box(name).latex);
+    const component = (solution: BoxedExpression, i: number) =>
+      unknowns.length === 1 ? solution : (opsOf(solution)[i] ?? solution);
+    const value =
+      solutions.length === 1
+        ? names.map((name, i) => `${name} = ${component(solutions[0], i).latex}`).join(',\\; ')
+        : `${unknowns.length === 1 ? names[0] : `(${names.join(', ')})`} \\in \\{${solutions
+            .map((solution) => solution.latex)
+            .join(', ')}\\}`;
+    return {
+      result: {
+        value,
+        approx: solutions.length === 1 && unknowns.length === 1 ? approxOf(solutions[0]) : null,
+        error: null,
+        assigned: false,
+        solved: true,
+      },
+      value: solved,
+    };
+  } catch (err) {
+    return failed(err instanceof Error ? err.message : 'Evaluation error');
   }
 }
 
@@ -269,7 +348,12 @@ export function evaluateLinked(
           results.push({ value: null, approx: null, error: blocked, assigned: false, solved: false });
           values.push(null);
         } else {
-          const run = runLine(ce, line, substitutions);
+          const expr = line.target ? null : substituted(ce, line, substitutions);
+          const equations = expr && equationsOf(expr);
+          const run =
+            expr && equations?.length === 1 && expr.unknowns.length === 1
+              ? solveEquations(ce, equations, expr.unknowns)
+              : runLine(ce, line, substitutions);
           results.push(run.result);
           values.push(run.value);
         }

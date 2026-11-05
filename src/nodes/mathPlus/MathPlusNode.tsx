@@ -182,7 +182,7 @@ function ResultLine({ result }: { result: LineResult }) {
     'nodrag cursor-pointer rounded p-1 text-muted opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-2 hover:text-fg focus-visible:opacity-100 [@media(hover:none)]:opacity-100';
   return (
     <li className="group flex min-h-7 items-center gap-2">
-      <span className="text-muted">=</span>
+      <span className="text-muted">{result.solved ? '⟹' : '='}</span>
       {/* Keyed by value: a new result settles in rather than swapping in place. */}
       <span key={result.value} className="result-tick">
         <Tex latex={result.value ?? ''} />

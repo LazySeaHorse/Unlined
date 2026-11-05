@@ -146,7 +146,7 @@ function mathPlusBody(latex: string, results: LineResult[] | undefined, inputs: 
     const r = results?.[i];
     if (!r) return line;
     if (r.error) return `${line}  ⟶ error: ${r.error}`;
-    if (r.assigned) return line;
+    if (r.assigned || r.value === null) return line;
     return `${line}  ⟶ ${r.value}${r.approx ? ` ≈ ${r.approx}` : ''}`;
   });
   const body = [...(inputs.length > 0 ? [inputsLine(inputs)] : []), ...lines];
