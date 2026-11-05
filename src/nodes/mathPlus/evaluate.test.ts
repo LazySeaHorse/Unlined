@@ -25,7 +25,7 @@ describe('splitLines', () => {
 describe('evaluateDocuments', () => {
   it('evaluates expressions with approximations', () => {
     const { a } = evaluateDocuments(ce, [{ id: 'a', latex: '\\displaylines{1+2\\\\\\frac{1}{3}}' }]);
-    expect(a[0]).toEqual({ value: '3', approx: null, error: null, assigned: false });
+    expect(a[0]).toEqual({ value: '3', approx: null, error: null, assigned: false, solved: false });
     expect(a[1]).toMatchObject({ value: '\\frac{1}{3}', approx: '0.3333333333' });
   });
 

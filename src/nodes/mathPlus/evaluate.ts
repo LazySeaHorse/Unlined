@@ -9,6 +9,8 @@ export interface LineResult {
   error: string | null;
   /** The line defined a variable or function (`a := 2`). */
   assigned: boolean;
+  /** The line is part of equations the node solved: its last line holds the answer, the lines above it none. */
+  solved: boolean;
 }
 
 /** What separates lines in Math+ LaTeX. */
@@ -115,7 +117,8 @@ interface ParsedLine {
 function parseLine(ce: ComputeEngine, latex: string, spellAns: boolean): ParsedLine | LineResult {
   try {
     const expr = ce.parse(spellAns ? spellNames(latex) : latex);
-    if (!expr.isValid) return { value: null, approx: null, error: 'Syntax error', assigned: false };
+    if (!expr.isValid)
+      return { value: null, approx: null, error: 'Syntax error', assigned: false, solved: false };
     if (expr.operator !== 'Assign') return { expr, reads: expr, assigns: null, target: null };
     const { op1, op2 } = expr as unknown as Operands;
     return { expr, reads: op2, assigns: (op1 as unknown as { symbol?: string }).symbol ?? null, target: op1 };
@@ -125,11 +128,20 @@ function parseLine(ce: ComputeEngine, latex: string, spellAns: boolean): ParsedL
       approx: null,
       error: err instanceof Error ? err.message : 'Evaluation error',
       assigned: false,
+      solved: false,
     };
   }
 }
 
 const isFailure = (line: ParsedLine | LineResult): line is LineResult => 'error' in line;
+
+/** A decimal for a result that is not a whole number already (√2 ≈ 1.414…), or null. */
+function approxOf(evaluated: BoxedExpression): string | null {
+  const numeric = evaluated.N().re;
+  if (!Number.isFinite(numeric) || Number.isInteger(numeric)) return null;
+  const approx = String(Number(numeric.toPrecision(10)));
+  return approx === evaluated.latex ? null : approx;
+}
 
 /** A line's result, and the evaluated expression for passing on along a link. */
 function runLine(
@@ -146,16 +158,13 @@ function runLine(
         : expr.subs(substitutions);
     }
     const evaluated = expr.evaluate();
-    const value = evaluated.latex;
-    const numeric = evaluated.N().re;
-    const approx =
-      Number.isFinite(numeric) && !Number.isInteger(numeric) ? String(Number(numeric.toPrecision(10))) : null;
     return {
       result: {
-        value,
-        approx: approx === value ? null : approx,
+        value: evaluated.latex,
+        approx: approxOf(evaluated),
         error: null,
         assigned: line.assigns !== null,
+        solved: false,
       },
       value: evaluated,
     };
@@ -166,6 +175,7 @@ function runLine(
         approx: null,
         error: err instanceof Error ? err.message : 'Evaluation error',
         assigned: false,
+        solved: false,
       },
       value: null,
     };
@@ -256,7 +266,7 @@ export function evaluateLinked(
           else substitutions[name] = first.outcome.value;
         }
         if (blocked) {
-          results.push({ value: null, approx: null, error: blocked, assigned: false });
+          results.push({ value: null, approx: null, error: blocked, assigned: false, solved: false });
           values.push(null);
         } else {
           const run = runLine(ce, line, substitutions);
