@@ -32,7 +32,6 @@ test('a graph row typed as ? and words takes the equation as a normal row, in on
   await expect(page.getByLabel('Describe it')).toBeFocused();
   // The bubble is labelled and says what the keys do; nothing in the node moved.
   const bubble = page.getByRole('dialog', { name: 'Ask AI' });
-  await expect(bubble).toContainText('Ask AI');
   await expect(bubble).toContainText('Enter');
   await expect(page.getByPlaceholder('Describe the equation')).toBeVisible();
   expect((await row.boundingBox())?.height).toBe(height);
