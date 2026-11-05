@@ -178,6 +178,14 @@ function ResultLine({ result }: { result: LineResult }) {
       </li>
     );
   }
+  // The lines above the answer of a system: it is below them.
+  if (result.solved && result.value === null) {
+    return (
+      <li aria-hidden className="flex min-h-7 items-center text-muted">
+        ↓
+      </li>
+    );
+  }
   const copyButton =
     'nodrag cursor-pointer rounded p-1 text-muted opacity-0 transition-opacity group-hover:opacity-100 hover:bg-surface-2 hover:text-fg focus-visible:opacity-100 [@media(hover:none)]:opacity-100';
   return (

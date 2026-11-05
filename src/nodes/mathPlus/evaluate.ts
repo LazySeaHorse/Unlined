@@ -201,6 +201,23 @@ function equationsOf(expr: BoxedExpression): BoxedExpression[] | null {
     : null;
 }
 
+/** The entries of a list, matrices included, row by row. */
+const entriesOf = (expr: BoxedExpression): BoxedExpression[] =>
+  expr.operator === 'List' ? opsOf(expr).flatMap(entriesOf) : [expr];
+
+/**
+ * An equation between two lists or matrices (`A·(u, v) = b`) is one equation for each entry. Any other equation,
+ * or one whose sides do not line up, is left as it is.
+ */
+function rowEquations(ce: ComputeEngine, equation: BoxedExpression): BoxedExpression[] {
+  const [left, right] = opsOf(equation).map((side) => side.evaluate());
+  if (left?.operator !== 'List' || right?.operator !== 'List') return [equation];
+  const lefts = entriesOf(left);
+  const rights = entriesOf(right);
+  if (lefts.length !== rights.length) return [equation];
+  return lefts.map((l, i) => ce.box(['Equal', l.json, rights[i].json] as never));
+}
+
 const plural = (n: number, noun: string) => `${n} ${noun}${n === 1 ? '' : 's'}`;
 
 /**
@@ -275,7 +292,7 @@ interface PendingEquation {
 
 /**
  * The results of consecutive equation lines, in order: solved together as one system, the answer on the last line
- * and the lines above it marked as part of it. One equation with several unknowns (`y = mx + b`) is no system to
+ * and the lines above it marked as part of it. An equation between matrices is solved entry by entry. One equation with several unknowns (`y = mx + b`) is no system to
  * solve for, so it is evaluated as any line is.
  */
 function solvePending(
@@ -283,7 +300,7 @@ function solvePending(
   pending: PendingEquation[],
 ): { result: LineResult; value: BoxedExpression | null }[] {
   if (pending.length === 0) return [];
-  const equations = pending.flatMap((p) => p.equations);
+  const equations = pending.flatMap((p) => p.equations.flatMap((e) => rowEquations(ce, e)));
   const unknowns = [...new Set(pending.flatMap((p) => p.unknowns))];
   if (equations.length === 1 && unknowns.length > 1) {
     return pending.map((p) => runLine(ce, p.line, p.substitutions));

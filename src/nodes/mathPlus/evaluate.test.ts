@@ -296,4 +296,22 @@ describe('equations', () => {
     );
     expect(lines.b[0].value).toBe('\\bigl\\lbrack4\\bigr\\rbrack');
   });
+
+  const matrix = '\\begin{pmatrix}1&2\\\\3&4\\end{pmatrix}';
+  const column = (...entries: string[]) => `\\begin{pmatrix}${entries.join('\\\\')}\\end{pmatrix}`;
+
+  it('solves a matrix times a column of unknowns', () => {
+    const [line] = run(`${matrix}${column('u', 'v')}=${column('5', '6')}`);
+    expect(line).toMatchObject({ value: 'u = -4,\\; v = \\frac{9}{2}', solved: true, error: null });
+  });
+
+  it('solves it for a matrix an earlier line defined', () => {
+    const lines = run(`\\displaylines{A:=${matrix}\\\\A${column('u', 'v')}=${column('5', '6')}}`);
+    expect(lines[1].value).toBe('u = -4,\\; v = \\frac{9}{2}');
+  });
+
+  it('tells a matrix that has no unique solution', () => {
+    const singular = '\\begin{pmatrix}1&2\\\\2&4\\end{pmatrix}';
+    expect(run(`${singular}${column('u', 'v')}=${column('1', '3')}`)[0].error).toBeTruthy();
+  });
 });
