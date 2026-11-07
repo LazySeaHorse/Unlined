@@ -72,11 +72,16 @@ const formulaParser = () =>
     },
   }));
 
+const dependencyParser = () => {
+  dependencies ??= new DepParser();
+  return dependencies;
+};
+
 /** The cells a formula reads, clipped to the grid; none when it does not parse (evaluating it reports that). */
 function references(formula: string, at: CellRef, rows: number, columns: number): CellRef[] {
   let refs: (CellRef | RangeRef)[];
   try {
-    refs = (dependencies ??= new DepParser()).parse(formula, { ...at, sheet: SHEET });
+    refs = dependencyParser().parse(formula, { ...at, sheet: SHEET });
   } catch {
     return [];
   }
