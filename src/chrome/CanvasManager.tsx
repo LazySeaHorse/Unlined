@@ -92,7 +92,8 @@ function CanvasRow({
   onOpen: () => void;
 }) {
   const content = useLiveQuery(() => loadContent(canvas.id), [canvas.id, canvas.updatedAt]);
-  const count = content?.nodes.length;
+  // A stack is one thing on the canvas, however many cards it holds.
+  const count = content && placedNodes(content.nodes).length;
 
   const rename = async () => {
     const name = await askText({

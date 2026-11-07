@@ -19,6 +19,11 @@ export function useSearchMatches(nodes: AppNode[]): Set<string> | null {
   );
 }
 
+/** How many things on the canvas the search found: a stack holding several matching cards counts once. */
+export function foundCount(nodes: readonly AppNode[], matches: ReadonlySet<string>): number {
+  return new Set([...matches].map((id) => placedId(nodes, id))).size;
+}
+
 /**
  * Pans the camera to the search matches once typing pauses; a card in a stack is wherever its stack is.
  * (Dimming the rest is the projection's job.)

@@ -1,5 +1,5 @@
 import { Search, X } from 'lucide-react';
-import { useSearchMatches } from '@/canvas/useSearch';
+import { foundCount, useSearchMatches } from '@/canvas/useSearch';
 import { cn } from '@/lib/cn';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUiStore } from '@/store/uiStore';
@@ -8,7 +8,8 @@ import { IconButton } from '@/ui/Button';
 /** Search field that lives in the top bar: a quiet button until opened, then an input. */
 export function SearchBar() {
   const { searchOpen, searchQuery, openSearch, closeSearch, setSearchQuery } = useUiStore();
-  const matches = useSearchMatches(useCanvasStore((s) => s.nodes));
+  const nodes = useCanvasStore((s) => s.nodes);
+  const matches = useSearchMatches(nodes);
 
   if (!searchOpen) {
     return (
@@ -38,7 +39,9 @@ export function SearchBar() {
         className="w-32 bg-transparent px-1 text-sm text-fg outline-none placeholder:text-muted xl:w-40"
       />
       {matches && (
-        <span className="text-xs whitespace-nowrap text-muted tabular-nums">{matches.size} found</span>
+        <span className="text-xs whitespace-nowrap text-muted tabular-nums">
+          {foundCount(nodes, matches)} found
+        </span>
       )}
       <IconButton icon={X} label="Close search" hint="Esc" size="sm" onClick={closeSearch} />
     </div>
