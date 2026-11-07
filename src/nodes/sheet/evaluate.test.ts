@@ -15,6 +15,18 @@ describe('evaluateSheet', () => {
     expect(evaluateSheet(long, false)[0][0]).toBe('200');
   });
 
+  it('follows a chain of thousands of formulas without running out of stack', () => {
+    const chain = Array.from({ length: 5000 }, (_, r) => [r === 0 ? '1' : `=A${r}+1`]);
+    expect(evaluateSheet(chain, false)[4999][0]).toBe('5000');
+  });
+
+  it('gives each sheet its own answers when one parser serves them all', () => {
+    expect(column(evaluateSheet([['2'], ['=A1*10']], false))).toEqual([undefined, '20']);
+    expect(column(evaluateSheet([['7'], ['=A1*10']], false))).toEqual([undefined, '70']);
+    expect(column(evaluateSheet([['=A2'], ['=A1']], false))).toEqual(['#REF!', '#REF!']);
+    expect(column(evaluateSheet([['3'], ['=A1+1']], false))).toEqual([undefined, '4']);
+  });
+
   it('keeps ordinary numbers, text and decimals working', () => {
     const shown = evaluateSheet([['0.25', '=A1*2', '=B1&"x"', '=1/0', '=IF(A1>0,"yes","no")']], true);
     expect(shown[0].slice(1)).toEqual(['1/2', '0.5x', '#DIV/0!', 'yes']);

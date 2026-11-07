@@ -43,11 +43,40 @@ const functions = {
   },
 };
 
+/** The grid being evaluated, which the shared parser reads through. Only set while `evaluateSheet` runs. */
+interface Grid {
+  rows: number;
+  columns: number;
+  values: unknown[][];
+}
+let grid: Grid | undefined;
+
+const read = (row: number, col: number) => grid?.values[row - 1]?.[col - 1];
+
+// Building a parser costs milliseconds (a dependency parser about as much as the formula parser), and a sheet has
+// hundreds of formulas, so both are made once and used for every sheet.
+let parser: InstanceType<typeof FormulaParser> | undefined;
+let dependencies: InstanceType<typeof DepParser> | undefined;
+
+const formulaParser = () =>
+  (parser ??= new FormulaParser({
+    functions,
+    onCell: ({ row, col }) => read(row, col),
+    onRange: ({ from, to }) => {
+      const { rows = 0, columns = 0 } = grid ?? {};
+      return Array.from({ length: Math.max(0, Math.min(to.row, rows) - from.row + 1) }, (_, r) =>
+        Array.from({ length: Math.max(0, Math.min(to.col, columns) - from.col + 1) }, (_, c) =>
+          read(from.row + r, from.col + c),
+        ),
+      );
+    },
+  }));
+
 /** The cells a formula reads, clipped to the grid; none when it does not parse (evaluating it reports that). */
 function references(formula: string, at: CellRef, rows: number, columns: number): CellRef[] {
   let refs: (CellRef | RangeRef)[];
   try {
-    refs = new DepParser().parse(formula, { ...at, sheet: SHEET });
+    refs = (dependencies ??= new DepParser()).parse(formula, { ...at, sheet: SHEET });
   } catch {
     return [];
   }
@@ -76,47 +105,73 @@ export function evaluateSheet(cells: string[][], fractions: boolean): (string | 
   const values: unknown[][] = cells.map((row) =>
     row.map((text) => (isFormula(text) ? undefined : literal(text))),
   );
-  const read = (row: number, col: number) => values[row - 1]?.[col - 1];
-  const parser = new FormulaParser({
-    functions,
-    onCell: ({ row, col }) => read(row, col),
-    onRange: ({ from, to }) =>
-      Array.from({ length: Math.max(0, Math.min(to.row, rows) - from.row + 1) }, (_, r) =>
-        Array.from({ length: Math.max(0, Math.min(to.col, columns) - from.col + 1) }, (_, c) =>
-          read(from.row + r, from.col + c),
-        ),
-      ),
-  });
+  const before = grid;
+  grid = { rows, columns, values };
+  try {
+    evaluateFormulas(cells, values, rows, columns);
+  } finally {
+    grid = before;
+  }
+  return cells.map((row, r) =>
+    row.map((text, c) => (isFormula(text) ? display(values[r][c], fractions) : undefined)),
+  );
+}
 
+/** Fills in `values` for every formula cell. */
+function evaluateFormulas(cells: string[][], values: unknown[][], rows: number, columns: number) {
   const formulaAt = (row: number, col: number) => isFormula(cells[row - 1]?.[col - 1] ?? '');
-  const state = new Map<string, 'visiting' | 'done'>();
-  const stack: CellRef[] = [];
+  const state = new Map<number, 'visiting' | 'done'>();
+  const keyOf = ({ row, col }: CellRef) => (row - 1) * columns + (col - 1);
 
-  function evaluate(at: CellRef) {
-    const key = `${at.row},${at.col}`;
-    if (state.get(key) === 'done') return;
-    if (state.get(key) === 'visiting') {
-      // A circle: every formula on it, from where it closed, is an error.
-      for (const cell of stack.slice(stack.findIndex((c) => c.row === at.row && c.col === at.col)))
-        values[cell.row - 1][cell.col - 1] = FormulaError.REF;
-      return;
-    }
-    state.set(key, 'visiting');
-    stack.push(at);
-    const formula = cells[at.row - 1][at.col - 1].slice(1);
-    for (const ref of references(formula, at, rows, columns)) if (formulaAt(ref.row, ref.col)) evaluate(ref);
-    stack.pop();
-    state.set(key, 'done');
-    if (values[at.row - 1][at.col - 1] === FormulaError.REF) return; // closed a circle
-    values[at.row - 1][at.col - 1] = compute(formula, at);
+  interface Frame {
+    at: CellRef;
+    formula: string;
+    /** The formulas it reads, which are evaluated first. */
+    reads: CellRef[];
+    next: number;
   }
 
   function compute(formula: string, at: CellRef): unknown {
     try {
-      const result = parser.parse(formula, { ...at, sheet: SHEET });
+      const result = formulaParser().parse(formula, { ...at, sheet: SHEET });
       return Array.isArray(result) ? result[0]?.[0] : result; // an array shows its first value
     } catch (error) {
       return error instanceof FormulaError ? error : FormulaError.REF;
+    }
+  }
+
+  // A walk with a stack of its own: a chain of formulas as long as the sheet is big would overflow the call stack.
+  function evaluate(root: CellRef) {
+    const frames: Frame[] = [];
+
+    const open = (at: CellRef) => {
+      const key = keyOf(at);
+      const seen = state.get(key);
+      if (seen === 'done') return;
+      if (seen === 'visiting') {
+        // A circle: every formula on it, from where it closed, is an error.
+        const from = frames.findIndex((frame) => frame.at.row === at.row && frame.at.col === at.col);
+        for (const { at: cell } of frames.slice(from)) values[cell.row - 1][cell.col - 1] = FormulaError.REF;
+        return;
+      }
+      state.set(key, 'visiting');
+      const formula = cells[at.row - 1][at.col - 1].slice(1);
+      const reads = references(formula, at, rows, columns).filter((ref) => formulaAt(ref.row, ref.col));
+      frames.push({ at, formula, reads, next: 0 });
+    };
+
+    open(root);
+    while (frames.length > 0) {
+      const frame = frames[frames.length - 1];
+      if (frame.next < frame.reads.length) {
+        open(frame.reads[frame.next++]);
+        continue;
+      }
+      frames.pop();
+      const { at } = frame;
+      state.set(keyOf(at), 'done');
+      if (values[at.row - 1][at.col - 1] === FormulaError.REF) continue; // closed a circle
+      values[at.row - 1][at.col - 1] = compute(frame.formula, at);
     }
   }
 
@@ -125,10 +180,6 @@ export function evaluateSheet(cells: string[][], fractions: boolean): (string | 
       if (isFormula(text)) evaluate({ row: r + 1, col: c + 1 });
     });
   });
-
-  return cells.map((row, r) =>
-    row.map((text, c) => (isFormula(text) ? display(values[r][c], fractions) : undefined)),
-  );
 }
 
 /**
