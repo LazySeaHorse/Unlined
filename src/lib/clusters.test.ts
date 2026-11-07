@@ -166,4 +166,11 @@ describe('findFreeSpot', () => {
       { x: 10, y: 75 },
     ]);
   });
+
+  it('tries the spot below a target first when asked', () => {
+    expect(besideCandidates(rect('a', 10, 20), 5, 'below')).toEqual([
+      { x: 10, y: 75 },
+      { x: 115, y: 20 },
+    ]);
+  });
 });

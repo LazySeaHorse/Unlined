@@ -23,7 +23,7 @@ export function requireLink(handle: string): AppEdge {
   if (!link)
     throw new ToolError(
       'link_not_found',
-      `No link "${handle}" on this canvas. Use list_links to find handles.`,
+      `There is no link "${handle}" on this canvas. Use list_links to find handles.`,
     );
   return link;
 }
@@ -34,7 +34,7 @@ export function requireNode(handle: string): AppNode {
   if (!node)
     throw new ToolError(
       'node_not_found',
-      `No node "${handle}" on this canvas. Use list_nodes or search_nodes to find handles.`,
+      `There is no node "${handle}" on this canvas. Use list_nodes or search_nodes to find handles.`,
     );
   return node;
 }
@@ -54,7 +54,7 @@ export function requireGroup(handle: string, groups: CanvasGroup[]): CanvasGroup
   if (!group)
     throw new ToolError(
       'group_not_found',
-      `No group "${handle}". Groups change as nodes move; call get_overview for current handles.`,
+      `There is no group "${handle}". Groups change when nodes move. Call get_overview for the current handles.`,
     );
   return group;
 }

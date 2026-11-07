@@ -38,15 +38,15 @@ export const runCode = defineTool({
   name: 'run_code',
   title: 'Run a script node',
   description:
-    'Run a code (JavaScript) node in its sandboxed worker and return the console output and the value of the last ' +
-    'expression ("=> ..."). Scripts are stopped after 5 seconds. Does not change the canvas.',
+    'Run a code (JavaScript) node in its sandboxed worker. Returns the console output and the value of the last ' +
+    'expression ("=> ..."). The tool stops a script after 5 seconds. It does not change the canvas.',
   input: z.object({ id: handleSchema }),
   readOnly: true,
   exclusive: true,
   handler: async ({ id }) => {
     const node = requireNode(id);
     if (node.type !== 'code')
-      throw new ToolError('not_code', `${id} is a ${node.type} node, not a code node.`);
+      throw new ToolError('not_code', `${id} is a ${node.type} node. It is not a code node.`);
     const lines = await collectScript(node.data.source);
     const prefix = {
       log: '',

@@ -195,10 +195,13 @@ export function findFreeSpot(
   for (let y = start.y; ; y += padding) if (free({ x: start.x, y })) return { x: start.x, y };
 }
 
-/** Candidate spots next to `target` for a new box: to its right, then below it. */
-export function besideCandidates(target: Omit<Rect, 'id'>, padding = NODE_PADDING) {
-  return [
-    { x: target.x + target.width + padding, y: target.y },
-    { x: target.x, y: target.y + target.height + padding },
-  ];
+/** Candidate spots next to `target` for a new box: to its right, then below it (or the other way round). */
+export function besideCandidates(
+  target: Omit<Rect, 'id'>,
+  padding = NODE_PADDING,
+  first: 'right' | 'below' = 'right',
+) {
+  const right = { x: target.x + target.width + padding, y: target.y };
+  const below = { x: target.x, y: target.y + target.height + padding };
+  return first === 'below' ? [below, right] : [right, below];
 }

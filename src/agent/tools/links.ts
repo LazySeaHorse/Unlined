@@ -26,9 +26,14 @@ const COLOR = ['auto', ...SECTION_COLORS] as const;
 /** How a link looks. Built from the format's own schema so the tools and the saved files agree on what is valid. */
 const lookShape = {
   label: linkDataSchema.shape.label.describe(
-    'Text along the link; $...$ is typeset as math. Empty clears it.',
+    'Text along the link. $...$ is typeset as math. An empty label removes it.',
   ),
-  color: z.enum(COLOR).optional().describe('Line and label colour; "auto" (the default) is a neutral grey.'),
+  color: z
+    .enum(COLOR)
+    .optional()
+    .describe(
+      'Colour of the line and label. "auto" is the default colour. Use "blue" for flow and "magenta" for a standard equation in use (see get_guide).',
+    ),
   dashed: linkDataSchema.shape.dashed.describe('Dashed line.'),
   head: z.enum(LINK_ENDS).optional().describe('End at the "to" node: arrow (default), dot, bar or none.'),
   tail: z.enum(LINK_ENDS).optional().describe('End at the "from" node: none (default), arrow, dot or bar.'),
@@ -48,9 +53,10 @@ export const linkNodesTool = defineTool({
   name: 'link_nodes',
   title: 'Link nodes',
   description:
-    `Draw up to ${MAX_LINKS} links between nodes in one undo step. A link goes from one node to another (an arrow ` +
-    'by default) and may carry a label, colour, dashed line and end shapes. Links between two Math+ nodes also pass a ' +
-    'value, see get_guide. Sections can be linked too. Returns the new link handles.',
+    `Draw up to ${MAX_LINKS} links between nodes in one undo step. A link goes from one node to another. It has an ` +
+    'arrow by default. It can have a label, a colour, a dashed line and end shapes. Keep labels short and add them ' +
+    'only where the reason for the link is not clear. A link between two Math+ nodes also passes a value (see ' +
+    'get_guide). You can link sections too. Returns the new link handles.',
   input: z.object({
     links: z
       .array(z.object({ from: handleSchema, to: handleSchema, ...lookShape }))
@@ -70,11 +76,11 @@ export const linkNodesTool = defineTool({
       if (sameDirection(existing, source, target))
         throw new ToolError(
           'link_exists',
-          `${from} is already linked to ${to}. Use update_links to change it, or link the other way round.`,
+          `${from} is already linked to ${to}. Use update_links to change the link, or link in the other direction.`,
         );
       if (closesMathPlusLoop(nodes, existing, source, target))
         notes.push(
-          `${from} -> ${to} closes a Math+ loop; it is broken at the node earliest in reading order, whose link from the loop is ignored when calculating.`,
+          `${from} -> ${to} closes a Math+ loop. The app breaks the loop at its node that is first in reading order. It ignores the link from the loop at that node when it calculates.`,
         );
       const data = normaliseLinkData(toPatch(look));
       const link: AppEdge = { id: newId(), source, target, ...(data ? { data } : {}) };
@@ -95,9 +101,9 @@ export const listLinks = defineTool({
   name: 'list_links',
   title: 'List links',
   description:
-    'One line per link: handle, from -> to, label and any non-default look. Optionally only the links of one node. Paginated.',
+    'One line for each link: handle, from -> to, label and each look that is not the default. You can list only the links of one node. The result has pages.',
   input: z.object({
-    node: handleSchema.optional().describe('Only links to or from this node.'),
+    node: handleSchema.optional().describe('Only the links to or from this node.'),
     offset: z.number().int().min(0).default(0),
     limit: z.number().int().min(1).max(200).default(50),
   }),
@@ -122,22 +128,27 @@ const updateSchema = z.object({
     .object(lookShape)
     .partial()
     .optional()
-    .describe('Fields to change; the rest stay. An empty label removes it, "auto" resets the colour.'),
-  reverse: z.boolean().optional().describe('Swap the ends so the link runs the other way.'),
+    .describe(
+      'Fields to change. The other fields stay the same. An empty label removes the label. "auto" resets the colour.',
+    ),
+  reverse: z.boolean().optional().describe('Swap the ends. The link then goes the other way.'),
 });
 
 export const updateLinks = defineTool({
   name: 'update_links',
   title: 'Update links',
   description:
-    'Change the look or direction of up to 50 links in one undo step. All updates are checked before any is applied.',
+    'Change the look or the direction of up to 50 links in one undo step. The app checks all updates before it applies any of them.',
   input: z.object({ updates: z.array(updateSchema).min(1).max(MAX_LINKS) }),
   readOnly: false,
   handler: ({ updates }) => {
     const checked = updates.map(({ id, set, reverse }) => ({ link: requireLink(id), set, reverse }));
     const ids = new Set(checked.map((c) => c.link.id));
     if (ids.size !== checked.length)
-      throw new ToolError('duplicate_update', 'Each link may appear once per call; merge its changes.');
+      throw new ToolError(
+        'duplicate_update',
+        'Each link can occur only once in a call. Put all its changes in one update.',
+      );
     // Turning a link round must not leave two links the same way between the same nodes.
     const pairs = canvasLinks().map((e) => ({ id: e.id, source: e.source, target: e.target }));
     for (const { link, reverse } of checked) {
@@ -176,7 +187,8 @@ export const updateLinks = defineTool({
 export const deleteLinks = defineTool({
   name: 'delete_links',
   title: 'Delete links',
-  description: 'Remove links (one undo step; the user can undo it). The nodes they join stay.',
+  description:
+    'Remove links. This is one undo step, and the user can undo it. The nodes that the links join stay.',
   input: z.object({ ids: z.array(linkHandleSchema).min(1).max(200) }),
   readOnly: false,
   destructive: true,

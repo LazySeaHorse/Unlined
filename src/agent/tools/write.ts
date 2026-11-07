@@ -35,15 +35,22 @@ const cellsSchema = z
   .array(z.array(z.string().max(2000)).max(MAX_GRID.cols))
   .min(1)
   .max(MAX_GRID.rows);
-const tint = z.enum(SECTION_COLORS).optional().describe('Background tint; omit for none.');
-const title = z.string().max(200).optional().describe('Optional name shown on the node; omit for none.');
+const tint = z
+  .enum(SECTION_COLORS)
+  .optional()
+  .describe('Background tint. Omit it, unless the tint carries a meaning (see get_guide).');
+const title = z
+  .string()
+  .max(200)
+  .optional()
+  .describe('Optional name that the user sees on the node. Omit it for no name.');
 const content = {
   text: {
-    markdown: z.string().max(100_000).describe('Markdown; $...$ and $$...$$ for LaTeX math.'),
+    markdown: z.string().max(100_000).describe('Markdown. Use $...$ and $$...$$ for LaTeX math.'),
     title,
     color: tint,
   },
-  math: { latex: z.string().max(20_000).describe('LaTeX, typeset only.'), title, color: tint },
+  math: { latex: z.string().max(20_000).describe('LaTeX. It is typeset only.'), title, color: tint },
   mathPlus: {
     title,
     color: tint,
@@ -51,22 +58,28 @@ const content = {
       .string()
       .max(20_000)
       .describe(
-        'LaTeX evaluated line by line; separate lines with \\\\. "a := 2" defines a shared variable.',
+        'LaTeX. The app evaluates it line by line. Separate lines with \\\\. "a := 2" defines a variable.',
       ),
   },
   graph: {
     equations: z
       .array(
         z.object({
-          latex: z.string().max(500).describe('As typed: "y=x^2", "x^2", "x=3", "y>x", "x^2+y^2=1".'),
-          color: z.enum(SECTION_COLORS).optional().describe('Curve colour; omit for the next free one.'),
+          latex: z
+            .string()
+            .max(500)
+            .describe('Write it as on a graphing calculator: "y=x^2", "x^2", "x=3", "y>x", "x^2+y^2=1".'),
+          color: z
+            .enum(SECTION_COLORS)
+            .optional()
+            .describe('Colour of the curve. Omit it to get the next free colour.'),
           name: z
             .string()
             .max(GRAPH_NAME_MAX)
             .optional()
             .describe(
-              'Optional name of the line, written along it in its colour (y= and x= curves, and points) and shown ' +
-                'when the user hovers it. Plain text; $math$ is typeset.',
+              'Optional name of the line. The app writes it along the line in its colour (y= and x= curves, and points) ' +
+                'and shows it when the user hovers over the line. Plain text; $math$ is typeset.',
             ),
         }),
       )
@@ -76,33 +89,37 @@ const content = {
     equalAxes: z
       .boolean()
       .optional()
-      .describe('Keep a unit the same length on both axes. Omit to scale each axis to fit the curves.'),
+      .describe('Make a unit the same length on both axes. Omit it to scale each axis to fit the curves.'),
     title,
     color: tint,
   },
-  table: { cells: cellsSchema.describe('Rows of cells, each a LaTeX math expression.'), title, color: tint },
+  table: {
+    cells: cellsSchema.describe('Rows of cells. Each cell is a LaTeX math expression.'),
+    title,
+    color: tint,
+  },
   sheet: {
-    cells: cellsSchema.describe('Rows of cells; formulas start with "=" and use A1 references.'),
+    cells: cellsSchema.describe('Rows of cells. A formula starts with "=" and uses A1 references.'),
     title,
     color: tint,
     fractions: z
       .boolean()
       .optional()
       .describe(
-        'Fraction mode: results show as fractions and row operations write fractions. Cells like 1/3 are numbers either way.',
+        'Fraction mode. Results and row operations show fractions. A cell such as 1/3 is a number in both modes.',
       ),
     fills: z
       .record(z.string(), z.enum(SECTION_COLORS))
       .optional()
-      .describe('Cell background by A1 reference, e.g. {"B2": "yellow"}.'),
+      .describe('Cell background by A1 reference, for example {"B2": "yellow"}.'),
   },
   code: {
-    source: z.string().max(100_000).describe('JavaScript, run in a sandboxed worker.'),
+    source: z.string().max(100_000).describe('JavaScript. It runs in a sandboxed worker.'),
     title,
     color: tint,
   },
   video: {
-    url: z.string().max(2000).describe('YouTube or Vimeo link, or another https embed URL.'),
+    url: z.string().max(2000).describe('A YouTube or Vimeo link, or an https embed URL.'),
     title,
     color: tint,
   },
@@ -110,7 +127,7 @@ const content = {
     url: z
       .string()
       .max(2000)
-      .describe('http(s) address of a web page; a bare domain like example.com works.'),
+      .describe('The http(s) address of a web page. A bare domain such as example.com is also correct.'),
     title,
     color: tint,
   },
@@ -123,16 +140,24 @@ const content = {
 };
 
 const placementShape = {
-  near: handleSchema.optional().describe('Place next to this node (right of it, else below).'),
-  group: groupHandleSchema.optional().describe('Place next to the nodes of this group.'),
-  x: z.number().optional().describe('Exact position; omit to let the app find free space.'),
+  near: handleSchema
+    .optional()
+    .describe('Place the node next to this node: on the side in `side`, or else on the other side.'),
+  side: z
+    .enum(['right', 'below'])
+    .optional()
+    .describe(
+      'With `near` or `group`: the side to try first. Default is right. Use below for a sequence of steps.',
+    ),
+  group: groupHandleSchema.optional().describe('Place the node next to the nodes of this group.'),
+  x: z.number().optional().describe('Exact position. Omit it to let the app find free space.'),
   y: z.number().optional(),
   width: z
     .number()
     .min(40)
     .max(4000)
     .optional()
-    .describe('code, graph, video and web only; others size to content.'),
+    .describe('For code, graph, video and web nodes only. The size of other nodes follows their content.'),
   height: z.number().min(40).max(4000).optional(),
 };
 
@@ -156,7 +181,7 @@ export function normaliseMathPlus(latex: string): string {
 
 function checkVideo(url: unknown) {
   if (typeof url === 'string' && !toEmbedUrl(url))
-    throw new ToolError('invalid_url', `"${url}" is not a video or embeddable https URL.`);
+    throw new ToolError('invalid_url', `"${url}" is not a video URL or an https embed URL.`);
 }
 
 /** The address in the form the Web node stores it. */
@@ -170,9 +195,10 @@ export const createNodes = defineTool({
   name: 'create_nodes',
   title: 'Create nodes',
   description:
-    'Add up to 20 nodes. Each has a kind plus its content fields. Without x/y the app places it in free space: ' +
-    'next to `near`, beside the nodes of `group`, or right of everything. Nodes created in one call are placed ' +
-    'one after another, so a list with the same `near` forms a row. Returns the new handles.',
+    'Add up to 20 nodes. Each node has a kind and its content fields. If you give no x and y, the app puts the node ' +
+    'in free space: next to `near`, beside the nodes of `group`, or to the right of all nodes. The app places the ' +
+    'nodes of one call one after the other. A list with the same `near` makes a row (or a column, with side below). ' +
+    'Returns the new handles.',
   input: z.object({ nodes: z.array(newNodeSchema).min(1).max(20) }),
   readOnly: false,
   handler: ({ nodes: specs }) => {
@@ -181,7 +207,7 @@ export const createNodes = defineTool({
     const created: AppNode[] = [];
 
     for (const spec of specs as NewNode[]) {
-      const { kind, near, group, x, y, width, height, ...data } = spec;
+      const { kind, near, group, side, x, y, width, height, ...data } = spec;
       if (kind === 'video') checkVideo(data.url);
       if (kind === 'web') data.url = checkWeb(data.url);
       if (kind === 'mathPlus') data.latex = normaliseMathPlus(String(data.latex));
@@ -192,10 +218,15 @@ export const createNodes = defineTool({
 
       let position: { x: number; y: number };
       if (x !== undefined && y !== undefined) position = { x, y };
-      else if (near) position = findFreeSpot(size, besideCandidates(nodeRect(requireNode(near))), obstacles);
+      else if (near)
+        position = findFreeSpot(
+          size,
+          besideCandidates(nodeRect(requireNode(near)), undefined, side),
+          obstacles,
+        );
       else if (group) {
         const members = requireGroup(group, groups).nodeIds.map((id) => nodeRect(requireNode(id)));
-        const candidates = [...members].reverse().flatMap((m) => besideCandidates(m));
+        const candidates = [...members].reverse().flatMap((m) => besideCandidates(m, undefined, side));
         position = findFreeSpot(size, candidates, obstacles);
       } else if (obstacles.length > 0) {
         const all = boundsOf(obstacles.map((o) => ({ id: '', ...o })));
@@ -249,27 +280,33 @@ const updateSchema = z.object({
     })
     .partial()
     .optional()
-    .describe("Replace whole fields. Only the node kind's own fields are allowed (see create_nodes)."),
+    .describe('Replace whole fields. Use only the fields of the node kind (see create_nodes).'),
   edits: z
     .array(
       z.object({
         find: z.string().min(1),
         replace: z.string(),
-        all: z.boolean().default(false).describe('Replace every match instead of requiring exactly one.'),
+        all: z
+          .boolean()
+          .default(false)
+          .describe('Replace every match. Without this, there must be exactly one match.'),
       }),
     )
     .max(50)
     .optional()
     .describe(
-      'Exact find/replace on the text of text, math, Math+, code, video, web and section nodes. Cheaper than set for small changes.',
+      'Exact find and replace in the text of text, math, Math+, code, video, web and section nodes. Use it for small changes. It costs less than set.',
     ),
   cells: z
     .array(
-      z.object({ cell: z.string().describe('A1-style reference, e.g. "B3".'), value: z.string().max(2000) }),
+      z.object({
+        cell: z.string().describe('A1-style reference, for example "B3".'),
+        value: z.string().max(2000),
+      }),
     )
     .max(500)
     .optional()
-    .describe('Set table or sheet cells; the grid grows to fit.'),
+    .describe('Set cells of a table or sheet. The grid grows to fit.'),
 });
 
 function applyEdits(text: string, edits: { find: string; replace: string; all: boolean }[], handle: string) {
@@ -279,12 +316,12 @@ function applyEdits(text: string, edits: { find: string; replace: string; all: b
     if (count === 0)
       throw new ToolError(
         'edit_not_found',
-        `${handle}: "${find}" not found. Read the node and copy the text exactly.`,
+        `${handle}: "${find}" is not in the node. Read the node and copy the text exactly.`,
       );
     if (count > 1 && !all)
       throw new ToolError(
         'edit_ambiguous',
-        `${handle}: "${find}" matches ${count} times. Add context or pass all: true.`,
+        `${handle}: "${find}" occurs ${count} times. Add more text around it, or pass all: true.`,
       );
     out = all ? out.split(find).join(replace) : out.replace(find, () => replace);
   }
@@ -298,7 +335,7 @@ function setCells(grid: string[][], cells: { cell: string; value: string }[], ha
     if (!ref || ref.row >= MAX_GRID.rows || ref.col >= MAX_GRID.cols)
       throw new ToolError(
         'invalid_cell',
-        `${handle}: "${cell}" is not a cell reference within ${MAX_GRID.cols} columns × ${MAX_GRID.rows} rows.`,
+        `${handle}: "${cell}" is not a cell reference in a grid of ${MAX_GRID.cols} columns × ${MAX_GRID.rows} rows.`,
       );
     const cols = Math.max(out[0]?.length ?? 0, ref.col + 1);
     out = out.map((row) => [...row, ...Array<string>(cols - row.length).fill('')]);
@@ -312,8 +349,9 @@ export const updateNodes = defineTool({
   name: 'update_nodes',
   title: 'Update nodes',
   description:
-    'Change the content of up to 20 nodes in one undo step: `edits` (exact find/replace, best for small changes), ' +
-    '`cells` (table/sheet cells by A1 reference) or `set` (replace whole fields). All updates are checked before any is applied.',
+    'Change the content of up to 20 nodes in one undo step. Use `edits` (exact find and replace) for small ' +
+    'changes, `cells` (cells of a table or sheet, by A1 reference) or `set` (replace whole fields). The app checks all ' +
+    'updates before it applies any of them.',
   input: z.object({ updates: z.array(updateSchema).min(1).max(20) }),
   readOnly: false,
   handler: ({ updates }) => {
@@ -323,28 +361,25 @@ export const updateNodes = defineTool({
       for (const [key, value] of Object.entries(set ?? {})) {
         // Which pages of a PDF are shown (and so readable) is the user's call alone.
         if (node.type === 'pdf' && key !== 'title')
-          throw new ToolError('invalid_field', `${id} is a pdf node; only its title can be changed.`);
+          throw new ToolError('invalid_field', `${id} is a pdf node. You can change only its title.`);
         if (
           !(key in data) &&
           !(key in ((node.type === 'pdf' ? { title } : (content as Record<string, object>)[node.type]) ?? {}))
         )
-          throw new ToolError('invalid_field', `${id} is a ${node.type} node; it has no "${key}" field.`);
+          throw new ToolError('invalid_field', `${id} is a ${node.type} node. It has no "${key}" field.`);
         data[key] = value;
       }
       if (edits?.length) {
         const field = TEXT_FIELD[node.type];
         if (!field)
-          throw new ToolError(
-            'invalid_edit',
-            `${id} is a ${node.type} node; use set or cells instead of edits.`,
-          );
+          throw new ToolError('invalid_edit', `${id} is a ${node.type} node. Use set or cells, not edits.`);
         data[field] = applyEdits(String(data[field]), edits, id);
       }
       if (cells?.length) {
         if (node.type !== 'table' && node.type !== 'sheet')
           throw new ToolError(
             'invalid_edit',
-            `${id} is a ${node.type} node; cells only apply to table and sheet nodes.`,
+            `${id} is a ${node.type} node. Use cells only for table and sheet nodes.`,
           );
         data.cells = setCells(data.cells as string[][], cells, id);
       }
@@ -370,8 +405,8 @@ export const moveNodes = defineTool({
   name: 'move_nodes',
   title: 'Move or resize nodes',
   description:
-    'Move nodes to x/y or by dx/dy, and resize code, graph, image, video, web and section nodes. Moving a section also ' +
-    'moves the nodes inside it. One undo step.',
+    'Move nodes to x and y, or by dx and dy. Resize code, graph, image, video, web and section nodes. When you move a ' +
+    'section, the nodes inside it move too. One undo step.',
   input: z.object({
     moves: z
       .array(
@@ -396,7 +431,10 @@ export const moveNodes = defineTool({
       moves.map((m) => {
         const node = placedNode(m.id);
         if ((m.width || m.height) && !RESIZABLE.has(node.type) && node.type !== 'image')
-          throw new ToolError('not_resizable', `${m.id} is a ${node.type} node, which sizes to its content.`);
+          throw new ToolError(
+            'not_resizable',
+            `${m.id} is a ${node.type} node. Its size follows its content.`,
+          );
         const position = {
           x: (m.x ?? node.position.x) + (m.dx ?? 0),
           y: (m.y ?? node.position.y) + (m.dy ?? 0),
@@ -448,7 +486,8 @@ export const deleteNodes = defineTool({
   name: 'delete_nodes',
   title: 'Delete nodes',
   description:
-    'Delete nodes (one undo step; the user can undo it). Deleting a section removes only the box, not the nodes inside.',
+    'Delete nodes. This is one undo step, and the user can undo it. When you delete a section, only the box goes. ' +
+    'The nodes inside it stay.',
   input: z.object({ ids: z.array(handleSchema).min(1).max(200) }),
   readOnly: false,
   destructive: true,
@@ -467,7 +506,7 @@ const historyInput = z.object({ steps: z.number().int().min(1).max(20).default(1
 export const undoTool = defineTool({
   name: 'undo',
   title: 'Undo',
-  description: 'Undo the latest canvas changes. Each of your write calls is one step.',
+  description: 'Undo the latest changes to the canvas. Each write call of yours is one step.',
   input: historyInput,
   readOnly: false,
   handler: ({ steps }) => {
@@ -479,7 +518,7 @@ export const undoTool = defineTool({
 export const redoTool = defineTool({
   name: 'redo',
   title: 'Redo',
-  description: 'Redo changes reverted by undo.',
+  description: 'Redo the changes that undo reverted.',
   input: historyInput,
   readOnly: false,
   handler: ({ steps }) => {

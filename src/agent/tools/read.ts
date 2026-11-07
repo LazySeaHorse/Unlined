@@ -54,9 +54,9 @@ export const getOverview = defineTool({
   name: 'get_overview',
   title: 'Canvas overview',
   description:
-    'Start here. Small, fixed-size summary of the open canvas: node counts by kind, groups of nearby nodes ' +
-    '(handle, size, bounds, kinds, a preview of the first node), the visible area and the selection. ' +
-    'Then use list_nodes on a group or area, and read_nodes for full content.',
+    'Start here. This is a small summary of the open canvas. It has a fixed size. It shows the node counts by kind, ' +
+    'the groups of nearby nodes (handle, size, bounds, kinds, a preview of the first node), the visible area and ' +
+    'the selection. Then use list_nodes for a group or an area, and read_nodes for the full content.',
   input: z.object({}),
   readOnly: true,
   handler: async () => {
@@ -112,17 +112,17 @@ export const listNodes = defineTool({
   name: 'list_nodes',
   title: 'List nodes',
   description:
-    'One line per node: handle, kind, x,y w×h, group, a short preview and the length of long content. ' +
-    'Filter by group, handles, area, kind, the selection or what is on screen. Paginated.',
+    'One line for each node: handle, kind, x,y w×h, group, a short preview and the length of long content. ' +
+    'You can filter by group, handles, area, kind, the selection or what is on screen. The result has pages.',
   input: z.object({
     group: groupHandleSchema.optional(),
     ids: z.array(handleSchema).max(200).optional(),
     scope: z
       .enum(['all', 'selected', 'in_view'])
       .default('all')
-      .describe('"selected": what the user selected.'),
+      .describe('"selected" is the nodes that the user selected.'),
     kind: kindSchema.optional(),
-    area: areaSchema.optional().describe('Only nodes overlapping this canvas rectangle.'),
+    area: areaSchema.optional().describe('Only the nodes that overlap this canvas rectangle.'),
     offset: z.number().int().min(0).default(0),
     limit: z.number().int().min(1).max(200).default(50),
   }),
@@ -174,12 +174,17 @@ export const readNodes = defineTool({
   name: 'read_nodes',
   title: 'Read nodes',
   description:
-    'Full content of up to 20 nodes. Text is Markdown with $LaTeX$; math is LaTeX; Math+ lines show their ' +
-    'computed result after ⟶; tables and sheets are grids with A1-style column letters and row numbers. ' +
-    'Long content is cut at maxChars; pass offset to read further.',
+    'The full content of up to 20 nodes. Text is Markdown with $LaTeX$. Math is LaTeX. Math+ lines show their ' +
+    'result after ⟶. Tables and sheets are grids with A1-style column letters and row numbers. ' +
+    'The tool cuts long content at maxChars. Pass offset to read more.',
   input: z.object({
     ids: z.array(handleSchema).min(1).max(20),
-    offset: z.number().int().min(0).default(0).describe('Character offset into each node, for long content.'),
+    offset: z
+      .number()
+      .int()
+      .min(0)
+      .default(0)
+      .describe('Character offset in each node. Use it for long content.'),
     maxChars: z.number().int().min(100).max(20000).default(4000).describe('Per node.'),
   }),
   readOnly: true,
@@ -213,7 +218,7 @@ export const searchNodes = defineTool({
   name: 'search_nodes',
   title: 'Search nodes',
   description:
-    'Case-insensitive text search across node content. Returns handles with a snippet around the first match.',
+    'Search the content of all nodes for text. Upper and lower case are the same. Returns handles, each with a snippet around the first match.',
   input: z.object({
     query: z.string().min(1).max(200),
     kind: kindSchema.optional(),
