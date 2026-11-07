@@ -56,8 +56,10 @@ const cancelSave = () => autosave.cancel();
 export const flushSave = () => autosave.flush();
 
 export async function openCanvas(id: string): Promise<void> {
+  // Opening what is already open would only wipe its undo history.
+  if (id === currentId()) return;
   // Leaving a canvas that could not be saved would lose what is in the store.
-  if (id !== currentId() && !(await autosave.flush())) {
+  if (!(await autosave.flush())) {
     toast.error('Could not save this canvas, so it stays open');
     return;
   }

@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_VIEWPORT } from '@/model/types';
 import { createNode } from '@/nodes/factory';
 import * as repo from '@/persistence/canvasRepo';
@@ -50,6 +50,30 @@ describe('workspace', () => {
     expect(canvas().nodes).toHaveLength(0);
     await openCanvas(a);
     expect(canvas().nodes).toHaveLength(1);
+  });
+
+  it('opening the canvas that is already open keeps its undo history', async () => {
+    await newCanvas('A');
+    canvas().addNodes([createNode('math', { x: 0, y: 0 })]);
+    const steps = useCanvasStore.temporal.getState().pastStates.length;
+    expect(steps).toBeGreaterThan(0);
+    await openCanvas(current());
+    expect(useCanvasStore.temporal.getState().pastStates).toHaveLength(steps);
+    expect(canvas().nodes).toHaveLength(1);
+  });
+
+  it('stays on a canvas that cannot be saved, so its edits are not lost', async () => {
+    await newCanvas('A');
+    const a = current();
+    await newCanvas('B');
+    canvas().addNodes([createNode('math', { x: 0, y: 0 })]);
+    const failing = vi.spyOn(repo, 'saveContent').mockRejectedValueOnce(new Error('quota'));
+    await openCanvas(a);
+    expect(current()).not.toBe(a);
+    expect(canvas().nodes).toHaveLength(1);
+    failing.mockRestore();
+    await openCanvas(a);
+    expect(current()).toBe(a);
   });
 
   it('removing the open canvas opens another, or a fresh one', async () => {
