@@ -1,4 +1,5 @@
 import type { XYPosition } from '@xyflow/react';
+import { toast } from 'sonner';
 import { create } from 'zustand';
 import { cloneGraph, internalEdges, sanitizeEdges, stripEdge } from '@/lib/links';
 import { placedNodes, withStackMembers } from '@/lib/stacks';
@@ -23,15 +24,15 @@ export const useWorkspace = create<WorkspaceState>(() => ({ currentId: null }));
 
 const currentId = () => useWorkspace.getState().currentId;
 
-/** Whether anything but the view changed since the last save: panning and zooming are saved, but are not edits. */
-let edited = false;
-
-const autosave = createAutosave(async () => {
-  const id = currentId();
-  const wasEdited = edited;
-  edited = false;
-  if (id) await repo.saveContent(id, getCanvasContent(), wasEdited);
-});
+// Panning and zooming are saved too, but are not edits: they leave the canvas as modified as it was.
+const autosave = createAutosave(
+  async (edited) => {
+    const id = currentId();
+    if (id) await repo.saveContent(id, getCanvasContent(), edited);
+  },
+  undefined,
+  () => toast.error('Could not save this canvas. Trying again…', { id: 'save-failed' }),
+);
 
 useCanvasStore.subscribe((state, prev) => {
   const changed =
@@ -39,8 +40,8 @@ useCanvasStore.subscribe((state, prev) => {
     state.edges !== prev.edges ||
     state.groups !== prev.groups ||
     state.fronts !== prev.fronts;
-  if (changed) edited = true;
-  if (changed || state.viewport !== prev.viewport) autosave.schedule();
+  if (changed) autosave.schedule('edit');
+  else if (state.viewport !== prev.viewport) autosave.schedule('view');
 });
 
 if (typeof window !== 'undefined') {
@@ -50,15 +51,16 @@ if (typeof window !== 'undefined') {
 }
 
 /** Drops a save still waiting, and the edits it would have carried. */
-const cancelSave = () => {
-  autosave.cancel();
-  edited = false;
-};
+const cancelSave = () => autosave.cancel();
 
 export const flushSave = () => autosave.flush();
 
 export async function openCanvas(id: string): Promise<void> {
-  if (id !== currentId()) await autosave.flush();
+  // Leaving a canvas that could not be saved would lose what is in the store.
+  if (id !== currentId() && !(await autosave.flush())) {
+    toast.error('Could not save this canvas, so it stays open');
+    return;
+  }
   const content = await repo.loadContent(id);
   useCanvasStore.getState().load(content);
   cancelSave();
