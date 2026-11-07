@@ -11,7 +11,7 @@ test('starts with an empty untitled canvas', async ({ page }) => {
 test('places, edits and persists a text node', async ({ page }) => {
   await placeNode(page, 'Text');
   await expect(nodes(page)).toHaveCount(1);
-  await nodes(page).locator('.prose').dblclick();
+  await nodes(page).locator('.markdown').dblclick();
   const editor = nodes(page).locator('textarea');
   await editor.fill('# Hello\n\nSome **bold** text and $x^2$');
   await editor.press('Escape');
@@ -50,7 +50,7 @@ test('marquee selection and drag', async ({ page }) => {
   await expect(page.locator('.react-flow__node.selected')).toHaveCount(2);
 
   const before = await nodes(page).first().boundingBox();
-  const header = nodes(page).first().locator('.prose');
+  const header = nodes(page).first().locator('.markdown');
   const box = await header.boundingBox();
   if (!before || !box) throw new Error('missing node box');
   await page.mouse.move(box.x + 10, box.y + 5);

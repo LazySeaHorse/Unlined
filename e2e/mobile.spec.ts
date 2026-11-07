@@ -36,7 +36,7 @@ test('mobile is a read-only viewer', async ({ page }) => {
 
   await nodes(page).first().click();
   await expect(page.locator('.react-flow__node.selected')).toHaveCount(0);
-  await nodes(page).locator('.prose').dblclick();
+  await nodes(page).locator('.markdown').dblclick();
   await expect(nodes(page).locator('textarea')).toHaveCount(0);
 
   await page.locator('.react-flow__pane').dblclick({ position: { x: 200, y: 600 } });

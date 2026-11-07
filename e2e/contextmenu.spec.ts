@@ -116,14 +116,14 @@ test('math menu tints the node background', async ({ page }) => {
 test('node menu: Duplicate copies the node', async ({ page }) => {
   await placeNode(page, 'Text');
   await expect(nodes(page)).toHaveCount(1);
-  await nodes(page).locator('.prose').click({ button: 'right' });
+  await nodes(page).locator('.markdown').click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Duplicate' }).click();
   await expect(nodes(page)).toHaveCount(2);
 });
 
 test('node menu: Delete removes the node and undo brings it back', async ({ page }) => {
   await placeNode(page, 'Text');
-  await nodes(page).locator('.prose').click({ button: 'right' });
+  await nodes(page).locator('.markdown').click({ button: 'right' });
   await page.getByRole('menuitem', { name: 'Delete' }).click();
   await expect(nodes(page)).toHaveCount(0);
   await page.keyboard.press('ControlOrMeta+z');

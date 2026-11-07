@@ -45,7 +45,7 @@ test('dragging a section moves the nodes inside it', async ({ page }) => {
   await wrapTwoTexts(page);
   await section(page).locator('input').press('Enter');
   const text = nodes(page)
-    .filter({ has: page.locator('.prose') })
+    .filter({ has: page.locator('.markdown') })
     .first();
   const before = await text.boundingBox();
   const sectionBefore = await section(page).boundingBox();
