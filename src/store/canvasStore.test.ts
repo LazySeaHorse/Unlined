@@ -140,6 +140,55 @@ describe('canvasStore', () => {
     expect(state().nodes).toHaveLength(3);
   });
 
+  describe('selection and history', () => {
+    const two = () => {
+      const [a, b] = [0, 1].map((x) => createNode('math', { x: x * 100, y: 0 }));
+      state().load({ nodes: [a, b], viewport: DEFAULT_VIEWPORT });
+      return [a.id, b.id];
+    };
+    const selectedIds = () =>
+      state()
+        .nodes.filter((n) => n.selected)
+        .map((n) => n.id);
+
+    it('undo and redo bring back what was selected before the edit', () => {
+      const [a, b] = two();
+      state().setSelection((n) => n.id === a);
+      state().updateNodeData<'math'>(a, { latex: 'x' });
+      state().setSelection((n) => n.id === b);
+      settle();
+      undo();
+      expect(selectedIds()).toEqual([a]);
+      expect(state().nodes.find((n) => n.id === a)?.data).not.toHaveProperty('latex', 'x');
+      redo();
+      expect(state().nodes.find((n) => n.id === a)?.data).toHaveProperty('latex', 'x');
+    });
+
+    it('brings a deleted selection back selected', () => {
+      const [a, b] = two();
+      state().setSelection(() => true);
+      state().deleteSelected();
+      expect(state().nodes).toHaveLength(0);
+      undo();
+      expect(selectedIds().sort()).toEqual([a, b].sort());
+    });
+
+    it('selecting is not an edit', () => {
+      const [a, b] = two();
+      const past = () => useCanvasStore.temporal.getState().pastStates.length;
+      const before = past();
+      state().setSelection((n) => n.id === a);
+      state().setSelection((n) => n.id === b);
+      expect(past()).toBe(before);
+    });
+
+    it('keeps the selection out of the saved content', () => {
+      const [a] = two();
+      state().setSelection((n) => n.id === a);
+      expect(getCanvasContent().nodes.some((n) => 'selected' in n)).toBe(false);
+    });
+  });
+
   it('load replaces content and clears history', () => {
     state().addNodes([createNode('math', { x: 0, y: 0 })]);
     state().load({ nodes: [], viewport: { x: 1, y: 2, zoom: 3 } });

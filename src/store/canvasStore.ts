@@ -402,8 +402,14 @@ export const useCanvasStore = create<CanvasState>()(
       },
     }),
     {
-      // Only node and link content is undoable: selection, measurement and the viewport are not.
-      partialize: (state) => ({ nodes: state.nodes.map(stripTransient), edges: state.edges.map(stripEdge) }),
+      // Only node and link content is undoable: measurement and the viewport are not. The selection is kept in the
+      // snapshots so undo brings back what was selected, but changing it is no edit (see `sameNode`).
+      partialize: (state) => ({
+        nodes: state.nodes.map((n) =>
+          n.selected ? { ...stripTransient(n), selected: true } : stripTransient(n),
+        ),
+        edges: state.edges.map((e) => (e.selected ? { ...stripEdge(e), selected: true } : stripEdge(e))),
+      }),
       equality: sameSnapshot,
       handleSet: (handleSet) => (pastState, replace) => {
         const now = Date.now();
