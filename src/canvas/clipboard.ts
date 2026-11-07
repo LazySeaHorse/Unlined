@@ -72,12 +72,13 @@ export async function pasteAt(at: XYPosition): Promise<void> {
   try {
     text = await navigator.clipboard.readText();
   } catch {
-    toast.error('Could not read the clipboard');
+    // Some browsers only let a page read the clipboard with permission; the paste key always works.
+    toast.error('Could not read the clipboard. Press Ctrl+V to paste instead.');
     return;
   }
   const pasted = parseClipboard(text);
   if (pasted) pasteNodes(pasted.nodes, at, pasted.edges);
-  else toast.error('No nodes on the clipboard');
+  else toast.error(text.trim() ? 'The clipboard has no Unlined nodes to paste' : 'The clipboard is empty');
 }
 
 /**

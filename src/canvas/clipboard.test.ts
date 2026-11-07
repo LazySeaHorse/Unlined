@@ -1,10 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { toast } from 'sonner';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_VIEWPORT } from '@/model/types';
 import { createNode } from '@/nodes/factory';
 import { exportCanvases } from '@/persistence/io';
 import { undo, useCanvasStore } from '@/store/canvasStore';
 import { pasteNodes } from '@/store/workspace';
-import { parseClipboard, serializeSelection } from './clipboard';
+import { parseClipboard, pasteAt, serializeSelection } from './clipboard';
 
 const state = () => useCanvasStore.getState();
 const at = (x: number, y: number) => ({ x, y });
@@ -114,5 +115,43 @@ describe('pasteNodes', () => {
     pasteNodes(pasted?.nodes ?? [], at(0, 400), pasted?.edges);
     expect(state().edges).toHaveLength(1);
     expect(state().edges[0].source).not.toBe(state().edges[0].target);
+  });
+});
+
+describe('pasteAt', () => {
+  const clipboard = (read: () => Promise<string>) =>
+    vi.stubGlobal('navigator', { clipboard: { readText: read } });
+  const error = vi.spyOn(toast, 'error').mockImplementation(() => '');
+
+  beforeEach(() => error.mockClear());
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('says so when the clipboard is empty, and when it holds something that is not nodes', async () => {
+    clipboard(async () => '  ');
+    await pasteAt(at(0, 0));
+    clipboard(async () => 'just some words');
+    await pasteAt(at(0, 0));
+    expect(error.mock.calls.map(([message]) => message)).toEqual([
+      'The clipboard is empty',
+      'The clipboard has no Unlined nodes to paste',
+    ]);
+    expect(state().nodes).toHaveLength(0);
+  });
+
+  it('points to the paste key when the browser will not let the page read the clipboard', async () => {
+    clipboard(async () => {
+      throw new Error('denied');
+    });
+    await pasteAt(at(0, 0));
+    expect(error.mock.calls[0][0]).toMatch(/Ctrl\+V/);
+  });
+
+  it('pastes nodes from the clipboard', async () => {
+    const node = createNode('math', at(0, 0), { latex: 'x' });
+    const payload = serializeSelection([{ ...node, selected: true }]) ?? '';
+    clipboard(async () => payload);
+    await pasteAt(at(300, 300));
+    expect(state().nodes).toHaveLength(1);
+    expect(error).not.toHaveBeenCalled();
   });
 });
