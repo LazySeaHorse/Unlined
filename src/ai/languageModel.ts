@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { createSerialQueue } from '@/lib/serialQueue';
 import { type LocalServerConfig, localApi } from './localServer';
 
 /**
@@ -121,12 +122,7 @@ if (typeof window !== 'undefined') window.addEventListener('pagehide', releaseSe
 
 // One request at a time: the model runs on the user's GPU, and a queue of small jobs finishes sooner than a pile of
 // parallel ones.
-let tail: Promise<unknown> = Promise.resolve();
-const enqueue = <T>(job: () => Promise<T>): Promise<T> => {
-  const run = tail.then(job, job);
-  tail = run.catch(() => {});
-  return run;
-};
+const enqueue = createSerialQueue();
 
 /** The longest one call to the model (getting a session, or one prompt) may take. A small model can loop, and
  * setting one up can hang; this ends either. */

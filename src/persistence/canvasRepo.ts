@@ -3,14 +3,15 @@ import { newId } from '@/nodes/factory';
 import type { SyncRecord } from '@/sync/status';
 import { db } from './db';
 
-const EMPTY_CONTENT: CanvasContent = { nodes: [], viewport: DEFAULT_VIEWPORT };
+/** A new object each time, so no canvas shares its node list with another. */
+const emptyContent = (): CanvasContent => ({ nodes: [], viewport: DEFAULT_VIEWPORT });
 
 /** All canvases, most recently modified first. */
 export const listCanvases = (): Promise<CanvasMeta[]> => db.canvases.orderBy('updatedAt').reverse().toArray();
 
 export const getCanvas = (id: string): Promise<CanvasMeta | undefined> => db.canvases.get(id);
 
-export async function createCanvas(name: string, content: CanvasContent = EMPTY_CONTENT): Promise<string> {
+export async function createCanvas(name: string, content: CanvasContent = emptyContent()): Promise<string> {
   const id = newId();
   await db.transaction('rw', db.canvases, db.contents, async () => {
     await db.canvases.add({ id, name, updatedAt: Date.now() });
@@ -21,7 +22,7 @@ export async function createCanvas(name: string, content: CanvasContent = EMPTY_
 
 export async function loadContent(id: string): Promise<CanvasContent> {
   const row = await db.contents.get(id);
-  if (!row) return EMPTY_CONTENT;
+  if (!row) return emptyContent();
   return {
     nodes: row.nodes,
     viewport: row.viewport,

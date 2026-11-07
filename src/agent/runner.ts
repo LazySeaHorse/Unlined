@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { createSerialQueue } from '@/lib/serialQueue';
 import { glide } from '@/motion/glide';
 import type { AgentToolDescriptor, AgentToolResult, AnyAgentTool } from './defineTool';
 import { ToolError } from './errors';
@@ -14,12 +15,7 @@ const errorResult = (payload: Record<string, unknown>): AgentToolResult => ({
 });
 
 // Write tools and scripts run one at a time so each call sees the canvas the previous one left.
-let exclusiveQueue: Promise<unknown> = Promise.resolve();
-function runExclusive<T>(fn: () => Promise<T>): Promise<T> {
-  const run = exclusiveQueue.then(fn, fn);
-  exclusiveQueue = run.catch(() => undefined);
-  return run;
-}
+const runExclusive = createSerialQueue();
 
 let callCounter = 0;
 

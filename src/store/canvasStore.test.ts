@@ -306,7 +306,7 @@ describe('canvasStore', () => {
         ],
       });
       expect(state().edges.map((e) => e.id)).toEqual(['1']);
-      state().clear();
+      useCanvasStore.setState({ nodes: [], edges: [] });
       expect(getCanvasContent()).not.toHaveProperty('edges');
     });
 

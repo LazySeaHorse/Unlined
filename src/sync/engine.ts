@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { createSerialQueue } from '@/lib/serialQueue';
 import * as repo from '@/persistence/canvasRepo';
 import * as workspace from '@/store/workspace';
 import { Cloud, type CloudEntry, type PushJob } from './cloud';
@@ -66,13 +67,8 @@ export async function connect(options: {
   return cloud.manifestId;
 }
 
-let tail: Promise<unknown> = Promise.resolve();
 /** One thing at a time: two pushes at once could swap each other's changes to the index. */
-const exclusive = <T>(task: () => Promise<T>): Promise<T> => {
-  const run = tail.then(task, task);
-  tail = run.catch(() => undefined);
-  return run;
-};
+const exclusive = createSerialQueue();
 
 const markBusy = async <T>(ids: string[] | 'all', task: () => Promise<T>): Promise<T> => {
   useSync.setState({ busy: ids });

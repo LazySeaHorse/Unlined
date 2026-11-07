@@ -78,7 +78,6 @@ export interface CanvasState {
   /** Removes nodes as one undo step; a section's contents stay. */
   deleteNodes: (ids: string[]) => void;
   deleteSelected: () => void;
-  clear: () => void;
   setGroups: (groups: CanvasGroup[]) => void;
   /** Shows card `memberId` of stack `stackId`. */
   setFront: (stackId: string, memberId: string) => void;
@@ -372,8 +371,6 @@ export const useCanvasStore = create<CanvasState>()(
           edges.flatMap((e) => (e.selected ? [e.id] : [])),
         );
       },
-
-      clear: () => set({ nodes: [], edges: [] }),
 
       setGroups: (groups) => set({ groups }),
 
