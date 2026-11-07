@@ -20,9 +20,8 @@ import { cardFor, placedId } from '@/lib/stacks';
 import type { AppNode } from '@/model/types';
 import { useGhostLayer } from '@/motion/ghosts';
 import { useGlide } from '@/motion/useGlide';
-import { nodeSpecs } from '@/nodes/catalog';
 import { nodeTypes } from '@/nodes/nodeTypes';
-import { dragHasPdf } from '@/nodes/pdf/drop';
+import { dragHasFiles } from '@/nodes/pdf/drop';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUiStore } from '@/store/uiStore';
 import { ContextMenu } from '@/ui/ContextMenu';
@@ -135,7 +134,7 @@ export function Canvas({ readOnly }: { readOnly: boolean }) {
   const tier = useZoomTier();
   // Figma-style wheel: scroll zooms, holding Shift pans instead.
   const panningScroll = useKeyPress('Shift');
-  const { addNode, dropPdfs } = useCanvasActions();
+  const { addNode, dropFiles } = useCanvasActions();
   const { screenToFlowPosition, fitView } = useReactFlow();
 
   useEffect(() => {
@@ -164,18 +163,17 @@ export function Canvas({ readOnly }: { readOnly: boolean }) {
     addNode(useUiStore.getState().tool, screenToFlowPosition({ x: event.clientX, y: event.clientY }));
   };
 
-  // Only kinds this browser supports take drops, so other browsers keep their default for dragged files.
-  const pdfDroppable = (event: DragEvent) =>
-    !readOnly && nodeSpecs.pdf.available?.() !== false && dragHasPdf(event.dataTransfer);
+  // Any dragged file is taken, even one that cannot be used, so a miss never leaves the page for the file.
+  const fileDroppable = (event: DragEvent) => !readOnly && dragHasFiles(event.dataTransfer);
   const onDragOver = (event: DragEvent) => {
-    if (!pdfDroppable(event)) return;
+    if (!fileDroppable(event)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = 'copy';
   };
   const onDrop = (event: DragEvent) => {
-    if (!pdfDroppable(event)) return;
+    if (!fileDroppable(event)) return;
     event.preventDefault();
-    void dropPdfs(event.dataTransfer, screenToFlowPosition({ x: event.clientX, y: event.clientY }));
+    void dropFiles(event.dataTransfer, screenToFlowPosition({ x: event.clientX, y: event.clientY }));
   };
 
   return (

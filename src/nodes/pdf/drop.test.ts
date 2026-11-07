@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dragHasPdf, pdfHandlesFromDrop } from './drop';
+import { dragHasFiles, dropHasPdf, imageFilesFromDrop, pdfHandlesFromDrop } from './drop';
 
 const item = (kind: string, type: string, handle?: unknown) =>
   ({
@@ -10,13 +10,31 @@ const item = (kind: string, type: string, handle?: unknown) =>
 const drop = (...items: DataTransferItem[]) => ({ items }) as unknown as Pick<DataTransfer, 'items'>;
 const file = (name: string) => ({ kind: 'file', name }) as FileSystemHandle;
 
-describe('dragHasPdf', () => {
-  it('sees a PDF among dragged files by its type', () => {
-    expect(dragHasPdf(drop(item('file', 'image/png'), item('file', 'application/pdf')))).toBe(true);
+const files = (...list: Partial<File>[]) => ({ files: list }) as unknown as Pick<DataTransfer, 'files'>;
+
+describe('dragHasFiles', () => {
+  it('accepts a drag of files whatever their type, which browsers may hide until the drop', () => {
+    expect(dragHasFiles(drop(item('file', '')))).toBe(true);
+    expect(dragHasFiles(drop(item('string', 'text/plain'), item('file', 'image/png')))).toBe(true);
   });
 
-  it('ignores other files and non-file items', () => {
-    expect(dragHasPdf(drop(item('file', 'image/png'), item('string', 'application/pdf')))).toBe(false);
+  it('ignores a drag of text', () => {
+    expect(dragHasFiles(drop(item('string', 'text/plain'), item('string', 'text/uri-list')))).toBe(false);
+  });
+});
+
+describe('imageFilesFromDrop', () => {
+  it('keeps the images', () => {
+    const png = { name: 'a.png', type: 'image/png' };
+    expect(imageFilesFromDrop(files(png, { name: 'b.pdf', type: 'application/pdf' }))).toEqual([png]);
+  });
+});
+
+describe('dropHasPdf', () => {
+  it('knows a PDF by its type or its name', () => {
+    expect(dropHasPdf(files({ name: 'a', type: 'application/pdf' }))).toBe(true);
+    expect(dropHasPdf(files({ name: 'Paper.PDF', type: '' }))).toBe(true);
+    expect(dropHasPdf(files({ name: 'a.png', type: 'image/png' }))).toBe(false);
   });
 });
 

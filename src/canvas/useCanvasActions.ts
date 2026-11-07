@@ -6,7 +6,7 @@ import { nodeSpecs } from '@/nodes/catalog';
 import { createNode } from '@/nodes/factory';
 import { imageBox } from '@/nodes/image/spec';
 import { addPdfNode, pickPdfHandle } from '@/nodes/pdf/actions';
-import { pdfHandlesFromDrop } from '@/nodes/pdf/drop';
+import { dropHasPdf, imageFilesFromDrop, pdfHandlesFromDrop } from '@/nodes/pdf/drop';
 import { toEmbedUrl } from '@/nodes/video/embedUrl';
 import { normaliseWebUrl } from '@/nodes/web/url';
 import { ImportError, parseExportFile } from '@/persistence/io';
@@ -14,6 +14,9 @@ import { useCanvasStore } from '@/store/canvasStore';
 import * as workspace from '@/store/workspace';
 import { askText } from '@/ui/dialogs';
 import { celebrate } from '@/ui/toast';
+
+/** Space between files dropped together. */
+const DROP_GAP = 20;
 
 /** User-facing canvas actions that need the viewport (where to put things) and UI feedback. */
 export function useCanvasActions() {
@@ -28,11 +31,15 @@ export function useCanvasActions() {
   const addNode = (kind: NodeKind, position: XYPosition) =>
     useCanvasStore.getState().addNodes([createNode(kind, position)]);
 
+  const readImage = async (file: File) => {
+    const src = await readAsDataUrl(file);
+    return { src, size: imageBox(await imageSize(src)) };
+  };
+
   const insertImage = async () => {
     const file = await pickFile('image/*');
     if (!file) return;
-    const src = await readAsDataUrl(file);
-    const size = imageBox(await imageSize(src));
+    const { src, size } = await readImage(file);
     useCanvasStore.getState().addNodes([createNode('image', centered(size), { src }, size)]);
   };
 
@@ -80,15 +87,39 @@ export function useCanvasActions() {
     }
   };
 
-  /** Links the PDF files in a drop, side by side from `at` (the middle of the first). */
-  const dropPdfs = async (data: DataTransfer, at: XYPosition) => {
+  /**
+   * Adds the images and links the PDF files in a drop, side by side from `at` (the middle of the first). The
+   * browser empties the drop once its event ends, so everything is taken from it before anything is awaited.
+   */
+  const dropFiles = async (data: DataTransfer, at: XYPosition) => {
+    const images = imageFilesFromDrop(data);
+    const canLinkPdfs = nodeSpecs.pdf.available?.() !== false;
+    const pdfDropped = dropHasPdf(data);
+    const pdfs = canLinkPdfs ? pdfHandlesFromDrop(data) : Promise.resolve([]);
+
+    const pdfSize = nodeSpecs.pdf.size ?? { width: 0, height: 0 };
+    let left: number | undefined;
+    const place = ({ width, height }: { width: number; height: number }): XYPosition => {
+      const x = left ?? at.x - width / 2;
+      left = x + width + DROP_GAP;
+      return { x, y: at.y - height / 2 };
+    };
+
     try {
-      const { width, height } = nodeSpecs.pdf.size ?? { width: 0, height: 0 };
-      const handles = await pdfHandlesFromDrop(data);
-      for (const [i, handle] of handles.entries())
-        await addPdfNode(handle, { x: at.x - width / 2 + i * (width + 20), y: at.y - height / 2 });
+      const [loaded, handles] = await Promise.all([Promise.all(images.map(readImage)), pdfs]);
+      if (loaded.length > 0)
+        useCanvasStore
+          .getState()
+          .addNodes(loaded.map(({ src, size }) => createNode('image', place(size), { src }, size)));
+      for (const handle of handles) await addPdfNode(handle, place(pdfSize));
+      if (loaded.length + handles.length > 0) return;
+      toast.error(
+        pdfDropped && !canLinkPdfs
+          ? 'PDFs can only be linked in Chrome or Edge'
+          : 'Only images and PDFs can be dropped here',
+      );
     } catch {
-      toast.error('Could not open that PDF');
+      toast.error('Could not open that file');
     }
   };
 
@@ -115,5 +146,5 @@ export function useCanvasActions() {
     }
   };
 
-  return { addNode, insertImage, insertVideo, insertWeb, insertPdf, dropPdfs, importJson, exportJson };
+  return { addNode, insertImage, insertVideo, insertWeb, insertPdf, dropFiles, importJson, exportJson };
 }
