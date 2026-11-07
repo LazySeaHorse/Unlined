@@ -1,0 +1,284 @@
+/*
+ * Styles for rendered Markdown (see Markdown.tsx): the small size of Tailwind Typography's `prose`, written out
+ * for the elements GitHub-flavoured Markdown produces, in light and dark.
+ *
+ * Why not the plugin: every rule it makes ends in `:not(:where([class~="not-prose"] *))`. A selector that
+ * depends on the `class` of any ancestor makes the browser re-style a whole subtree whenever one `class`
+ * changes, and React Flow changes the pane's the moment a pan starts, so on a big canvas every pan stalled for
+ * the time of a full style recalculation. Keep selectors here to a class, tags and structure; no `[class…] *`.
+ *
+ * Tag selectors sit in `:where()` so they stay as easy to override as the plugin's were.
+ */
+.markdown {
+  --md-body: oklch(37.3% 0.034 259.733);
+  --md-headings: oklch(21% 0.034 264.665);
+  --md-links: oklch(21% 0.034 264.665);
+  --md-bold: oklch(21% 0.034 264.665);
+  --md-counters: oklch(55.1% 0.027 264.364);
+  --md-bullets: oklch(87.2% 0.01 258.338);
+  --md-hr: oklch(92.8% 0.006 264.531);
+  --md-quotes: oklch(21% 0.034 264.665);
+  --md-quote-borders: oklch(92.8% 0.006 264.531);
+  --md-code: oklch(21% 0.034 264.665);
+  --md-pre-code: oklch(92.8% 0.006 264.531);
+  --md-pre-bg: oklch(27.8% 0.033 256.848);
+  --md-th-borders: oklch(87.2% 0.01 258.338);
+  --md-td-borders: oklch(92.8% 0.006 264.531);
+
+  color: var(--md-body);
+  font-size: 0.875rem;
+  line-height: 1.7142857;
+}
+
+:where(.dark) .markdown {
+  --md-body: oklch(87.2% 0.01 258.338);
+  --md-headings: #fff;
+  --md-links: #fff;
+  --md-bold: #fff;
+  --md-counters: oklch(70.7% 0.022 261.325);
+  --md-bullets: oklch(44.6% 0.03 256.802);
+  --md-hr: oklch(37.3% 0.034 259.733);
+  --md-quotes: oklch(96.7% 0.003 264.542);
+  --md-quote-borders: oklch(37.3% 0.034 259.733);
+  --md-code: #fff;
+  --md-pre-code: oklch(87.2% 0.01 258.338);
+  --md-pre-bg: rgb(0 0 0 / 50%);
+  --md-th-borders: oklch(44.6% 0.03 256.802);
+  --md-td-borders: oklch(37.3% 0.034 259.733);
+}
+
+/* Text */
+.markdown :where(p) {
+  margin-top: 1.1428571em;
+  margin-bottom: 1.1428571em;
+}
+.markdown :where(a) {
+  color: var(--md-links);
+  text-decoration: underline;
+  font-weight: 500;
+}
+.markdown :where(strong) {
+  color: var(--md-bold);
+  font-weight: 600;
+}
+.markdown :where(a strong, blockquote strong, thead th strong) {
+  color: inherit;
+}
+
+/* Headings */
+.markdown :where(h1, h2, h3, h4) {
+  color: var(--md-headings);
+}
+.markdown :where(h1) {
+  font-size: 2.1428571em;
+  font-weight: 800;
+  margin-top: 0;
+  margin-bottom: 0.8em;
+  line-height: 1.2;
+}
+.markdown :where(h2) {
+  font-size: 1.4285714em;
+  font-weight: 700;
+  margin-top: 1.6em;
+  margin-bottom: 0.8em;
+  line-height: 1.4;
+}
+.markdown :where(h3) {
+  font-size: 1.2857143em;
+  font-weight: 600;
+  margin-top: 1.5555556em;
+  margin-bottom: 0.4444444em;
+  line-height: 1.5555556;
+}
+.markdown :where(h4) {
+  font-weight: 600;
+  margin-top: 1.4285714em;
+  margin-bottom: 0.5714286em;
+  line-height: 1.4285714;
+}
+.markdown :where(h1 strong) {
+  font-weight: 900;
+  color: inherit;
+}
+.markdown :where(h2 strong) {
+  font-weight: 800;
+  color: inherit;
+}
+.markdown :where(h3 strong, h4 strong) {
+  font-weight: 700;
+  color: inherit;
+}
+
+/* Lists */
+.markdown :where(ol) {
+  list-style-type: decimal;
+}
+.markdown :where(ul) {
+  list-style-type: disc;
+}
+.markdown :where(ol, ul) {
+  margin-top: 1.1428571em;
+  margin-bottom: 1.1428571em;
+  padding-inline-start: 1.5714286em;
+}
+.markdown :where(li) {
+  margin-top: 0.2857143em;
+  margin-bottom: 0.2857143em;
+}
+.markdown :where(ol > li, ul > li) {
+  padding-inline-start: 0.4285714em;
+}
+.markdown :where(ol > li)::marker {
+  font-weight: 400;
+  color: var(--md-counters);
+}
+.markdown :where(ul > li)::marker {
+  color: var(--md-bullets);
+}
+.markdown :where(ul ul, ul ol, ol ul, ol ol) {
+  margin-top: 0.5714286em;
+  margin-bottom: 0.5714286em;
+}
+.markdown :where(.markdown > ul > li p) {
+  margin-top: 0.5714286em;
+  margin-bottom: 0.5714286em;
+}
+.markdown :where(.markdown > ul > li > p:first-child, .markdown > ol > li > p:first-child) {
+  margin-top: 1.1428571em;
+}
+.markdown :where(.markdown > ul > li > p:last-child, .markdown > ol > li > p:last-child) {
+  margin-bottom: 1.1428571em;
+}
+
+/* Quotes and rules */
+.markdown :where(blockquote) {
+  font-weight: 500;
+  font-style: italic;
+  color: var(--md-quotes);
+  border-inline-start: 0.25rem solid var(--md-quote-borders);
+  quotes: "\201C" "\201D" "\2018" "\2019";
+  margin-top: 1.3333333em;
+  margin-bottom: 1.3333333em;
+  padding-inline-start: 1.1111111em;
+}
+.markdown :where(blockquote p:first-of-type)::before {
+  content: open-quote;
+}
+.markdown :where(blockquote p:last-of-type)::after {
+  content: close-quote;
+}
+.markdown :where(hr) {
+  border-color: var(--md-hr);
+  border-top-width: 1px;
+  margin-top: 2.8571429em;
+  margin-bottom: 2.8571429em;
+}
+.markdown :where(hr + *, h2 + *, h3 + *, h4 + *) {
+  margin-top: 0;
+}
+
+/* Images */
+.markdown :where(img) {
+  margin-top: 1.7142857em;
+  margin-bottom: 1.7142857em;
+}
+
+/* Code */
+.markdown :where(code) {
+  color: var(--md-code);
+  font-weight: 600;
+  font-size: 0.8571429em;
+}
+.markdown :where(code)::before,
+.markdown :where(code)::after {
+  content: "`";
+}
+.markdown :where(a code, h1 code, h2 code, h3 code, h4 code, blockquote code, thead th code) {
+  color: inherit;
+}
+.markdown :where(h2 code) {
+  font-size: 0.9em;
+}
+.markdown :where(h3 code) {
+  font-size: 0.8888889em;
+}
+.markdown :where(pre) {
+  color: var(--md-pre-code);
+  background-color: var(--md-pre-bg);
+  overflow-x: auto;
+  font-weight: 400;
+  font-size: 0.8571429em;
+  line-height: 1.6666667;
+  margin-top: 1.6666667em;
+  margin-bottom: 1.6666667em;
+  border-radius: 0.25rem;
+  padding: 0.6666667em 1em;
+}
+/* Size and line height are left to the `code` rule above: code blocks have always been a notch smaller than
+   the block around them, and keep to that. */
+.markdown :where(pre code) {
+  background-color: transparent;
+  border-width: 0;
+  border-radius: 0;
+  padding: 0;
+  font-weight: inherit;
+  color: inherit;
+  font-family: inherit;
+}
+.markdown :where(pre code)::before,
+.markdown :where(pre code)::after {
+  content: none;
+}
+
+/* Tables */
+.markdown :where(table) {
+  width: 100%;
+  table-layout: auto;
+  margin-top: 2em;
+  margin-bottom: 2em;
+  font-size: 0.8571429em;
+  line-height: 1.5;
+}
+.markdown :where(thead) {
+  border-bottom: 1px solid var(--md-th-borders);
+}
+.markdown :where(thead th) {
+  color: var(--md-headings);
+  font-weight: 600;
+  vertical-align: bottom;
+  padding: 0 1em 0.6666667em;
+}
+.markdown :where(tbody tr) {
+  border-bottom: 1px solid var(--md-td-borders);
+}
+.markdown :where(tbody tr:last-child) {
+  border-bottom-width: 0;
+}
+.markdown :where(tbody td) {
+  vertical-align: baseline;
+  padding: 0.6666667em 1em;
+}
+.markdown :where(tfoot) {
+  border-top: 1px solid var(--md-th-borders);
+}
+.markdown :where(tfoot td) {
+  vertical-align: top;
+  padding: 0.6666667em 1em;
+}
+.markdown :where(th, td) {
+  text-align: start;
+}
+.markdown :where(thead th:first-child, tbody td:first-child, tfoot td:first-child) {
+  padding-inline-start: 0;
+}
+.markdown :where(thead th:last-child, tbody td:last-child, tfoot td:last-child) {
+  padding-inline-end: 0;
+}
+
+/* The first and last blocks sit flush with the edges. Last, so they win over the margins above. */
+.markdown > :where(:first-child) {
+  margin-top: 0;
+}
+.markdown > :where(:last-child) {
+  margin-bottom: 0;
+}
