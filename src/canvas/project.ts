@@ -32,8 +32,10 @@ const NODE_DRAG_HANDLE = '.node-tab, .stack-bar';
 /** Each node with its handle set, kept so an untouched node stays the same object from one projection to the next. */
 const withHandle = new WeakMap<AppNode, AppNode>();
 function handled(node: AppNode): AppNode {
-  let out = withHandle.get(node);
-  if (!out) withHandle.set(node, (out = { ...node, dragHandle: NODE_DRAG_HANDLE }));
+  const known = withHandle.get(node);
+  if (known) return known;
+  const out = { ...node, dragHandle: NODE_DRAG_HANDLE };
+  withHandle.set(node, out);
   return out;
 }
 
