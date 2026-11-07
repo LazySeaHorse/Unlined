@@ -9,6 +9,8 @@ export interface CardInStack {
   hidden: boolean;
   /** Drawn in place of the card's own tab (the stack's tab strip, say); undefined keeps the card's own. */
   tabs: ReactNode;
+  /** The stack's own controls, drawn in the card's corner after its own actions. */
+  actions?: ReactNode;
 }
 
 export const CardContext = createContext<CardInStack | null>(null);

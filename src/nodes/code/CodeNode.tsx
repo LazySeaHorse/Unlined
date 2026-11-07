@@ -12,7 +12,7 @@ import { useReadOnly } from '@/canvas/readOnly';
 import { cn } from '@/lib/cn';
 import type { NodeOf } from '@/model/types';
 import { useUiStore } from '@/store/uiStore';
-import { Button } from '@/ui/Button';
+import { Button, IconButton } from '@/ui/Button';
 import { NodeShell } from '../NodeShell';
 import { useUpdateNodeData } from '../useNodeData';
 import { codeAsk, codeComplete } from './ask';
@@ -83,9 +83,7 @@ export default function CodeNode({ id, data, selected }: NodeProps<NodeOf<'code'
           <Button size="xs" onClick={clear}>
             Clear
           </Button>
-          <Button variant="primary" size="xs" onClick={run}>
-            <Play className="size-3" /> Run
-          </Button>
+          <IconButton icon={Play} label="Run" size="sm" onClick={run} />
         </>
       }
     >

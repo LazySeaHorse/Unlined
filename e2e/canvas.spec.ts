@@ -206,7 +206,7 @@ test('inserting a row keeps text cells as text', async ({ page }) => {
   await expect.poll(() => value(6)).toBe('\\text{two}');
 });
 
-test('a video keeps its play button when the canvas is zoomed out, unlike editing controls', async ({
+test('node controls stay when the canvas is zoomed out', async ({
   page,
 }) => {
   await page.route('https://www.youtube.com/**', (route) =>
@@ -228,7 +228,7 @@ test('a video keeps its play button when the canvas is zoomed out, unlike editin
     await page.getByRole('button', { name: 'Zoom out' }).click();
     await expect(page.locator('.react-flow[data-zoom="mid"]')).toHaveCount(1, { timeout: 400 });
   }).toPass();
-  await expect(run).toBeHidden();
+  await expect(run).toBeVisible();
   await expect(play).toBeVisible();
 });
 

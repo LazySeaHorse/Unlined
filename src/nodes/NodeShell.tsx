@@ -25,10 +25,8 @@ interface NodeShellProps {
   customTitle?: string;
   /** Fills the top of the tile under the tab, e.g. a formula bar. Stays in read-only mode. */
   toolbar?: ReactNode;
-  /** Controls on the tab line, shown while the node is hovered or selected; hidden in read-only mode. */
+  /** Controls on the tab line, shown while the node is hovered or selected, at any zoom; hidden in read-only mode. */
   actions?: ReactNode;
-  /** The actions stay when the canvas is zoomed out, where editing controls go: a video's play button. */
-  steadyActions?: boolean;
   resize?: {
     minWidth: number;
     minHeight: number;
@@ -55,7 +53,6 @@ export function NodeShell({
   customTitle,
   toolbar,
   actions,
-  steadyActions,
   resize,
   tint,
   live,
@@ -93,12 +90,10 @@ export function NodeShell({
               {live && <span className="shrink-0 text-2xs font-normal opacity-80">· Live</span>}
             </div>
           )}
-          {!readOnly && actions && (
-            <div
-              className="node-actions nodrag ml-auto flex items-center gap-1 self-center"
-              data-steady={steadyActions || undefined}
-            >
-              {actions}
+          {((!readOnly && actions) || card?.actions) && (
+            <div className="node-actions nodrag ml-auto flex items-center gap-1 self-center">
+              {!readOnly && actions}
+              {card?.actions}
             </div>
           )}
         </div>

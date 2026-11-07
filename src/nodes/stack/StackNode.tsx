@@ -111,6 +111,7 @@ function TabbedStack({ props, cards, front }: { props: StackProps; cards: CardNo
     box,
   );
   const strip = <StackTabs stackId={id} cards={cards} front={front} />;
+  const corner = <StackActions stackId={id} count={cards.length} />;
   return (
     <>
       <CornerResizer selected={selected && !fan} minWidth={200} minHeight={140} />
@@ -134,7 +135,13 @@ function TabbedStack({ props, cards, front }: { props: StackProps; cards: CardNo
                   <CardView
                     props={props}
                     card={card}
-                    context={{ stackId: id, cardId: card.id, hidden: !isFront, tabs }}
+                    context={{
+                      stackId: id,
+                      cardId: card.id,
+                      hidden: !isFront,
+                      tabs,
+                      actions: isFront && !fan ? corner : undefined,
+                    }}
                     selected={selected && isFront && !fan}
                   />
                 )}
@@ -259,8 +266,28 @@ function CardTab({ card }: { card: CardNode }) {
   );
 }
 
-function StackTabs({ stackId, cards, front }: { stackId: string; cards: CardNode[]; front?: string }) {
+/** The stack's controls in the corner of its front card, beside the card's own: spread the cards out, pin them open. */
+function StackActions({ stackId, count }: { stackId: string; count: number }) {
   const readOnly = useReadOnly();
+  return (
+    <>
+      {count > 1 && (
+        <IconButton
+          icon={GalleryHorizontalEnd}
+          label="Spread out the cards"
+          hint="Space"
+          size="sm"
+          onClick={() => openFan(stackId)}
+        />
+      )}
+      {!readOnly && (
+        <IconButton icon={Pin} label="Pin open" size="sm" onClick={() => setStackLayout(stackId, 'row')} />
+      )}
+    </>
+  );
+}
+
+function StackTabs({ stackId, cards, front }: { stackId: string; cards: CardNode[]; front?: string }) {
   const wheel = useRef(0);
   // Scrolling over the tabs flips through the cards instead of zooming.
   const onWheel = (event: WheelEvent) => {
@@ -296,28 +323,6 @@ function StackTabs({ stackId, cards, front }: { stackId: string; cards: CardNode
           </button>
         );
       })}
-      {cards.length > 1 && (
-        <button
-          type="button"
-          className="stack-strip-button nodrag"
-          title="Spread out the cards (Space)"
-          aria-label="Spread out the cards"
-          onClick={() => openFan(stackId)}
-        >
-          <GalleryHorizontalEnd className="size-3.5" />
-        </button>
-      )}
-      {!readOnly && (
-        <button
-          type="button"
-          className="stack-strip-button nodrag"
-          title="Pin open, every card in sight"
-          aria-label="Pin open"
-          onClick={() => setStackLayout(stackId, 'row')}
-        >
-          <Pin className="size-3.5" />
-        </button>
-      )}
     </div>
   );
 }

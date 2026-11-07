@@ -27,6 +27,16 @@ export interface View {
 /** A fanned stack spreads over its neighbours, so it is drawn above them (and above a selected node's 1000). */
 const FANNED_Z = 2000;
 
+/** Every node but a section moves only by its tab (a stack pinned open, by its bar). */
+const NODE_DRAG_HANDLE = '.node-tab, .stack-bar';
+/** Each node with its handle set, kept so an untouched node stays the same object from one projection to the next. */
+const withHandle = new WeakMap<AppNode, AppNode>();
+function handled(node: AppNode): AppNode {
+  let out = withHandle.get(node);
+  if (!out) withHandle.set(node, (out = { ...node, dragHandle: NODE_DRAG_HANDLE }));
+  return out;
+}
+
 /**
  * Cards inside stacks are left out: their stack draws them. A stack is a search miss only when none of its cards
  * match.
@@ -44,7 +54,9 @@ export function projectNodes(nodes: AppNode[], view: View): AppNode[] {
         .filter(Boolean)
         .join(' ') || undefined;
     const drawn = isStack(n) && n.data.layout ? pinnedOpen(n) : n;
-    const node = className ? { ...drawn, className, ...(fanned ? { zIndex: FANNED_Z } : {}) } : drawn;
+    const node = className
+      ? { ...drawn, className, dragHandle: NODE_DRAG_HANDLE, ...(fanned ? { zIndex: FANNED_Z } : {}) }
+      : handled(drawn);
     // Sections sit behind everything and only their header takes the pointer, so the canvas
     // underneath (marquee, double-click to add a node, panning) keeps working inside them.
     return node.type === 'section'

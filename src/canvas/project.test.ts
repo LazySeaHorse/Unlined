@@ -14,9 +14,9 @@ const view = (over: Partial<View> = {}): View => ({
 });
 
 describe('projectNodes', () => {
-  it('passes untouched nodes through as the same objects', () => {
+  it('passes untouched nodes through as the same objects from one projection to the next', () => {
     const nodes = [createNode('math', { x: 0, y: 0 })];
-    expect(projectNodes(nodes, view())[0]).toBe(nodes[0]);
+    expect(projectNodes(nodes, view())[0]).toBe(projectNodes(nodes, view())[0]);
   });
 
   it('dims search misses and keeps their marks', () => {
@@ -35,6 +35,11 @@ describe('projectNodes', () => {
       dragHandle: '.section-handle',
       style: { pointerEvents: 'none' },
     });
+  });
+
+  it('lets any other node be dragged by its tab only', () => {
+    const text = createNode('text', { x: 0, y: 0 });
+    expect(projectNodes([text], view())[0]).toMatchObject({ dragHandle: '.node-tab, .stack-bar' });
   });
 });
 
@@ -72,7 +77,7 @@ describe('stacks', () => {
       { width: 400, height: 300 },
     );
     const pinned = { ...tabbed, data: { ...tabbed.data, layout: 'row' as const } };
-    expect(projectNodes([a, b, tabbed], view())[0]).toBe(tabbed);
+    expect(projectNodes([a, b, tabbed], view())[0]).toMatchObject({ id: tabbed.id, width: 400, height: 300 });
     const [drawn] = projectNodes([a, b, pinned], view());
     expect([drawn.width, drawn.height]).toEqual([undefined, undefined]);
     expect(pinned.width).toBe(400);

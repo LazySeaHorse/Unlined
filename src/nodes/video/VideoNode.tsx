@@ -66,7 +66,6 @@ export function VideoNode({ id, data, selected, dragging }: NodeProps<NodeOf<'vi
       customTitle={data.title}
       tint={data.color}
       resize={{ minWidth: 240, minHeight: 160, onResizing: setResizing }}
-      steadyActions
       actions={
         kind && (
           <>
