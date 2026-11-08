@@ -18,6 +18,26 @@ test('right-clicking the empty canvas opens the canvas menu at the pointer', asy
   await expect(menu(page)).toHaveCount(0);
 });
 
+test('a submenu opens over its row on click, inside the window, and dims the level below', async ({
+  page,
+}) => {
+  await page.mouse.click(600, 860, { button: 'right' });
+  const row = page.getByRole('menuitem', { name: 'Add node' });
+  await row.hover();
+  await expect(page.getByRole('menu', { name: 'Add node' })).toHaveCount(0);
+
+  await row.click();
+  const panel = page.getByRole('menu', { name: 'Add node' });
+  await expect(panel).toBeVisible();
+  const box = await panel.boundingBox();
+  expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThanOrEqual(900);
+  await expect(page.locator('[data-covered]')).toHaveCount(1);
+
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
+  await expect(menu(page)).toBeVisible();
+});
+
 test('right-drag pans the canvas without opening a menu', async ({ page }) => {
   const before = await viewport(page);
   await page.mouse.move(600, 400);

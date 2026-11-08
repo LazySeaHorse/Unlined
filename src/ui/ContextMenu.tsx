@@ -1,6 +1,6 @@
 import { DropdownMenu } from 'radix-ui';
 import { useRef } from 'react';
-import { type MenuEntry, panelClass, renderEntries } from './Menu';
+import { MenuContent, type MenuEntry } from './Menu';
 
 interface ContextMenuProps {
   /** Where the menu opens, in screen coordinates; null keeps it closed. */
@@ -26,15 +26,16 @@ export function ContextMenu({ at, items, onClose }: ContextMenuProps) {
         />
       </DropdownMenu.Trigger>
       <DropdownMenu.Portal>
-        <DropdownMenu.Content
+        <MenuContent
+          // A new point is a new menu, with no submenus left open.
+          key={`${shown.at?.x},${shown.at?.y}`}
           align="start"
           // Focus stays wherever the action puts it (e.g. a title being renamed).
           onCloseAutoFocus={(event) => event.preventDefault()}
           collisionPadding={8}
-          className={panelClass}
-        >
-          {renderEntries(DropdownMenu, shown.items, onClose)}
-        </DropdownMenu.Content>
+          items={shown.items}
+          close={onClose}
+        />
       </DropdownMenu.Portal>
     </DropdownMenu.Root>
   );
