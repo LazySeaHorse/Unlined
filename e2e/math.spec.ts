@@ -444,3 +444,16 @@ test('Math+: math pasted in as several lines becomes several rows', async ({ pag
   });
   await expect(rows).toHaveCount(3);
 });
+
+test('text in a math field is set in the LaTeX text font, not the app font', async ({ page }) => {
+  await placeNode(page, 'Math');
+  const field = nodes(page).locator('math-field');
+  await field.evaluate((el: HTMLElement & { setValue: (v: string) => void }) =>
+    el.setValue('x\\text{ for all }y'),
+  );
+  const family = await field.evaluate((el) => {
+    const text = el.shadowRoot?.querySelector('.ML__text');
+    return text ? getComputedStyle(text).fontFamily : null;
+  });
+  expect(family).toContain('KaTeX_Main');
+});

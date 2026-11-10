@@ -415,7 +415,8 @@ math-field {
   --selection-background-color: color-mix(in srgb, var(--accent) 25%, transparent);
   --contains-highlight-background-color: var(--surface-2);
   --placeholder-color: var(--muted);
-  --text-font-family: inherit;
+  /* Text inside math is set in the LaTeX text font (as KaTeX draws \text), not the app font. */
+  --text-font-family: KaTeX_Main, "Times New Roman", serif;
   display: block;
   /* React Flow nodes are user-select:none, and MathLive then disables mouse caret placement and selection. */
   -webkit-user-select: text;
