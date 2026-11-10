@@ -457,3 +457,20 @@ test('text in a math field is set in the LaTeX text font, not the app font', asy
   });
   expect(family).toContain('KaTeX_Main');
 });
+
+test('a space typed in math mode, after text, stays in math mode and adds nothing', async ({ page }) => {
+  await placeNode(page, 'Math');
+  const field = nodes(page).locator('math-field');
+  await field.click();
+  await expect(field).toBeFocused();
+  const state = () =>
+    field.evaluate((el: HTMLElement & { mode: string; value: string }) => [el.mode, el.value]);
+  await page.keyboard.type('x');
+  await page.keyboard.press('Shift+Quote');
+  await page.keyboard.type('hi yo');
+  await page.keyboard.press('Shift+Quote');
+  await expect.poll(state).toEqual(['math', 'x\\text{hi yo}']);
+  await page.keyboard.press('Space');
+  await page.keyboard.type('z');
+  await expect.poll(state).toEqual(['math', 'x\\text{hi yo}z']);
+});

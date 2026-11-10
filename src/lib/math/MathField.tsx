@@ -143,6 +143,14 @@ export function MathField({
         node()?.focus();
         return;
       }
+      // Math ignores spaces, and so does MathLive, except next to text: there it turns a space typed in math mode
+      // into a text space and lets the key through again, so one press leaves two spaces and puts the caret back in
+      // text mode, right after `"` had left it. Text is entered with `"` only.
+      if (event.key === ' ' && field.mode === 'math' && !event.ctrlKey && !event.metaKey && !event.altKey) {
+        event.preventDefault();
+        event.stopPropagation();
+        return;
+      }
       if (multiline && event.key === 'Enter' && event.shiftKey) {
         event.preventDefault();
         event.stopPropagation();
